@@ -148,3 +148,9 @@ process.on('SIGINT', () => {
         process.exit(0);
     });
 });
+
+// server/server.js に追加
+app.use((err, req, res, next) => {
+    console.error('Server Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+});
