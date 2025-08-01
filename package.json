@@ -1,0 +1,32 @@
+{
+  "name": "pig-house-temple-game",
+  "version": "1.0.0",
+  "description": "恐怖の豚男 - 豚小屋に入らずんば子豚を得ず",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "realtime",
+    "socket.io",
+    "web-game",
+    "pig",
+    "temple",
+    "horror"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
