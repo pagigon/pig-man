@@ -551,3 +551,92 @@ function endRound(game, roomId, io) {
 }
 
 module.exports = { setupSocketHandlers };
+
+// server/socketHandlers.js に追加
+function setupSocketHandlers(io) {
+    io.on('connection', (socket) => {
+        console.log('新しい接続:', socket.id);
+
+        // エラーハンドリングを各イベントに追加
+        const safeEventHandler = (eventName, handler) => {
+            socket.on(eventName, async (data) => {
+                try {
+                    await handler(data);
+                } catch (error) {
+                    console.error(`Error in ${eventName}:`, error);
+                    socket.emit('error', { 
+                        message: 'サーバーエラーが発生しました',
+                        code: 'SERVER_ERROR',
+                        timestamp: Date.now()
+                    });
+                }
+            });
+        };
+
+        // バリデーション付きイベントハンドラー
+        const validateAndHandle = (eventName, validator, handler) => {
+            socket.on(eventName, (data) => {
+                try {
+                    // データバリデーション
+                    const validationResult = validator(data);
+                    if (!validationResult.isValid) {
+                        socket.emit('error', { 
+                            message: validationResult.message,
+                            code: 'VALIDATION_ERROR'
+                        });
+                        return;
+                    }
+                    
+                    handler(data);
+                } catch (error) {
+                    console.error(`Error in ${eventName}:`, error);
+                    socket.emit('error', { 
+                        message: 'リクエストの処理に失敗しました',
+                        code: 'PROCESSING_ERROR'
+                    });
+                }
+            });
+        };
+
+        // バリデーター例
+        const validators = {
+            createRoom: (data) => {
+                if (!data || typeof data.playerName !== 'string') {
+                    return { isValid: false, message: 'プレイヤー名が必要です' };
+                }
+                if (data.playerName.length > 20) {
+                    return { isValid: false, message: 'プレイヤー名は20文字以内にしてください' };
+                }
+                if (data.hasPassword && (!data.password || data.password.length < 4)) {
+                    return { isValid: false, message: 'パスワードは4文字以上にしてください' };
+                }
+                return { isValid: true };
+            },
+            
+            joinRoom: (data) => {
+                if (!data || !data.roomId || !data.playerName) {
+                    return { isValid: false, message: 'ルームIDとプレイヤー名が必要です' };
+                }
+                if (data.roomId.length !== 6) {
+                    return { isValid: false, message: '無効なルームIDです' };
+                }
+                return { isValid: true };
+            },
+            
+            sendChat: (data) => {
+                if (!data || typeof data !== 'string') {
+                    return { isValid: false, message: 'メッセージが必要です' };
+                }
+                if (data.length > 200) {
+                    return { isValid: false, message: 'メッセージは200文字以内にしてください' };
+                }
+                return { isValid: true };
+            }
+        };
+
+        // 使用例
+        validateAndHandle('createRoom', validators.createRoom, (data) => {
+            // ルーム作成処理
+        });
+    });
+}
