@@ -5,39 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>豚小屋探検隊 - 豚小屋に入らずんば子豚を得ず</title>
     
-    <!-- CSS読み込み -->
+    <!-- Socket.io CDN -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    
+    <!-- 外部CSS -->
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/enhanced.css">
 </head>
 <body>
     <div class="connection-status disconnected" id="connection-status">🔴 未接続</div>
-    <div class="player-name-display" id="player-name-display">👤 <span id="my-name"></span></div>
-    <div class="game-room-id" id="game-room-id">🏠 ルーム: <span id="game-room-id-text"></span></div>
-    
-    <!-- ローディングオーバーレイ -->
-    <div class="loading-overlay" id="loading-overlay">
-        <div class="spinner"></div>
-    </div>
-    
-    <!-- 確認モーダル -->
-    <div class="modal" id="confirm-modal">
-        <div class="modal-content">
-            <h3 id="confirm-title">確認</h3>
-            <p id="confirm-message">この操作を実行しますか？</p>
-            <div style="margin-top: 20px;">
-                <button id="confirm-yes" class="btn btn-success" style="width: auto; margin: 5px;">はい</button>
-                <button id="confirm-no" class="btn btn-danger" style="width: auto; margin: 5px;">いいえ</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- クイック参加ボタン -->
-    <button class="quick-join" id="quick-join" title="ランダムルームに参加">🎲</button>
-    
-    <!-- 進捗バー -->
-    <div class="progress-bar" id="progress-bar">
-        <div class="progress-fill" id="progress-fill"></div>
-    </div>
+    <div class="player-name-display" id="player-name-display" style="display: none;">👤 <span id="my-name"></span></div>
     
     <div class="container">
         <div class="header">
@@ -49,112 +25,247 @@
 
         <!-- ロビー画面 -->
         <div id="lobby" class="lobby">
-            <div class="control-section">
-                <h3>新しいルームを作成</h3>
-                <div class="input-group">
-                    <label for="player-name-create">プレイヤー名:</label>
-                    <input type="text" id="player-name-create" placeholder="名前を入力">
+            <div class="room-controls">
+                <div class="control-section">
+                    <h3>新しいルームを作成</h3>
+                    <div class="input-group">
+                        <label for="player-name-create">プレイヤー名:</label>
+                        <input type="text" id="player-name-create" placeholder="名前を入力">
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="use-password">
+                        <label for="use-password">パスワードを設定する</label>
+                    </div>
+                    <div class="input-group" id="password-group" style="display: none;">
+                        <label for="room-password">パスワード:</label>
+                        <input type="password" id="room-password" placeholder="パスワードを入力">
+                    </div>
+                    <button id="create-room" class="btn">ルームを作成</button>
                 </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="use-password">
-                    <label for="use-password" style="display: inline;">パスワードを設定する</label>
+                
+                <div class="control-section">
+                    <h3>ルームに参加</h3>
+                    <div class="input-group">
+                        <label for="player-name-join">プレイヤー名:</label>
+                        <input type="text" id="player-name-join" placeholder="名前を入力">
+                    </div>
+                    <div class="input-group">
+                        <label for="room-id-input">ルームID:</label>
+                        <input type="text" id="room-id-input" placeholder="ルームIDを入力">
+                    </div>
+                    <div class="input-group" id="join-password-group" style="display: none;">
+                        <label for="join-password">パスワード:</label>
+                        <input type="password" id="join-password" placeholder="パスワードを入力">
+                    </div>
+                    <button id="join-room" class="btn">ルームに参加</button>
                 </div>
-                <div class="input-group" id="password-group" style="display: none;">
-                    <label for="room-password">パスワード:</label>
-                    <input type="password" id="room-password" placeholder="パスワードを入力">
+
+                <div class="control-section">
+                    <h3>ゲーム中のルームに再入場</h3>
+                    <div class="input-group">
+                        <label for="rejoin-player-name">プレイヤー名:</label>
+                        <input type="text" id="rejoin-player-name" placeholder="元の名前を入力">
+                    </div>
+                    <div class="input-group">
+                        <label for="rejoin-room-id">ルームID:</label>
+                        <input type="text" id="rejoin-room-id" placeholder="ルームIDを入力">
+                    </div>
+                    <button id="rejoin-room" class="btn">ゲームに再入場</button>
                 </div>
-                <button id="create-room" class="btn">ルームを作成 (Ctrl+Enter)</button>
-            </div>
-            
-            <div class="control-section">
-                <h3>ルームに参加</h3>
-                <div class="input-group">
-                    <label for="player-name-join">プレイヤー名:</label>
-                    <input type="text" id="player-name-join" placeholder="名前を入力">
+
+                <div class="control-section">
+                    <h3>観戦モード</h3>
+                    <div class="input-group">
+                        <label for="spectator-name">観戦者名:</label>
+                        <input type="text" id="spectator-name" placeholder="名前を入力">
+                    </div>
+                    <div class="input-group">
+                        <label for="spectate-room-id">ルームID:</label>
+                        <input type="text" id="spectate-room-id" placeholder="ルームIDを入力">
+                    </div>
+                    <button id="spectate-room" class="btn">観戦する</button>
                 </div>
-                <div class="input-group">
-                    <label for="room-id-input">ルームID:</label>
-                    <input type="text" id="room-id-input" placeholder="ルームIDを入力">
-                </div>
-                <div class="input-group" id="join-password-group" style="display: none;">
-                    <label for="join-password">パスワード:</label>
-                    <input type="password" id="join-password" placeholder="パスワードを入力">
-                </div>
-                <button id="join-room" class="btn">ルームに参加</button>
             </div>
 
-            <div class="control-section">
-                <h3>ゲーム中のルームに再入場</h3>
-                <div class="input-group">
-                    <label for="rejoin-player-name">プレイヤー名:</label>
-                    <input type="text" id="rejoin-player-name" placeholder="元の名前を入力">
-                </div>
-                <div class="input-group">
-                    <label for="rejoin-room-id">ルームID:</label>
-                    <input type="text" id="rejoin-room-id" placeholder="ルームIDを入力">
-                </div>
-                <button id="rejoin-room" class="btn">ゲームに再入場</button>
+            <div class="room-list">
+                <h3>🏠 開設中のルーム</h3>
+                <button id="refresh-rooms" class="btn btn-small">更新</button>
+                <div id="room-list-container"></div>
             </div>
 
-            <div class="control-section">
-                <h3>観戦モード</h3>
-                <div class="input-group">
-                    <label for="spectator-name">観戦者名:</label>
-                    <input type="text" id="spectator-name" placeholder="名前を入力">
+            <div class="ongoing-games">
+                <h3>🎮 進行中のゲーム</h3>
+                <button id="refresh-ongoing" class="btn btn-small">更新</button>
+                <div id="ongoing-games-container"></div>
+            </div>
+
+            <div class="info-box">
+                <h3>🎮 ゲームルール</h3>
+                <div class="rule-toggle">
+                    <button id="toggle-rules" class="btn btn-small">ルールを表示</button>
+                    <ul id="game-rules" class="rules-list" style="display: none;">
+                        <li><strong>ストーリー</strong>：豚男という怪物が村の子供たちを誘拐し、豚の姿に変えてしまいました</li>
+                        <li><strong>探検家チーム</strong>：豚に変えられた子供をすべて救出することが目標</li>
+                        <li><strong>豚男チーム</strong>：罠をすべて発動させるか、4ラウンド終了まで子供たちを守る（隠す）ことが目標</li>
+                        <li>各プレイヤーには最初5枚のカードが配られます</li>
+                        <li>自分のカードの内訳は分かりますが、位置は分かりません</li>
+                        <li>鍵を持った人が、他のプレイヤーのカードを1枚選んで公開します</li>
+                        <li>選ばれた人が次に鍵を受け取ります</li>
+                        <li>各ラウンドでプレイヤー数分のカードを公開したら、カードを回収して再配布します</li>
+                    </ul>
                 </div>
-                <div class="input-group">
-                    <label for="spectate-room-id">ルームID:</label>
-                    <input type="text" id="spectate-room-id" placeholder="ルームIDを入力">
-                </div>
-                <button id="spectate-room" class="btn">観戦する</button>
             </div>
         </div>
 
         <!-- ルーム情報画面 -->
         <div id="room-info" class="room-info">
-            <div class="room-id-display">ルームID: <span id="room-id-display"></span></div>
+            <div class="room-id-display">
+                ルームID: <span id="room-id-display"></span>
+            </div>
             
             <div class="players-list">
                 <h3>参加プレイヤー (<span id="player-count">0</span>/10)</h3>
                 <div id="players-list"></div>
             </div>
             
-            <div>
-                <button id="start-game" class="btn btn-success" style="display: none;">ゲーム開始 (3人以上必要)</button>
-                <button id="leave-room" class="btn btn-danger">ルームを退出</button>
-                <button id="temp-leave-room" class="btn" style="display: none;">一時退出</button>
-                <button id="cancel-temp-leave" class="btn" style="display: none;">キャンセル</button>
+            <div class="room-buttons">
+                <button id="start-game" class="btn btn-primary" style="display: none;">ゲーム開始 (3人以上必要)</button>
+                <button id="leave-room" class="btn btn-secondary">ルームを退出</button>
             </div>
 
+            <!-- プレイ中退出機能 -->
             <div class="temp-leave-section" id="temp-leave-section" style="display: none;">
-                <h4>⚠️ ゲーム中の一時退出</h4>
-                <p>ゲーム中ですが、一時的に退出できます。</p>
+                <div class="temp-leave-info">
+                    <h4>⚠️ ゲーム中の一時退出</h4>
+                    <p>ゲーム中ですが、一時的に退出できます。</p>
+                    <p>プレイヤー名とルームIDを覚えておけば、後で再入場可能です。</p>
+                </div>
+                <div class="temp-leave-buttons">
+                    <button id="temp-leave-room" class="btn btn-secondary">一時退出</button>
+                    <button id="cancel-temp-leave" class="btn">キャンセル</button>
+                </div>
             </div>
         </div>
 
         <!-- ゲーム画面 -->
         <div id="game-board" class="game-board">
-            <div class="game-info">
-                <h3>ゲーム情報</h3>
-                <p>ラウンド: <span id="current-round">1</span>/4</p>
-                <p>財宝: <span id="treasure-found">0</span>/<span id="treasure-goal">7</span></p>
-                <p>罠: <span id="trap-triggered">0</span>/<span id="trap-goal">2</span></p>
-                <p>鍵保持者: <span id="key-holder-name">不明</span></p>
-                <p id="turn-message">待機中...</p>
+            <!-- 折りたたみ可能なゲーム概要 -->
+            <div class="collapsible-section">
+                <button class="section-toggle" onclick="toggleSection('game-overview')">
+                    <span>ゲーム情報</span> <span class="toggle-icon">▼</span>
+                </button>
+                <div id="game-overview" class="game-overview collapsed">
+                    <div class="overview-grid">
+                        <div class="role-possibility">
+                            <h4>役職構成</h4>
+                            <p id="role-possibility-text"></p>
+                        </div>
+                        <div class="card-distribution">
+                            <h4>カード内訳</h4>
+                            <p id="card-distribution-text"></p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            <!-- 進捗バー -->
+            <div class="progress-bars">
+                <div class="treasure-progress">
+                    <span>救出</span>
+                    <div id="treasure-icons" class="icon-row"></div>
+                </div>
+                <div class="trap-progress">
+                    <span>罠</span>
+                    <div id="trap-icons" class="icon-row"></div>
+                </div>
+            </div>
+
+            <!-- コンパクトなゲーム情報 -->
+            <div class="game-info mobile-compact">
+                <div class="info-row">
+                    <div class="info-item">
+                        <span class="label">R</span>
+                        <span class="value"><span id="current-round">1</span>/4</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">🐷</span>
+                        <span class="value"><span id="treasure-found">0</span>/<span id="treasure-goal">7</span></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">💀</span>
+                        <span class="value"><span id="trap-triggered">0</span>/<span id="trap-goal">2</span></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">配布</span>
+                        <span class="value" id="cards-per-player">5</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">公開</span>
+                        <span class="value"><span id="cards-flipped">0</span>枚</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 役職表示 -->
+            <div id="role-reveal" class="role-card compact">
+                <div class="role-header">
+                    <img id="role-image" class="role-image-small" src="" alt="">
+                    <div class="role-info">
+                        <div id="player-role"></div>
+                        <p id="role-description"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 鍵保持者情報 -->
+            <div id="key-holder-message" class="key-holder-message compact">
+                <div class="key-info">
+                    <img src="/images/key-icon.png" class="key-icon-small" alt="鍵">
+                    <span>鍵: <strong id="key-holder-name"></strong></span>
+                </div>
+                <p id="turn-message" class="turn-status"></p>
+            </div>
+
+            <!-- 自分のカード -->
             <div class="my-cards-section">
-                <h3>あなたのカード</h3>
-                <p>子豚 <span id="my-treasure">0</span> / 罠 <span id="my-trap">0</span> / 空き <span id="my-empty">0</span></p>
-                <div id="my-cards-grid" class="my-cards-grid"></div>
+                <div class="section-header">
+                    <h3>あなたのカード</h3>
+                    <p class="card-info">子豚 <span id="my-treasure">0</span> / 罠 <span id="my-trap">0</span> / 空き <span id="my-empty">0</span></p>
+                </div>
+                <div id="my-cards-grid" class="my-cards-grid mobile-optimized"></div>
             </div>
 
-            <div>
+            <!-- 他のプレイヤー -->
+            <div class="other-players-section">
                 <h3>他のプレイヤー</h3>
-                <div id="other-players-container" class="other-players-container"></div>
+                <div id="other-players-container"></div>
             </div>
 
-            <button id="game-leave-room" class="btn btn-danger">一時退出</button>
+            <!-- ゲーム中の退出ボタン -->
+            <div class="game-leave-section">
+                <button id="game-leave-room" class="btn btn-secondary btn-small">一時退出</button>
+            </div>
+
+            <!-- チャット -->
+            <div class="collapsible-section">
+                <button class="section-toggle" onclick="toggleSection('chat-section')">
+                    <span>チャット</span> <span class="toggle-icon">▼</span>
+                </button>
+                <div id="chat-section" class="collapsed">
+                    <div id="chat-container" class="chat-container mobile"></div>
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-input" placeholder="メッセージ..." maxlength="100">
+                        <button id="send-chat" class="btn btn-small">送信</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ラウンド開始演出 -->
+        <div id="round-start-overlay" class="round-start-overlay">
+            <div class="round-start-text">
+                <h1 id="round-start-message">ラウンド 1 スタート！</h1>
+            </div>
         </div>
 
         <!-- 勝利画面 -->
@@ -162,29 +273,33 @@
             <div class="victory-content">
                 <h2 id="victory-title"></h2>
                 <p id="victory-message"></p>
-                <div id="winners-list"></div>
-                <button id="return-to-lobby-victory" class="btn btn-success">ロビーに戻る</button>
+                <div id="winners-list" style="margin: 20px 0;"></div>
+                <button id="return-to-lobby" class="btn">ロビーに戻る</button>
             </div>
         </div>
     </div>
 
-    <!-- 必要な隠し要素 -->
-    <div id="treasure-icons" style="display: none;"></div>
-    <div id="trap-icons" style="display: none;"></div>
-    <div id="role-reveal" style="display: none;">
-        <div id="player-role"></div>
-        <p id="role-description"></p>
-        <img id="role-image" src="" alt="">
-    </div>
-
-    <!-- Socket.io CDN -->
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <!-- JavaScript統合版 -->
+    <script src="js/pig-man.js"></script>
     
-    <!-- JavaScript読み込み -->
-    <script src="js/utils.js"></script>
-    <script src="js/ui-manager.js"></script>
-    <script src="js/socket-client.js"></script>
-    <script src="js/game-main.js"></script>
-    <script src="js/app.js"></script>
+    <script>
+        // 折りたたみ機能
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const button = section.previousElementSibling;
+            const icon = button.querySelector('.toggle-icon');
+            
+            section.classList.toggle('collapsed');
+            icon.textContent = section.classList.contains('collapsed') ? '▼' : '▲';
+        }
+
+        // ルール表示切り替え
+        document.getElementById('toggle-rules').addEventListener('click', function() {
+            const rules = document.getElementById('game-rules');
+            const isHidden = rules.style.display === 'none';
+            rules.style.display = isHidden ? 'block' : 'none';
+            this.textContent = isHidden ? 'ルールを隠す' : 'ルールを表示';
+        });
+    </script>
 </body>
 </html>
