@@ -1,23 +1,26 @@
-window.addEventListener('error', (event) => {
-            this.logError('JavaScript Error', {
-                message: event.message,
-                filename: event.filename,
-                lineno: event.lineno,
-                colno: event.colno,
-                stack: event.error?.stack
-            });
+initializeErrorMonitoring() {
+    const self = this; // thisを保存
+    
+    window.addEventListener('error', (event) => {
+        self.logError('JavaScript Error', {  // selfを使用
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            stack: event.error?.stack
         });
+    });
 
-        window.addEventListener('unhandledrejection', (event) => {
-            this.logError('Unhandled Promise Rejection', {
-                reason: event.reason,
-                promise: event.promise
-            });
+    window.addEventListener('unhandledrejection', (event) => {
+        self.logError('Unhandled Promise Rejection', {  // selfを使用
+            reason: event.reason,
+            promise: event.promise
         });
+    });
 
-        this.socketErrorCount = 0;
-        this.lastSocketError = null;
-    }
+    this.socketErrorCount = 0;
+    this.lastSocketError = null;
+}
 
     logError(type, details) {
         const errorInfo = {
