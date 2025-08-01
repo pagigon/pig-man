@@ -3,9 +3,20 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+        origin: "*",  // 本番では具体的なドメインを指定推奨
+        methods: ["GET", "POST"],
+        allowedHeaders: ["*"],
+        credentials: false
+    },
+    // Render対応の設定
+    transports: ['polling', 'websocket'],
+    allowEIO3: true,
+    pingTimeout: 30000,
+    pingInterval: 30000,
+    // 接続タイムアウト
+    connectTimeout: 20000,
+    // アップグレード許可
+    allowUpgrades: true
 });
 const path = require('path');
 
