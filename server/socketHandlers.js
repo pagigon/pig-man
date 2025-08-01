@@ -1,4 +1,4 @@
-const GameManager = require('./gameManager');
+const GameManager = require('./gameManager.js');
 const {
     generateRoomId,
     assignRoles,
@@ -8,16 +8,20 @@ const {
 } = require('./gameLogic');
 
 function setupSocketHandlers(io) {
+    console.log('=== Socket.io ハンドラー設定開始 ===');
+    
     io.on('connection', (socket) => {
-        console.log('新しい接続:', socket.id);
+        console.log('🔗 新しい接続:', socket.id);
+        console.log('接続元:', socket.handshake.address);
 
         socket.emit('roomList', GameManager.getPublicRoomList());
 
         socket.on('getRoomList', () => {
+            console.log('📋 ルーム一覧要求:', socket.id);
             socket.emit('roomList', GameManager.getPublicRoomList());
         });
 
-        // 再入場処理を追加
+        // 再入場処理
         socket.on('rejoinRoom', (data) => {
             const { roomId, playerName } = data;
             console.log(`再入場試行: ${playerName} -> ${roomId}`);
@@ -34,21 +38,18 @@ function setupSocketHandlers(io) {
                 return;
             }
 
-            // プレイヤー情報を更新
             player.id = socket.id;
             player.connected = true;
             
             socket.join(roomId);
             socket.roomId = roomId;
 
-            // 再入場成功を通知
             socket.emit('rejoinSuccess', { 
                 roomId, 
                 gameData: game,
                 isHost: game.host === player.id || game.host === playerName
             });
 
-            // 他のプレイヤーに再入場を通知
             game.messages.push({
                 type: 'system',
                 text: `${playerName} がゲームに復帰しました`,
@@ -61,7 +62,7 @@ function setupSocketHandlers(io) {
             console.log(`${playerName} が ${roomId} に再入場しました`);
         });
 
-        // 一時退出処理を追加
+        // 一時退出処理
         socket.on('tempLeaveRoom', () => {
             const roomId = socket.roomId;
             if (!roomId) return;
@@ -71,7 +72,6 @@ function setupSocketHandlers(io) {
 
             const player = game.players.find(p => p.id === socket.id);
             if (player) {
-                // 一時退出状態にマーク
                 player.connected = false;
                 player.tempLeft = true;
                 
@@ -91,7 +91,7 @@ function setupSocketHandlers(io) {
             console.log(`プレイヤーが ${roomId} から一時退出しました`);
         });
 
-        // 観戦処理を追加
+        // 観戦処理
         socket.on('spectateRoom', (data) => {
             const { roomId, spectatorName } = data;
             console.log(`観戦試行: ${spectatorName} -> ${roomId}`);
@@ -102,18 +102,15 @@ function setupSocketHandlers(io) {
                 return;
             }
 
-            // 観戦者として参加
             socket.join(roomId);
             socket.roomId = roomId;
             socket.isSpectator = true;
 
-            // 観戦成功を通知
             socket.emit('spectateSuccess', { 
                 roomId, 
                 gameData: game
             });
 
-            // 他のプレイヤーに観戦者参加を通知
             game.messages.push({
                 type: 'system',
                 text: `${spectatorName} が観戦を開始しました`,
@@ -126,7 +123,7 @@ function setupSocketHandlers(io) {
             console.log(`${spectatorName} が ${roomId} を観戦開始`);
         });
 
-        // 再接続処理を追加
+        // 再接続処理
         socket.on('reconnectToRoom', (data) => {
             const { roomId, playerName } = data;
             console.log(`再接続試行: ${playerName} -> ${roomId}`);
@@ -143,21 +140,18 @@ function setupSocketHandlers(io) {
                 return;
             }
 
-            // プレイヤー情報を更新
             player.id = socket.id;
             player.connected = true;
             
             socket.join(roomId);
             socket.roomId = roomId;
 
-            // 再接続成功を通知
             socket.emit('reconnectSuccess', { 
                 roomId, 
                 gameData: game,
                 isHost: game.host === player.id || game.host === playerName
             });
 
-            // 他のプレイヤーに再接続を通知
             game.messages.push({
                 type: 'system',
                 text: `${playerName} が再接続しました`,
@@ -173,31 +167,52 @@ function setupSocketHandlers(io) {
         // クライアントエラー監視
         socket.on('clientError', (errorInfo) => {
             console.error('Client Error Report:', errorInfo);
-            // ここでエラーログサービスに送信可能
         });
 
+        // ルーム作成（修正版）
         socket.on('createRoom', (data) => {
-            const { playerName, hasPassword, password } = data;
-            const roomId = generateRoomId();
-            const game = GameManager.create(roomId, socket.id, playerName, hasPassword, password);
+            console.log('🏠 ルーム作成要求受信:', socket.id);
+            console.log('受信データ:', JSON.stringify(data, null, 2));
             
-            socket.join(roomId);
-            socket.roomId = roomId;
-            
-            // ローカルストレージ用の情報を保存
-            socket.emit('roomCreated', { 
-                roomId, 
-                gameData: game,
-                playerInfo: { roomId, playerName, isHost: true }
-            });
-            
-            io.emit('roomList', GameManager.getPublicRoomList());
-            
-            console.log(`ルーム ${roomId} が作成されました`);
+            try {
+                const { playerName, hasPassword, password } = data;
+                console.log('パース後:', { playerName, hasPassword, password });
+                
+                const roomId = generateRoomId();
+                console.log('生成されたルームID:', roomId);
+                
+                const game = GameManager.create(roomId, socket.id, playerName, hasPassword, password);
+                console.log('GameManager.create完了:', game ? 'success' : 'failed');
+                
+                socket.join(roomId);
+                socket.roomId = roomId;
+                console.log('ソケットルーム参加完了:', roomId);
+                
+                const responseData = {
+                    roomId, 
+                    gameData: game,
+                    playerInfo: { roomId, playerName, isHost: true }
+                };
+                
+                socket.emit('roomCreated', responseData);
+                console.log('✅ roomCreated イベント送信完了');
+                
+                io.emit('roomList', GameManager.getPublicRoomList());
+                console.log('📋 ルーム一覧更新送信完了');
+                
+                console.log(`🎉 ルーム ${roomId} が作成されました`);
+                
+            } catch (error) {
+                console.error('❌ ルーム作成エラー:', error);
+                console.error('エラースタック:', error.stack);
+                socket.emit('error', { message: 'ルーム作成に失敗しました: ' + error.message });
+            }
         });
 
         socket.on('joinRoom', (data) => {
             const { roomId, playerName, password } = data;
+            console.log(`👥 ルーム参加要求: ${playerName} -> ${roomId}`);
+            
             const game = GameManager.get(roomId);
 
             if (!game) {
@@ -227,7 +242,6 @@ function setupSocketHandlers(io) {
             socket.join(roomId);
             socket.roomId = roomId;
 
-            // 参加成功を通知（再接続情報付き）
             socket.emit('joinSuccess', {
                 roomId,
                 gameData: game,
@@ -356,7 +370,6 @@ function setupSocketHandlers(io) {
             const revealedCard = targetPlayer.hand[cardIndex];
             revealedCard.revealed = true;
 
-            // バイブレーション用にカード情報を追加
             game.lastRevealedCard = { type: revealedCard.type };
 
             let message = `${targetPlayer.name} の`;
@@ -417,10 +430,8 @@ function setupSocketHandlers(io) {
             if (game) {
                 const player = game.players.find(p => p.id === socket.id);
                 if (player) {
-                    // 完全に削除するのではなく、切断状態にマーク
                     player.connected = false;
                     
-                    // 一時退出でない場合のメッセージ
                     if (!player.tempLeft) {
                         game.messages.push({
                             type: 'system',
@@ -434,8 +445,7 @@ function setupSocketHandlers(io) {
                 }
             }
 
-            // 5分後に完全にプレイヤーを削除（一時退出の場合は30分後）
-            const timeoutDuration = player?.tempLeft ? 30 * 60 * 1000 : 5 * 60 * 1000;
+            const timeoutDuration = 5 * 60 * 1000; // 5分
             setTimeout(() => {
                 const gameAfterTimeout = GameManager.get(roomId);
                 if (gameAfterTimeout) {
@@ -459,7 +469,6 @@ function setupSocketHandlers(io) {
             const roomId = socket.roomId;
             if (!roomId) return;
             
-            // 観戦者の場合
             if (socket.isSpectator) {
                 socket.leave(roomId);
                 socket.roomId = null;
@@ -551,92 +560,3 @@ function endRound(game, roomId, io) {
 }
 
 module.exports = { setupSocketHandlers };
-
-// server/socketHandlers.js に追加
-function setupSocketHandlers(io) {
-    io.on('connection', (socket) => {
-        console.log('新しい接続:', socket.id);
-
-        // エラーハンドリングを各イベントに追加
-        const safeEventHandler = (eventName, handler) => {
-            socket.on(eventName, async (data) => {
-                try {
-                    await handler(data);
-                } catch (error) {
-                    console.error(`Error in ${eventName}:`, error);
-                    socket.emit('error', { 
-                        message: 'サーバーエラーが発生しました',
-                        code: 'SERVER_ERROR',
-                        timestamp: Date.now()
-                    });
-                }
-            });
-        };
-
-        // バリデーション付きイベントハンドラー
-        const validateAndHandle = (eventName, validator, handler) => {
-            socket.on(eventName, (data) => {
-                try {
-                    // データバリデーション
-                    const validationResult = validator(data);
-                    if (!validationResult.isValid) {
-                        socket.emit('error', { 
-                            message: validationResult.message,
-                            code: 'VALIDATION_ERROR'
-                        });
-                        return;
-                    }
-                    
-                    handler(data);
-                } catch (error) {
-                    console.error(`Error in ${eventName}:`, error);
-                    socket.emit('error', { 
-                        message: 'リクエストの処理に失敗しました',
-                        code: 'PROCESSING_ERROR'
-                    });
-                }
-            });
-        };
-
-        // バリデーター例
-        const validators = {
-            createRoom: (data) => {
-                if (!data || typeof data.playerName !== 'string') {
-                    return { isValid: false, message: 'プレイヤー名が必要です' };
-                }
-                if (data.playerName.length > 20) {
-                    return { isValid: false, message: 'プレイヤー名は20文字以内にしてください' };
-                }
-                if (data.hasPassword && (!data.password || data.password.length < 4)) {
-                    return { isValid: false, message: 'パスワードは4文字以上にしてください' };
-                }
-                return { isValid: true };
-            },
-            
-            joinRoom: (data) => {
-                if (!data || !data.roomId || !data.playerName) {
-                    return { isValid: false, message: 'ルームIDとプレイヤー名が必要です' };
-                }
-                if (data.roomId.length !== 6) {
-                    return { isValid: false, message: '無効なルームIDです' };
-                }
-                return { isValid: true };
-            },
-            
-            sendChat: (data) => {
-                if (!data || typeof data !== 'string') {
-                    return { isValid: false, message: 'メッセージが必要です' };
-                }
-                if (data.length > 200) {
-                    return { isValid: false, message: 'メッセージは200文字以内にしてください' };
-                }
-                return { isValid: true };
-            }
-        };
-
-        // 使用例
-        validateAndHandle('createRoom', validators.createRoom, (data) => {
-            // ルーム作成処理
-        });
-    });
-}
