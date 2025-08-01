@@ -624,65 +624,92 @@ class PigManGame {
     }
 
     // サーバーからのイベント処理
-    onRoomCreated(data) {
-        console.log('✅ ルーム作成成功コールバック (Render版):', data);
-        
-        this.roomId = data.roomId;
-        this.gameData = data.gameData;
-        this.isHost = true;
+// onRoomCreated の修正版
+onRoomCreated(data) {
+    console.log('✅ ルーム作成成功コールバック:', data);
+    
+    this.roomId = data.roomId;
+    this.gameData = data.gameData;
+    this.isHost = true;
 
-        UIManager.showError(`ルーム ${data.roomId} を作成しました！`, 'success');
-        this.showRoomInfo();
+    UIManager.showError(`ルーム ${data.roomId} を作成しました！`, 'success');
+    this.showRoomInfo();
+    
+    // ★重要：UI更新を追加
+    this.updateUI();
+}
+
+// onJoinSuccess の修正版
+onJoinSuccess(data) {
+    console.log('✅ ルーム参加成功コールバック:', data);
+    
+    this.roomId = data.roomId;
+    this.gameData = data.gameData;
+    this.isHost = data.playerInfo?.isHost || false;
+
+    UIManager.showError(`ルーム ${data.roomId} に参加しました！`, 'success');
+    
+    // ★重要：UI更新を追加
+    this.updateUI();
+}
+
+// updateUI の修正版
+updateUI() {
+    console.log('🎨 UI更新');
+    if (!this.gameData) {
+        console.warn('⚠️ ゲームデータが存在しません');
+        return;
     }
 
-    onJoinSuccess(data) {
-        console.log('✅ ルーム参加成功コールバック (Render版):', data);
-        
-        this.roomId = data.roomId;
-        this.gameData = data.gameData;
-        this.isHost = data.playerInfo?.isHost || false;
-
-        UIManager.showError(`ルーム ${data.roomId} に参加しました！`, 'success');
-        this.updateUI();
-    }
-
-    showRoomInfo() {
-        console.log('🏠 ルーム情報画面表示 (Render版)');
-        UIManager.showScreen('room-info');
-        const roomIdDisplay = safeGetElement('room-id-display');
-        if (roomIdDisplay && this.roomId) {
-            roomIdDisplay.textContent = this.roomId;
-        }
-    }
-
-    updateUI() {
-        console.log('🎨 UI更新 (Render版)');
-        if (!this.gameData) {
-            console.warn('⚠️ ゲームデータが存在しません');
-            return;
-        }
-
+    // ★重要：プレイヤー一覧を常に更新
+    if (this.gameData.players) {
         UIManager.updatePlayersList(this.gameData.players, this.gameData.host);
-
-        if (this.gameData.gameState === 'waiting') {
-            this.updateLobbyUI();
-        }
-        // 他の状態は後で実装
     }
 
-    updateLobbyUI() {
-        console.log('🏠 ロビーUI更新 (Render版)');
-        UIManager.showScreen('room-info');
-        
-        const startButton = safeGetElement('start-game');
-        const count = this.gameData.players.filter(p => p.connected).length;
-        
-        if (this.isHost && count >= 3 && startButton) {
-            startButton.style.display = 'block';
-        } else if (startButton) {
-            startButton.style.display = 'none';
-        }
+    if (this.gameData.gameState === 'waiting') {
+        this.updateLobbyUI();
+    } else if (this.gameData.gameState === 'playing') {
+        this.updateGameUI();
+    } else if (this.gameData.gameState === 'finished') {
+        UIManager.showVictoryScreen(this.gameData);
     }
+}
+
+// updateLobbyUI の修正版
+updateLobbyUI() {
+    console.log('🏠 ロビーUI更新');
+    UIManager.showScreen('room-info');
+    
+    // ★重要：プレイヤー一覧を再更新
+    if (this.gameData.players) {
+        UIManager.updatePlayersList(this.gameData.players, this.gameData.host);
+    }
+    
+    const startButton = safeGetElement('start-game');
+    const count = this.gameData.players ? this.gameData.players.filter(p => p.connected).length : 0;
+    
+    if (this.isHost && count >= 3 && startButton) {
+        startButton.style.display = 'block';
+    } else if (startButton) {
+        startButton.style.display = 'none';
+    }
+}
+
+// showRoomInfo の修正版
+showRoomInfo() {
+    console.log('🏠 ルーム情報画面表示');
+    UIManager.showScreen('room-info');
+    
+    const roomIdDisplay = safeGetElement('room-id-display');
+    if (roomIdDisplay && this.roomId) {
+        roomIdDisplay.textContent = this.roomId;
+    }
+    
+    // ★重要：プレイヤー一覧も更新
+    if (this.gameData && this.gameData.players) {
+        UIManager.updatePlayersList(this.gameData.players, this.gameData.host);
+    }
+}
 }
 
 // グローバルに公開
