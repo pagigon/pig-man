@@ -624,7 +624,7 @@ class PigManGame {
     }
 
     // サーバーからのイベント処理
-// onRoomCreated の修正版
+    // onRoomCreated の修正版
 onRoomCreated(data) {
     console.log('✅ ルーム作成成功コールバック:', data);
     
@@ -709,7 +709,6 @@ showRoomInfo() {
     if (this.gameData && this.gameData.players) {
         UIManager.updatePlayersList(this.gameData.players, this.gameData.host);
     }
-}
 }
 
 // グローバルに公開
