@@ -287,3 +287,4 @@ export class SocketClient {
             }, 1000);
         }
     }
+}
