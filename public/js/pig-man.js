@@ -751,26 +751,230 @@ class SocketClient {
 }
 
 // メインゲームクラス
+// PigManGameクラスの修正部分
+
 class PigManGame {
     constructor() {
-        console.log('🐷 PigManGame 初期化開始');
+        // ... 既存のコード ...
         
-        this.socket = null;
-        this.roomId = null;
-        this.gameData = null;
-        this.isHost = false;
-        this.mySocketId = null;
-        this.myName = null;
-        this.isSpectator = false;
-        
-        this.socketClient = new SocketClient(this);
-        this.initializeEventListeners();
-        this.initializeErrorMonitoring();
-        
-        this.attemptReconnection();
-        
-        console.log('✅ PigManGame 初期化完了');
+        // 送信状態管理を追加
+        this.isJoining = false;
+        this.isCreating = false;
+        this.lastJoinAttempt = 0;
+        this.joinCooldown = 3000; // 3秒のクールダウン
     }
+
+    // 重複防止付きルーム作成
+    createRoom() {
+        console.log('🏠 ルーム作成処理開始');
+        
+        // 重複作成防止
+        if (this.isCreating) {
+            console.warn('⚠️ ルーム作成中のため処理をスキップ');
+            UIManager.showError('ルーム作成中です。しばらくお待ちください。', 'warning');
+            return;
+        }
+        
+        if (!this.socketClient.isConnected()) {
+            console.error('❌ ルーム作成失敗: Socket未接続');
+            UIManager.showError('サーバーに接続されていません。再接続ボタンを押してください。');
+            return;
+        }
+
+        const nameInput = safeGetElement('player-name-create');
+        const passwordCheck = safeGetElement('use-password');
+        const passwordInput = safeGetElement('room-password');
+
+        if (!nameInput) {
+            console.error('❌ プレイヤー名入力欄が見つかりません');
+            UIManager.showError('プレイヤー名入力欄が見つかりません');
+            return;
+        }
+
+        const playerName = nameInput.value.trim() || `プレイヤー${Math.floor(Math.random() * 1000)}`;
+        const hasPassword = passwordCheck ? passwordCheck.checked : false;
+        const password = hasPassword && passwordInput ? passwordInput.value : '';
+
+        console.log('ルーム作成パラメータ:', {
+            playerName,
+            hasPassword,
+            passwordLength: password.length
+        });
+
+        this.myName = playerName;
+        UIManager.showPlayerName(this.myName);
+
+        // 作成中フラグを設定
+        this.isCreating = true;
+        
+        const success = this.socketClient.createRoom(playerName, hasPassword, password);
+        
+        if (success) {
+            UIManager.showError('ルームを作成中...', 'warning');
+            
+            // タイムアウト処理
+            setTimeout(() => {
+                if (this.isCreating && !this.roomId) {
+                    console.warn('⚠️ ルーム作成がタイムアウトしました');
+                    this.isCreating = false;
+                    UIManager.showError('ルーム作成に時間がかかっています。もう一度お試しください。', 'warning');
+                }
+            }, 15000);
+        } else {
+            this.isCreating = false;
+        }
+    }
+
+    // 重複防止付きルーム参加
+    joinRoom() {
+        console.log('👥 ルーム参加処理開始');
+        
+        const now = Date.now();
+        
+        // クールダウンチェック
+        if (now - this.lastJoinAttempt < this.joinCooldown) {
+            const remaining = Math.ceil((this.joinCooldown - (now - this.lastJoinAttempt)) / 1000);
+            console.warn(`⚠️ クールダウン中: あと${remaining}秒`);
+            UIManager.showError(`${remaining}秒後に再試行してください`, 'warning');
+            return;
+        }
+        
+        // 重複参加防止
+        if (this.isJoining) {
+            console.warn('⚠️ ルーム参加中のため処理をスキップ');
+            UIManager.showError('ルーム参加中です。しばらくお待ちください。', 'warning');
+            return;
+        }
+        
+        if (!this.socketClient.isConnected()) {
+            console.error('❌ ルーム参加失敗: Socket未接続');
+            UIManager.showError('サーバーに接続されていません');
+            return;
+        }
+
+        const nameInput = safeGetElement('player-name-join');
+        const roomInput = safeGetElement('room-id-input');
+        const passwordInput = safeGetElement('join-password');
+
+        if (!nameInput || !roomInput) {
+            console.error('❌ 必要な入力欄が見つかりません');
+            UIManager.showError('入力欄が見つかりません');
+            return;
+        }
+
+        const playerName = nameInput.value.trim() || `プレイヤー${Math.floor(Math.random() * 1000)}`;
+        const roomId = roomInput.value.trim().toUpperCase();
+        const password = passwordInput ? passwordInput.value : '';
+
+        if (!roomId) {
+            UIManager.showError('ルームIDを入力してください');
+            return;
+        }
+
+        console.log('ルーム参加パラメータ:', { playerName, roomId });
+
+        this.myName = playerName;
+        this.roomId = roomId;
+        UIManager.showPlayerName(this.myName);
+
+        // 参加中フラグを設定
+        this.isJoining = true;
+        this.lastJoinAttempt = now;
+        
+        const success = this.socketClient.joinRoom(roomId, playerName, password);
+        
+        if (success) {
+            UIManager.showError('ルームに参加中...', 'warning');
+            
+            // タイムアウト処理
+            setTimeout(() => {
+                if (this.isJoining && (!this.gameData || this.gameData.id !== roomId)) {
+                    console.warn('⚠️ ルーム参加がタイムアウトしました');
+                    this.isJoining = false;
+                    UIManager.showError('ルーム参加に時間がかかっています。もう一度お試しください。', 'warning');
+                }
+            }, 10000);
+        } else {
+            this.isJoining = false;
+        }
+    }
+
+    // サーバーからのイベント処理（修正版）
+    onRoomCreated(data) {
+        console.log('✅ ルーム作成成功コールバック:', data);
+        
+        // 作成中フラグをリセット
+        this.isCreating = false;
+        
+        this.roomId = data.roomId;
+        this.gameData = data.gameData;
+        this.isHost = true;
+        
+        this.savePlayerInfo(data.playerInfo);
+
+        UIManager.showError(`ルーム ${data.roomId} を作成しました！`, 'success');
+        this.showRoomInfo();
+        this.updateUI();
+    }
+
+    onJoinSuccess(data) {
+        console.log('✅ ルーム参加成功コールバック:', data);
+        
+        // 参加中フラグをリセット
+        this.isJoining = false;
+        
+        this.roomId = data.roomId;
+        this.gameData = data.gameData;
+        this.isHost = data.playerInfo?.isHost || false;
+        
+        this.savePlayerInfo(data.playerInfo);
+
+        UIManager.showError(`ルーム ${data.roomId} に参加しました！`, 'success');
+        this.updateUI();
+    }
+
+    // エラー時の処理も追加
+    onError(error) {
+        console.error('❌ サーバーエラー:', error);
+        
+        // フラグをリセット
+        this.isJoining = false;
+        this.isCreating = false;
+        
+        UIManager.showError(error.message || 'エラーが発生しました');
+    }
+
+    // ボタンの無効化/有効化
+    updateButtonStates() {
+        const createBtn = safeGetElement('create-room');
+        const joinBtn = safeGetElement('join-room');
+        
+        if (createBtn) {
+            createBtn.disabled = this.isCreating;
+            createBtn.textContent = this.isCreating ? '作成中...' : 'ルームを作成';
+        }
+        
+        if (joinBtn) {
+            joinBtn.disabled = this.isJoining;
+            joinBtn.textContent = this.isJoining ? '参加中...' : 'ルームに参加';
+        }
+    }
+}
+
+// SocketClientクラスの修正部分
+class SocketClient {
+    setupEventListeners() {
+        // ... 既存のコード ...
+
+        // エラーイベントを修正
+        this.socket.on('error', (error) => {
+            console.error('❌ サーバーエラー:', error);
+            this.game.onError(error);
+        });
+
+        // ... 他の既存のコード ...
+    }
+}
 
     initializeErrorMonitoring() {
         const self = this; // thisを保存
