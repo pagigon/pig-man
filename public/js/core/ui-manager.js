@@ -152,7 +152,10 @@ export class UIManager {
 
     static updateOngoingGames(games) {
         const container = this.safeGetElement('ongoing-games-container');
-        if (!container) return;
+    if (!container) {
+        console.warn('room-list-container not found');
+        return;
+    }
         
         container.innerHTML = '';
 
