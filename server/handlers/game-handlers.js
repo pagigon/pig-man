@@ -142,7 +142,7 @@ function startGameLogic(gameData, playerCount) {
     console.log('🎮 ゲーム開始ロジック実行:', { playerCount });
     
     try {
-        const { assignRoles, generateAllCards, distributeCards, calculateVictoryGoal } = require('../game/game-logic');
+        const { assignRoles, generateAllCards, distributeCards, calculateVictoryGoal } = require('../game/game-Logic');
         
         // 役職割り当て
         const roles = assignRoles(playerCount);
