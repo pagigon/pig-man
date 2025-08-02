@@ -1,5 +1,5 @@
 // ルーム関連のSocket.ioイベントハンドラー
-const { generateRoomId } = require('../game/game-logic');
+const { generateRoomId } = require('../game/game-Logic');
 const { validatePlayerName, validateRoomId } = require('../utils/validation');
 const { checkRateLimit } = require('../utils/rate-limiter');
 
