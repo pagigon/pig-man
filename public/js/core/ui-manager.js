@@ -151,53 +151,58 @@ export class UIManager {
     }
 
     static updateOngoingGames(games) {
+        console.log('updateOngoingGames called with:', games);
         const container = this.safeGetElement('ongoing-games-container');
-    if (!container) {
-        console.warn('room-list-container not found');
-        return;
-    }
+        if (!container) {
+            console.warn('ongoing-games-container element not found');
+            return;
+        }
         
         container.innerHTML = '';
 
-        if (games.length === 0) {
+        if (!games || games.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: #32CD32;">現在進行中のゲームはありません</p>';
             return;
         }
 
         games.forEach(game => {
-            const gameDiv = document.createElement('div');
-            gameDiv.className = 'ongoing-game-item';
-            
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'ongoing-game-info';
-            infoDiv.innerHTML = `
-                <strong>ID: ${game.id}</strong>
-                <br>
-                ラウンド: ${game.currentRound}/4 | プレイヤー: ${game.playerCount}/10
-                <br>
-                救出: ${game.treasureFound}/${game.treasureGoal} | 罠: ${game.trapTriggered}/${game.trapGoal}
-            `;
-            
-            const spectateBtn = document.createElement('button');
-            spectateBtn.className = 'btn btn-small';
-            spectateBtn.textContent = '観戦する';
-            spectateBtn.onclick = () => {
-                const spectateRoomInput = this.safeGetElement('spectate-room-id');
-                const spectatorNameInput = this.safeGetElement('spectator-name');
+            try {
+                const gameDiv = document.createElement('div');
+                gameDiv.className = 'ongoing-game-item';
                 
-                if (spectateRoomInput) spectateRoomInput.value = game.id;
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'ongoing-game-info';
+                infoDiv.innerHTML = `
+                    <strong>ID: ${game.id || 'N/A'}</strong>
+                    <br>
+                    ラウンド: ${game.currentRound || 1}/4 | プレイヤー: ${game.playerCount || 0}/10
+                    <br>
+                    救出: ${game.treasureFound || 0}/${game.treasureGoal || 7} | 罠: ${game.trapTriggered || 0}/${game.trapGoal || 2}
+                `;
                 
-                const spectatorName = `観戦者${Math.floor(Math.random() * 1000)}`;
-                if (spectatorNameInput) spectatorNameInput.value = spectatorName;
+                const spectateBtn = document.createElement('button');
+                spectateBtn.className = 'btn btn-small';
+                spectateBtn.textContent = '観戦する';
+                spectateBtn.onclick = () => {
+                    const spectateRoomInput = this.safeGetElement('spectate-room-id');
+                    const spectatorNameInput = this.safeGetElement('spectator-name');
+                    
+                    if (spectateRoomInput) spectateRoomInput.value = game.id || '';
+                    
+                    const spectatorName = `観戦者${Math.floor(Math.random() * 1000)}`;
+                    if (spectatorNameInput) spectatorNameInput.value = spectatorName;
+                    
+                    if (window.pigGame) {
+                        window.pigGame.spectateRoom();
+                    }
+                };
                 
-                if (window.pigGame) {
-                    window.pigGame.spectateRoom();
-                }
-            };
-            
-            gameDiv.appendChild(infoDiv);
-            gameDiv.appendChild(spectateBtn);
-            container.appendChild(gameDiv);
+                gameDiv.appendChild(infoDiv);
+                gameDiv.appendChild(spectateBtn);
+                container.appendChild(gameDiv);
+            } catch (error) {
+                console.error('Error creating ongoing game item:', error, game);
+            }
         });
     }
 
