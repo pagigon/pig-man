@@ -19,8 +19,9 @@ const io = require('socket.io')(http, {
     allowUpgrades: true
 });
 const path = require('path');
+const fs = require('fs');
 
-// エラーハンドリングを追加
+// エラーハンドリング
 process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
     process.exit(1);
@@ -35,7 +36,6 @@ const publicPath = path.join(__dirname, '../public');
 console.log('Static files path:', publicPath);
 
 // 静的ファイルの存在確認
-const fs = require('fs');
 if (!fs.existsSync(publicPath)) {
     console.error('Public directory does not exist:', publicPath);
     process.exit(1);
@@ -95,11 +95,15 @@ app.get('/', (req, res) => {
     }
 });
 
-// Socket.ioハンドラーの設定
+// Socket.ioハンドラーの設定（分割版）
 try {
-    const { setupSocketHandlers } = require('./socketHandlers');
-    setupSocketHandlers(io);
-    console.log('Socket handlers initialized');
+    const { setupConnectionHandlers } = require('./handlers/connection-handlers');
+    const { setupRateLimitCleanup } = require('./utils/rate-limiter');
+    
+    const socketRequestHistory = setupConnectionHandlers(io);
+    setupRateLimitCleanup(socketRequestHistory);
+    
+    console.log('Socket handlers initialized (分割版)');
 } catch (error) {
     console.error('Error initializing socket handlers:', error);
     // Socket.ioなしでも起動できるようにする
@@ -128,7 +132,7 @@ const PORT = process.env.PORT || 3000;
 
 // サーバー起動
 const server = http.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ サーバーがポート ${PORT} で起動しました`);
+    console.log(`✅ サーバーがポート ${PORT} で起動しました (分割版)`);
     console.log(`📁 Public files served from: ${publicPath}`);
     console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`💾 Memory usage:`, process.memoryUsage());
@@ -160,8 +164,4 @@ process.on('SIGINT', () => {
     });
 });
 
-// server/server.js に追加
-app.use((err, req, res, next) => {
-    console.error('Server Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-});
+module.exports = { app, server, io };
