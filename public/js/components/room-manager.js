@@ -290,6 +290,10 @@ export class RoomManager {
     // 再接続の試行
     attemptReconnection() {
         try {
+            // 一時的に再接続を無効化してテスト
+            console.log('再接続処理をスキップ（デバッグ用）');
+            return;
+            
             const rejoinInfo = StorageManager.getRejoinInfo();
             if (rejoinInfo) {
                 console.log('保存された再入場情報:', rejoinInfo);
