@@ -1,21 +1,14 @@
-window.addEventListener('error', (event) => {
-            this.logError('JavaScript Error', {
-                message: event.message,
-                filename: event.filename,
-                lineno: event.lineno,
-                colno: event.colno,
-                stack: event.error?.stack
-            });
-        });
-        window.addEventListener('unhandledrejection', (event) => {
-            this.logError('Unhandled Promise Rejection', {
+window.addEventListener('unhandledrejection', (event) => {
+            self.logError('Unhandled Promise Rejection', {
                 reason: event.reason,
                 promise: event.promise
             });
         });
+
         this.socketErrorCount = 0;
         this.lastSocketError = null;
     }
+
     logError(type, details) {
         const errorInfo = {
             type,
@@ -742,303 +735,6 @@ window.addEventListener('error', (event) => {
                     emoji.style.fontSize = '2.5em';
                     emoji.style.textAlign = 'center';
                     emoji.style.lineHeight = '1';
-                    div.appendChild(emoji);
-                };
-                
-                div.appendChild(img);
-                
-                switch (card.type) {
-                    case 'treasure':
-                        treasureCount++;
-                        break;
-                    case 'trap':
-                        trapCount++;
-                        break;
-                    case 'empty':
-                        emptyCount++;
-                        break;
-                }
-            }
-            
-            container.appendChild(div);
-        });
-
-        safeSetText('my-treasure', treasureCount);
-        safeSetText('my-trap', trapCount);
-        safeSetText('my-empty', emptyCount);
-    }
-
-    renderOtherPlayers(isMyTurn) {
-        const container = safeGetElement('other-players-container');
-        if (!container) return;
-        
-        container.innerHTML = '';
-
-        this.gameData.players.forEach((player) => {
-            if (player.id === this.mySocketId) return;
-
-            const playerBox = document.createElement('div');
-            playerBox.className = 'other-player-box';
-            if (player.id === this.gameData.keyHolderId) {
-                playerBox.classList.add('has-key');
-            }
-
-            const header = document.createElement('h4');
-            header.textContent = player.name;
-            
-            if (!player.connected) {
-                header.textContent += ' (切断中)';
-                header.style.color = '#888';
-            }
-            
-            if (player.id === this.gameData.keyHolderId) {
-                const keyImg = document.createElement('img');
-                keyImg.src = '/images/key-icon.png';
-                keyImg.className = 'key-icon-small';
-                keyImg.alt = '鍵';
-                
-                keyImg.onerror = () => {
-                    keyImg.style.display = 'none';
-                    const emoji = document.createElement('span');
-                    emoji.textContent = '🗝️';
-                    emoji.style.fontSize = '20px';
-                    emoji.style.marginLeft = '8px';
-                    header.appendChild(emoji);
-                };
-                
-                header.appendChild(keyImg);
-            }
-            playerBox.appendChild(header);
-
-            const cardsGrid = document.createElement('div');
-            cardsGrid.className = 'other-player-cards';
-
-            if (player.hand) {
-                player.hand.forEach((card, index) => {
-                    const cardDiv = document.createElement('div');
-                    cardDiv.className = 'other-card';
-                    
-                    if (card.revealed) {
-                        cardDiv.classList.add('revealed', card.type);
-                        const img = document.createElement('img');
-                        img.className = 'other-card-image';
-                        img.src = `/images/card-${card.type}-medium.png`;
-                        img.alt = card.type;
-                        
-                        img.onerror = () => {
-                            img.style.display = 'none';
-                            const emoji = document.createElement('div');
-                            emoji.style.fontSize = '1.5em';
-                            emoji.style.textAlign = 'center';
-                            emoji.style.lineHeight = '1';
-                            switch (card.type) {
-                                case 'treasure':
-                                    emoji.textContent = '🐷';
-                                    break;
-                                case 'trap':
-                                    emoji.textContent = '💀';
-                                    break;
-                                case 'empty':
-                                    emoji.textContent = '🏠';
-                                    break;
-                            }
-                            cardDiv.appendChild(emoji);
-                        };
-                        
-                        cardDiv.appendChild(img);
-                    } else {
-                        const img = document.createElement('img');
-                        img.className = 'other-card-image';
-                        img.src = '/images/card-back-medium.png';
-                        img.alt = 'カード裏面';
-                        
-                        img.onerror = () => {
-                            img.style.display = 'none';
-                            const emoji = document.createElement('div');
-                            emoji.textContent = '❓';
-                            emoji.style.fontSize = '1.5em';
-                            emoji.style.textAlign = 'center';
-                            emoji.style.lineHeight = '1';
-                            cardDiv.appendChild(emoji);
-                        };
-                        
-                        cardDiv.appendChild(img);
-                        
-                        if (isMyTurn && !card.revealed && player.connected) {
-                            cardDiv.addEventListener('click', () => {
-                                this.selectCard(player.id, index);
-                            });
-                        } else {
-                            cardDiv.classList.add('disabled');
-                        }
-                    }
-                    
-                    cardsGrid.appendChild(cardDiv);
-                });
-            }
-
-            playerBox.appendChild(cardsGrid);
-            container.appendChild(playerBox);
-        });
-    }
-
-    selectCard(targetPlayerId, cardIndex) {
-        if (this.isSpectator) {
-            UIManager.showError('観戦者はカードを選択できません');
-            return;
-        }
-        
-        this.socketClient.selectCard(targetPlayerId, cardIndex);
-    }
-
-    sendChat() {
-        const input = safeGetElement('chat-input');
-        if (!input) return;
-        
-        const message = input.value.trim();
-        
-        if (!message || !this.roomId) return;
-        
-        this.socketClient.sendChat(message);
-        input.value = '';
-    }
-
-    startGame() {
-        if (this.isSpectator) {
-            UIManager.showError('観戦者はゲームを開始できません');
-            return;
-        }
-        
-        this.socketClient.startGame();
-    }
-
-    leaveRoom() {
-        this.socketClient.leaveRoom();
-        this.roomId = null;
-        this.gameData = null;
-        this.isHost = false;
-        this.isSpectator = false;
-        
-        this.clearPlayerInfo();
-        
-        UIManager.showSpectatorMode(false);
-        UIManager.showScreen('lobby');
-    }
-
-    returnToLobby() {
-        this.leaveRoom();
-    }
-}
-
-// グローバルに公開
-window.UIManager = UIManager;
-window.SocketClient = SocketClient;
-window.PigManGame = PigManGame;
-
-// Render環境用のグローバル関数
-window.forceReconnect = () => {
-    if (window.pigGame && window.pigGame.socketClient) {
-        window.pigGame.socketClient.forceReconnect();
-        UIManager.showError('手動再接続を実行中...', 'warning');
-    }
-};
-
-window.testConnection = () => {
-    console.log('=== 接続テスト ===');
-    if (window.pigGame && window.pigGame.socketClient) {
-        console.log('Socket状態:', window.pigGame.socketClient.socket.connected);
-        console.log('Socket ID:', window.pigGame.socketClient.socket.id);
-        window.pigGame.socketClient.getRoomList();
-    }
-};
-
-// DOM読み込み完了後の初期化
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📄 DOM読み込み完了');
-    
-    // Render環境の警告表示
-    if (isRenderEnvironment) {
-        console.log('⚠️ Render環境で動作中 - 接続に時間がかかる場合があります');
-    }
-    
-    // 必須要素の存在確認
-    const requiredElements = [
-        'lobby', 'room-info', 'error-message', 
-        'create-room', 'player-name-create', 'connection-status'
-    ];
-    
-    const missingElements = requiredElements.filter(id => !document.getElementById(id));
-    
-    if (missingElements.length > 0) {
-        console.error('❌ 必須要素が不足:', missingElements);
-        alert('ページの読み込みに問題があります。\n不足要素: ' + missingElements.join(', '));
-        return;
-    }
-    
-    console.log('✅ 必須要素確認完了');
-    
-    // Socket.io の存在確認
-    if (typeof io === 'undefined') {
-        console.error('❌ Socket.io が読み込まれていません');
-        alert('Socket.io ライブラリが読み込まれていません。インターネット接続を確認してください。');
-        return;
-    }
-    
-    console.log('✅ Socket.io ライブラリ確認完了');
-    
-    try {
-        // ゲームインスタンス作成
-        const pigGame = new PigManGame();
-        window.pigGame = pigGame;
-        
-        console.log('✅ 豚小屋探検隊ゲーム初期化成功！');
-        
-        if (isRenderEnvironment) {
-            UIManager.showError('🐷 Render環境で豚小屋探検隊が起動しました！接続に時間がかかる場合があります。', 'warning');
-        } else {
-            UIManager.showError('🐷 豚小屋探検隊へようこそ！', 'success');
-        }
-        
-        // デバッグ情報をコンソールに出力
-        setTimeout(() => {
-            window.debugInfo();
-            console.log('コンソールで使用可能なコマンド:');
-            console.log('- debugInfo() : デバッグ情報表示');
-            console.log('- forceReconnect() : 手動再接続');
-            console.log('- testConnection() : 接続テスト');
-        }, isRenderEnvironment ? 5000 : 2000);
-        
-    } catch (error) {
-        console.error('❌ ゲーム初期化エラー:', error);
-        UIManager.showError('ゲームの初期化に失敗しました: ' + error.message);
-    }
-});
-
-// エラーハンドリング
-window.addEventListener('error', function(event) {
-    console.error('JavaScript エラー:', event.error);
-    UIManager.showError('予期しないエラーが発生しました');
-});
-
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('Promise エラー:', event.reason);
-    UIManager.showError('通信エラーが発生しました');
-});
-
-// Render環境でのページ可視性変更の監視
-document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible' && window.pigGame) {
-        console.log('ページが再表示されました - 接続状態確認');
-        setTimeout(() => {
-            if (window.pigGame.socketClient && !window.pigGame.socketClient.isConnected()) {
-                console.log('再表示時に切断されていたため再接続を試行');
-                window.pigGame.socketClient.forceReconnect();
-            }
-        }, 1000);
-    }
-});
-
-console.log('🐷 豚小屋探検隊 JavaScript 読み込み完了 (完全版)');';
                     switch (card.type) {
                         case 'treasure':
                             emoji.textContent = '🐷';
@@ -1066,7 +762,19 @@ console.log('🐷 豚小屋探検隊 JavaScript 読み込み完了 (完全版)')
                     emoji.textContent = '❓';
                     emoji.style.fontSize = '2.5em';
                     emoji.style.textAlign = 'center';
-                    emoji.style.lineHeight = '1// 豚小屋探検隊 - 完全版JavaScript
+                    emoji.style.lineHeight = '1';
+                    div.appendChild(emoji);
+                };
+                
+                div.appendChild(img);
+                
+                switch (card.type) {
+                    case 'treasure':
+                        treasureCount++;
+                        break;
+                    case 'trap':
+                        trapCount++;
+                        break;// 豚小屋探検隊 - 修正版完全JavaScript
 console.log('🐷 豚小屋探検隊 JavaScript 開始');
 
 // Render環境の検出
@@ -1841,11 +1549,17 @@ class PigManGame {
     }
 
     initializeErrorMonitoring() {
+        const self = this; // thisを保存
+        
         window.addEventListener('error', (event) => {
-            this.logError('JavaScript Error', {
+            self.logError('JavaScript Error', {
                 message: event.message,
                 filename: event.filename,
                 lineno: event.lineno,
                 colno: event.colno,
                 stack: event.error?.stack
             });
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            self.logError('Unhandled Promise
