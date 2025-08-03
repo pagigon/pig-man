@@ -1,9 +1,9 @@
-// 完全版socketHandlers.js
+// 重複参加問題修正版 socketHandlers.js
 const activeRooms = new Map();
 const socketRequestHistory = new Map();
 
 function setupSocketHandlers(io) {
-    console.log('🚀 Socket.io ハンドラー設定開始（完全版）');
+    console.log('🚀 Socket.io ハンドラー設定開始（重複修正版）');
     
     io.on('connection', (socket) => {
         console.log('✅ 新しい接続確認:', socket.id);
@@ -170,7 +170,7 @@ function setupSocketHandlers(io) {
             }
         });
         
-        // ルーム参加
+        // ルーム参加 - 重複防止強化版
         socket.on('joinRoom', (data) => {
             const now = Date.now();
             const history = socketRequestHistory.get(socket.id);
@@ -189,7 +189,10 @@ function setupSocketHandlers(io) {
                 history.lastJoinRequest = now;
             }
             
-            console.log('👥 ルーム参加要求:', data, 'Socket:', socket.id);
+            console.log('👥 ===== ルーム参加要求受信 =====');
+            console.log('Socket ID:', socket.id);
+            console.log('データ:', data);
+            
             const { roomId, playerName, password } = data;
             
             const room = activeRooms.get(roomId);
@@ -210,7 +213,7 @@ function setupSocketHandlers(io) {
                 return;
             }
             
-            // このSocketが既にルームに参加していないかチェック
+            // 🔧 重複チェック強化：Socket IDでの重複確認
             const socketAlreadyInRoom = room.players.find(p => p.id === socket.id);
             if (socketAlreadyInRoom) {
                 console.warn(`⚠️ Socket ${socket.id} は既にルームに参加済み`);
@@ -218,10 +221,10 @@ function setupSocketHandlers(io) {
                 return;
             }
             
-            // 同じ名前のアクティブプレイヤーがいないかチェック
-            const nameConflict = room.players.find(p => p.name === playerName && p.connected);
-            if (nameConflict) {
-                console.warn(`⚠️ プレイヤー名 "${playerName}" は既に使用中`);
+            // 🔧 プレイヤー名での重複チェック強化
+            const nameConflictConnected = room.players.find(p => p.name === playerName && p.connected);
+            if (nameConflictConnected) {
+                console.warn(`⚠️ プレイヤー名 "${playerName}" は既に接続中`);
                 socket.emit('error', { 
                     message: `プレイヤー名 "${playerName}" は既に使用されています` 
                 });
@@ -235,16 +238,25 @@ function setupSocketHandlers(io) {
                 return;
             }
             
-            // 切断済みの同名プレイヤーを探す
+            // 🔧 切断済みプレイヤーの処理を改善
             const disconnectedPlayer = room.players.find(p => p.name === playerName && !p.connected);
             
             if (disconnectedPlayer) {
-                // 再接続処理
+                // 再接続処理：既存のプレイヤーデータを更新
+                console.log(`${playerName} が再接続します（既存データ更新）`);
                 disconnectedPlayer.id = socket.id;
                 disconnectedPlayer.connected = true;
-                console.log(`${playerName} が再接続しました`);
+                
+                // gameData.playersも同期更新
+                const gameDataPlayer = room.gameData.players.find(p => p.name === playerName);
+                if (gameDataPlayer) {
+                    gameDataPlayer.id = socket.id;
+                    gameDataPlayer.connected = true;
+                }
             } else {
-                // 新規プレイヤー追加
+                // 🔧 新規プレイヤー追加（重複防止）
+                console.log(`${playerName} が新規参加します`);
+                
                 const newPlayer = {
                     id: socket.id,
                     name: playerName,
@@ -252,15 +264,28 @@ function setupSocketHandlers(io) {
                     role: null,
                     hand: []
                 };
-                room.players.push(newPlayer);
-                room.gameData.players.push(newPlayer);
-                console.log(`${playerName} が新規参加しました`);
+                
+                // 🔧 両方の配列に確実に追加（重複チェック付き）
+                const existsInPlayers = room.players.find(p => p.id === socket.id || p.name === playerName);
+                const existsInGameData = room.gameData.players.find(p => p.id === socket.id || p.name === playerName);
+                
+                if (!existsInPlayers) {
+                    room.players.push(newPlayer);
+                }
+                if (!existsInGameData) {
+                    room.gameData.players.push({ ...newPlayer });
+                }
             }
             
             // ソケットの情報を設定
             socket.join(roomId);
             socket.roomId = roomId;
             socket.playerName = playerName;
+            
+            // 🔧 データ整合性チェック
+            console.log('参加後の状態確認:');
+            console.log('- room.players:', room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected })));
+            console.log('- room.gameData.players:', room.gameData.players.map(p => ({ id: p.id, name: p.name, connected: p.connected })));
             
             // 成功応答
             socket.emit('joinSuccess', {
@@ -280,6 +305,7 @@ function setupSocketHandlers(io) {
             updateRoomList(io);
             
             console.log(`✅ ${playerName} がルーム ${roomId} に参加完了`);
+            console.log('🏁 ===== ルーム参加処理完了 =====');
         });
         
         // 再入場
@@ -309,6 +335,13 @@ function setupSocketHandlers(io) {
             // 再接続処理
             existingPlayer.id = socket.id;
             existingPlayer.connected = true;
+            
+            // gameData.playersも同期更新
+            const gameDataPlayer = room.gameData.players.find(p => p.name === playerName);
+            if (gameDataPlayer) {
+                gameDataPlayer.id = socket.id;
+                gameDataPlayer.connected = true;
+            }
             
             socket.join(roomId);
             socket.roomId = roomId;
@@ -537,6 +570,13 @@ function setupSocketHandlers(io) {
                 player.id = socket.id;
                 player.connected = true;
                 
+                // gameData.playersも同期更新
+                const gameDataPlayer = room.gameData.players.find(p => p.name === playerName);
+                if (gameDataPlayer) {
+                    gameDataPlayer.id = socket.id;
+                    gameDataPlayer.connected = true;
+                }
+                
                 socket.join(roomId);
                 socket.roomId = roomId;
                 socket.playerName = playerName;
@@ -553,7 +593,7 @@ function setupSocketHandlers(io) {
             }
         });
         
-        // 切断時の履歴削除
+        // 切断時の処理
         socket.on('disconnect', (reason) => {
             console.log('🔌 切断:', socket.id, 'reason:', reason);
             
@@ -580,6 +620,34 @@ function setupSocketHandlers(io) {
     console.log('🏁 Socket.io ハンドラー設定完了');
 }
 
+// 🔧 データ整合性を保つユーティリティ関数
+function syncPlayerData(room) {
+    try {
+        // room.players と room.gameData.players を同期
+        const playerMap = new Map();
+        
+        // 全プレイヤーを収集（重複除去）
+        [...room.players, ...room.gameData.players].forEach(player => {
+            if (player && player.id) {
+                const existing = playerMap.get(player.id);
+                if (!existing || player.connected) {
+                    playerMap.set(player.id, player);
+                }
+            }
+        });
+        
+        // 同期された配列を作成
+        const syncedPlayers = Array.from(playerMap.values());
+        
+        room.players = syncedPlayers;
+        room.gameData.players = syncedPlayers.map(p => ({ ...p }));
+        
+        console.log('プレイヤーデータ同期完了:', syncedPlayers.map(p => ({ id: p.id, name: p.name, connected: p.connected })));
+    } catch (error) {
+        console.error('プレイヤーデータ同期エラー:', error);
+    }
+}
+
 // ゲーム開始ロジック
 function startGameLogic(gameData, playerCount) {
     console.log('🎮 ゲーム開始ロジック実行:', { playerCount });
@@ -597,7 +665,7 @@ function startGameLogic(gameData, playerCount) {
                                    Math.random() < 0.1 ? 'trap' : 'empty';
                     player.hand.push({
                         type: cardType,
-                        id: `${cardType}-${player.id}-${i}`,
+                        id: cardType + '-' + player.id + '-' + i,
                         revealed: false
                     });
                 }
@@ -632,7 +700,7 @@ function checkWinConditions(gameData) {
     if (gameData.treasureFound >= gameData.treasureGoal) {
         gameData.gameState = 'finished';
         gameData.winningTeam = 'adventurer';
-        gameData.victoryMessage = `全ての子豚を救出しました！探検家チームの勝利です！`;
+        gameData.victoryMessage = '全ての子豚を救出しました！探検家チームの勝利です！';
         return;
     }
     
@@ -640,7 +708,7 @@ function checkWinConditions(gameData) {
     if (gameData.trapTriggered >= gameData.trapGoal) {
         gameData.gameState = 'finished';
         gameData.winningTeam = 'guardian';
-        gameData.victoryMessage = `すべての罠が発動しました！豚男チームの勝利です！`;
+        gameData.victoryMessage = 'すべての罠が発動しました！豚男チームの勝利です！';
         return;
     }
     
@@ -654,7 +722,7 @@ function checkWinConditions(gameData) {
         if (gameData.currentRound > gameData.maxRounds) {
             gameData.gameState = 'finished';
             gameData.winningTeam = 'guardian';
-            gameData.victoryMessage = `4ラウンドが終了しました！豚男チームの勝利です！`;
+            gameData.victoryMessage = '4ラウンドが終了しました！豚男チームの勝利です！';
         }
     }
 }
@@ -678,6 +746,12 @@ function handlePlayerTempLeave(socket, io) {
         console.log(`${player.name} が一時退出しました`);
     }
     
+    // gameData.playersも同期更新
+    const gameDataPlayer = room.gameData.players.find(p => p.id === socket.id);
+    if (gameDataPlayer) {
+        gameDataPlayer.connected = false;
+    }
+    
     // ルーム内の他のプレイヤーに更新を送信
     io.to(socket.roomId).emit('gameUpdate', room.gameData);
     
@@ -692,9 +766,11 @@ function handlePlayerLeave(socket, io) {
     const room = activeRooms.get(socket.roomId);
     if (!room) return;
     
-    // プレイヤーを完全に削除
+    // 🔧 両方の配列から完全に削除
     room.players = room.players.filter(p => p.id !== socket.id);
     room.gameData.players = room.gameData.players.filter(p => p.id !== socket.id);
+    
+    console.log(`プレイヤー ${socket.playerName} (${socket.id}) をルーム ${socket.roomId} から完全削除`);
     
     // ホストが退出した場合、次のプレイヤーをホストに
     if (room.gameData.host === socket.id) {
@@ -732,6 +808,12 @@ function handlePlayerDisconnect(socket, io) {
         console.log(`${player.name} が切断しました`);
     }
     
+    // gameData.playersも同期更新
+    const gameDataPlayer = room.gameData.players.find(p => p.id === socket.id);
+    if (gameDataPlayer) {
+        gameDataPlayer.connected = false;
+    }
+    
     // 全員が切断した場合、ルームを削除
     if (room.players.every(p => !p.connected)) {
         activeRooms.delete(socket.roomId);
@@ -767,6 +849,9 @@ setInterval(() => {
     const roomsToDelete = [];
     
     for (const [roomId, room] of activeRooms) {
+        // 🔧 データ整合性チェックと修正
+        syncPlayerData(room);
+        
         // 全員が切断して30分以上経過したルームを削除
         if (room.players.every(p => !p.connected)) {
             const lastActivity = room.lastActivity || room.createdAt || now;
@@ -847,6 +932,17 @@ function getServerStats() {
 setInterval(() => {
     const stats = getServerStats();
     console.log('📊 サーバー統計情報:', stats);
+    
+    // 🔧 各ルームの詳細情報も出力
+    for (const [roomId, room] of activeRooms) {
+        const playerInfo = room.players.map(p => ({
+            id: p.id.slice(-4), // IDの最後4文字のみ表示
+            name: p.name,
+            connected: p.connected
+        }));
+        console.log(`ルーム ${roomId}: プレイヤー数 ${room.players.length}, 接続中 ${room.players.filter(p => p.connected).length}`);
+        console.log('  プレイヤー:', playerInfo);
+    }
 }, 5 * 60 * 1000); // 5分ごと
 
 // デバッグ用のエクスポート関数
@@ -856,7 +952,12 @@ function getDebugInfo() {
         gameState: room.gameData.gameState,
         playerCount: room.players.length,
         connectedCount: room.players.filter(p => p.connected).length,
-        host: room.players.find(p => p.id === room.gameData.host)?.name || '不明'
+        host: room.players.find(p => p.id === room.gameData.host)?.name || '不明',
+        players: room.players.map(p => ({
+            id: p.id.slice(-4),
+            name: p.name,
+            connected: p.connected
+        }))
     }));
     
     return {
@@ -875,7 +976,8 @@ process.on('SIGINT', () => {
     const roomData = Array.from(activeRooms.entries()).map(([id, room]) => ({
         id,
         playerCount: room.players.length,
-        gameState: room.gameData.gameState
+        gameState: room.gameData.gameState,
+        players: room.players.map(p => ({ name: p.name, connected: p.connected }))
     }));
     
     if (roomData.length > 0) {
@@ -894,5 +996,6 @@ process.on('SIGTERM', () => {
 module.exports = { 
     setupSocketHandlers,
     getDebugInfo,
-    getServerStats
+    getServerStats,
+    syncPlayerData
 };
