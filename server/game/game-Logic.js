@@ -119,7 +119,7 @@ function generateAllCards(playerCount) {
 
     let treasureCount, trapCount, emptyCount;
 
-    // 🎯 バランス調整版：罠カードを増やして戦略性向上
+    // 恐怖の古代寺院ルール準拠のカード配分（元の仕様通り）
     switch(playerCount) {
         case 3:
             treasureCount = 5;  // 子豚カード
@@ -133,39 +133,39 @@ function generateAllCards(playerCount) {
             break;
         case 5:
             treasureCount = 7;
-            trapCount = 3;      // 2→3に変更（バランス調整）
-            emptyCount = 15;    // 16→15に調整
+            trapCount = 2;
+            emptyCount = 16;
             break;
         case 6:
             treasureCount = 8;
-            trapCount = 3;      // 2→3に変更（バランス調整）
-            emptyCount = 19;    // 20→19に調整
+            trapCount = 2;
+            emptyCount = 20;
             break;
         case 7:
             treasureCount = 7;
-            trapCount = 3;      // 2→3に変更（バランス調整）
-            emptyCount = 25;    // 26→25に調整
+            trapCount = 2;
+            emptyCount = 26;
             break;
         case 8:
             treasureCount = 8;
-            trapCount = 3;      // 2→3に変更（バランス調整）
-            emptyCount = 29;    // 30→29に調整
+            trapCount = 2;
+            emptyCount = 30;
             break;
         case 9:
             treasureCount = 9;
-            trapCount = 4;      // 2→4に変更（バランス調整）
-            emptyCount = 32;    // 34→32に調整
+            trapCount = 2;
+            emptyCount = 34;
             break;
         case 10:
             treasureCount = 10;
-            trapCount = 4;      // 3→4に変更（バランス調整）
-            emptyCount = 36;    // 37→36に調整
+            trapCount = 3;
+            emptyCount = 37;
             break;
         default:
             // フォールバック
             treasureCount = 7;
-            trapCount = 3;
-            emptyCount = 15;
+            trapCount = 2;
+            emptyCount = 16;
     }
 
     const cards = [];
@@ -404,7 +404,7 @@ function getRevealedCardStatistics(players) {
     return stats;
 }
 
-// 勝利条件計算（バランス調整済み）
+// 勝利条件計算（元の恐怖の古代寺院ルール準拠）
 function calculateVictoryGoal(playerCount) {
     if (!playerCount || playerCount < 3 || playerCount > 10) {
         console.warn('無効なプレイヤー数:', playerCount);
@@ -426,26 +426,8 @@ function calculateVictoryGoal(playerCount) {
         default: treasureGoal = 7; break;
     }
     
-    // 🎯 バランス調整版：罠の勝利条件
-    switch(playerCount) {
-        case 3:
-        case 4:
-            trapGoal = 2;
-            break;
-        case 5:
-        case 6:
-        case 7:
-        case 8:
-            trapGoal = 3;
-            break;
-        case 9:
-        case 10:
-            trapGoal = 4;
-            break;
-        default:
-            trapGoal = 3;
-            break;
-    }
+    // 罠の勝利条件：全ての罠を発動させる（元のルール通り）
+    trapGoal = playerCount === 10 ? 3 : 2;
     
     console.log(`勝利条件設定: 財宝${treasureGoal}個、罠${trapGoal}個`);
     
