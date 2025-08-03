@@ -1,4 +1,5 @@
-// 恐怖の古代寺院ルール対応版 game-Logic.js
+// 恐怖の古代寺院ルール完全対応版 game-Logic.js
+
 function generateRoomId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = 'PIG';
@@ -8,7 +9,7 @@ function generateRoomId() {
     return result;
 }
 
-// プレイヤー数に応じた役職割り当て
+// プレイヤー数に応じた役職割り当て（恐怖の古代寺院ルール準拠）
 function assignRoles(playerCount) {
     console.log('🎭 役職割り当て開始:', playerCount, '人');
     
@@ -107,7 +108,7 @@ function assignRoles(playerCount) {
     return roles.slice(0, playerCount);
 }
 
-// プレイヤー数に応じたカード生成
+// プレイヤー数に応じたカード生成（恐怖の古代寺院ルール準拠）
 function generateAllCards(playerCount) {
     console.log('🃏 カード生成開始:', playerCount, '人用');
     
@@ -118,7 +119,7 @@ function generateAllCards(playerCount) {
 
     let treasureCount, trapCount, emptyCount;
 
-    // プレイヤー数に応じたカード配分
+    // 恐怖の古代寺院ルール準拠のカード配分
     switch(playerCount) {
         case 3:
             treasureCount = 5;  // 子豚カード
@@ -217,7 +218,20 @@ function shuffleArray(array) {
     return newArray;
 }
 
-// カード配布
+// ラウンドに応じた手札枚数を計算（恐怖の古代寺院ルール）
+function getCardsPerPlayerForRound(round) {
+    // 恐怖の古代寺院ルール: 1ラウンド=5枚、2ラウンド=4枚、3ラウンド=3枚、4ラウンド=2枚
+    const cardsPerRound = {
+        1: 5,
+        2: 4,
+        3: 3,
+        4: 2
+    };
+    
+    return cardsPerRound[round] || 5;
+}
+
+// カード配布（ラウンド対応版）
 function distributeCards(allCards, playerCount, cardsPerPlayer) {
     console.log('🎴 カード配布開始:', `${playerCount}人に${cardsPerPlayer}枚ずつ`);
     
@@ -236,6 +250,12 @@ function distributeCards(allCards, playerCount, cardsPerPlayer) {
         cardsPerPlayer = 5; // デフォルト値
     }
 
+    // 必要なカード数を計算
+    const totalNeededCards = playerCount * cardsPerPlayer;
+    if (allCards.length < totalNeededCards) {
+        console.warn(`カード不足: 必要${totalNeededCards}枚、利用可能${allCards.length}枚`);
+    }
+
     const shuffledCards = shuffleArray([...allCards]);
     const playerHands = {};
     
@@ -243,13 +263,20 @@ function distributeCards(allCards, playerCount, cardsPerPlayer) {
         const hand = shuffledCards.splice(0, cardsPerPlayer);
         playerHands[i] = shuffleArray(hand);
         console.log(`プレイヤー${i}: ${hand.length}枚配布`);
+        
+        // カードの中身をログ出力（デバッグ用）
+        const cardTypes = hand.reduce((acc, card) => {
+            acc[card.type] = (acc[card.type] || 0) + 1;
+            return acc;
+        }, {});
+        console.log(`  - 内訳: 子豚${cardTypes.treasure || 0}, 罠${cardTypes.trap || 0}, 空き${cardTypes.empty || 0}`);
     }
     
     console.log(`配布完了: 残りカード${shuffledCards.length}枚`);
     return { playerHands, remainingCards: shuffledCards };
 }
 
-// 勝利条件計算
+// 勝利条件計算（恐怖の古代寺院ルール準拠）
 function calculateVictoryGoal(playerCount) {
     if (!playerCount || playerCount < 3 || playerCount > 10) {
         console.warn('無効なプレイヤー数:', playerCount);
@@ -258,7 +285,7 @@ function calculateVictoryGoal(playerCount) {
 
     let treasureGoal, trapGoal;
     
-    // 財宝の勝利条件：全ての財宝を発見する
+    // 財宝の勝利条件：全ての財宝を発見する（恐怖の古代寺院ルール準拠）
     switch(playerCount) {
         case 3: treasureGoal = 5; break;
         case 4: treasureGoal = 6; break;
@@ -271,7 +298,7 @@ function calculateVictoryGoal(playerCount) {
         default: treasureGoal = 7; break;
     }
     
-    // 罠の勝利条件：全ての罠を発動させる
+    // 罠の勝利条件：全ての罠を発動させる（恐怖の古代寺院ルール準拠）
     trapGoal = playerCount === 10 ? 3 : 2;
     
     console.log(`勝利条件設定: 財宝${treasureGoal}個、罠${trapGoal}個`);
@@ -281,7 +308,7 @@ function calculateVictoryGoal(playerCount) {
 
 // 恐怖の古代寺院ゲームデータ初期化
 function initializeGameData(playerCount) {
-    console.log('🎮 ゲームデータ初期化:', playerCount, '人');
+    console.log('🎮 ゲームデータ初期化:', playerCount, '人（恐怖の古代寺院ルール）');
     
     const { cards, treasureCount, trapCount } = generateAllCards(playerCount);
     const { treasureGoal, trapGoal } = calculateVictoryGoal(playerCount);
@@ -302,10 +329,10 @@ function initializeGameData(playerCount) {
         // 役職
         assignedRoles: roles,
         
-        // ゲーム進行
+        // ゲーム進行（恐怖の古代寺院ルール）
         currentRound: 1,
-        maxRounds: 4,
-        cardsPerPlayer: 5,
+        maxRounds: 4,  // 4ラウンド制
+        cardsPerPlayer: getCardsPerPlayerForRound(1), // 1ラウンド目は5枚
         cardsFlippedThisRound: 0,
         
         // 進捗
@@ -315,6 +342,133 @@ function initializeGameData(playerCount) {
         // ターン管理
         keyHolderId: null,
         turnInRound: 0
+    };
+}
+
+// ラウンド進行処理（恐怖の古代寺院ルール）
+function advanceToNextRound(gameData, connectedPlayerCount) {
+    console.log('📋 ===== ラウンド進行処理（恐怖の古代寺院ルール） =====');
+    console.log('現在のラウンド:', gameData.currentRound);
+    
+    // カード公開数をリセット
+    gameData.cardsFlippedThisRound = 0;
+    
+    // ラウンドを進める
+    gameData.currentRound++;
+    console.log(`📈 ラウンド進行: ${gameData.currentRound - 1} → ${gameData.currentRound}`);
+    
+    // 最大ラウンド到達チェック（4ラウンド終了で豚男チーム勝利）
+    if (gameData.currentRound > gameData.maxRounds) {
+        console.log('⏰ 4ラウンド終了！豚男チームの勝利');
+        gameData.gameState = 'finished';
+        gameData.winningTeam = 'guardian';
+        gameData.victoryMessage = `${gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！`;
+        return { gameEnded: true, reason: 'max_rounds_reached' };
+    }
+    
+    // 新しいラウンドの手札枚数を設定
+    const newCardsPerPlayer = getCardsPerPlayerForRound(gameData.currentRound);
+    gameData.cardsPerPlayer = newCardsPerPlayer;
+    
+    console.log(`🆕 ラウンド ${gameData.currentRound} 開始準備完了（手札${newCardsPerPlayer}枚）`);
+    return { newRound: gameData.currentRound, gameEnded: false, cardsPerPlayer: newCardsPerPlayer };
+}
+
+// カード再配布処理（恐怖の古代寺院ルール対応）
+function redistributeCardsForNewRound(gameData, connectedPlayers) {
+    console.log('🃏 ===== カード再配布処理（恐怖の古代寺院ルール） =====');
+    console.log(`ラウンド ${gameData.currentRound} 用のカード配布（${gameData.cardsPerPlayer}枚ずつ）`);
+    
+    try {
+        const playerCount = connectedPlayers.length;
+        
+        // 恐怖の古代寺院ルールで新しいカードセットを生成
+        const { cards } = generateAllCards(playerCount);
+        const { playerHands } = distributeCards(cards, playerCount, gameData.cardsPerPlayer);
+        
+        // 各プレイヤーに新しいカードを配布
+        connectedPlayers.forEach((player, index) => {
+            player.hand = playerHands[index] || [];
+            console.log(`${player.name} に ${player.hand.length} 枚のカードを再配布`);
+        });
+        
+        // ラウンド開始時は最初のプレイヤーに鍵を渡す
+        if (connectedPlayers.length > 0) {
+            const firstPlayer = connectedPlayers[0];
+            gameData.keyHolderId = firstPlayer.id;
+            console.log(`🗝️ ラウンド ${gameData.currentRound} の最初の鍵保持者: ${firstPlayer.name}`);
+        }
+        
+        console.log('✅ カード再配布完了（恐怖の古代寺院ルール）');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ カード再配布エラー:', error);
+        
+        // エラー時のフォールバック処理
+        connectedPlayers.forEach((player) => {
+            player.hand = [];
+            for (let i = 0; i < gameData.cardsPerPlayer; i++) {
+                player.hand.push({
+                    type: 'empty',
+                    id: `empty-${player.id}-fallback-${i}`,
+                    revealed: false
+                });
+            }
+        });
+        return false;
+    }
+}
+
+// ゲーム終了条件チェック（恐怖の古代寺院ルール）
+function checkGameEndConditions(gameData) {
+    console.log('🏁 ゲーム終了条件チェック:', {
+        treasureFound: gameData.treasureFound,
+        treasureGoal: gameData.treasureGoal,
+        trapTriggered: gameData.trapTriggered,
+        trapGoal: gameData.trapGoal,
+        currentRound: gameData.currentRound,
+        maxRounds: gameData.maxRounds
+    });
+    
+    // 探検家チーム勝利：全ての財宝を発見
+    if (gameData.treasureFound >= gameData.treasureGoal) {
+        console.log('🏆 探検家チーム勝利（全財宝発見）');
+        return {
+            ended: true,
+            winner: 'adventurer',
+            reason: 'all_treasures_found',
+            message: `全ての子豚（${gameData.treasureGoal}匹）を救出しました！探検家チームの勝利です！`
+        };
+    }
+    
+    // 豚男チーム勝利：全ての罠を発動
+    if (gameData.trapTriggered >= gameData.trapGoal) {
+        console.log('🏆 豚男チーム勝利（全罠発動）');
+        return {
+            ended: true,
+            winner: 'guardian',
+            reason: 'all_traps_triggered',
+            message: `全ての罠（${gameData.trapGoal}個）が発動しました！豚男チームの勝利です！`
+        };
+    }
+    
+    // 豚男チーム勝利：4ラウンド終了
+    if (gameData.currentRound > gameData.maxRounds) {
+        console.log('🏆 豚男チーム勝利（4ラウンド終了）');
+        return {
+            ended: true,
+            winner: 'guardian',
+            reason: 'max_rounds_reached',
+            message: `${gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！`
+        };
+    }
+    
+    return {
+        ended: false,
+        winner: null,
+        reason: null,
+        message: null
     };
 }
 
@@ -329,7 +483,7 @@ function validateGameState(gameData) {
     // 必須フィールドチェック
     const requiredFields = [
         'treasureGoal', 'trapGoal', 'currentRound', 'maxRounds',
-        'treasureFound', 'trapTriggered', 'cardsFlippedThisRound'
+        'treasureFound', 'trapTriggered', 'cardsFlippedThisRound', 'cardsPerPlayer'
     ];
     
     requiredFields.forEach(field => {
@@ -349,6 +503,12 @@ function validateGameState(gameData) {
     
     if (gameData.currentRound > gameData.maxRounds) {
         errors.push('現在ラウンドが最大ラウンドを超えています');
+    }
+    
+    // 恐怖の古代寺院ルール特有のチェック
+    const expectedCardsPerPlayer = getCardsPerPlayerForRound(gameData.currentRound);
+    if (gameData.cardsPerPlayer !== expectedCardsPerPlayer) {
+        errors.push(`ラウンド${gameData.currentRound}の手札枚数が正しくありません（期待値: ${expectedCardsPerPlayer}、実際: ${gameData.cardsPerPlayer}）`);
     }
     
     return {
@@ -419,52 +579,6 @@ function getPlayerStatistics(players) {
     return stats;
 }
 
-// ゲーム終了条件チェック
-function checkGameEndConditions(gameData) {
-    const validation = validateGameState(gameData);
-    if (!validation.valid) {
-        console.error('ゲーム状態が無効:', validation.errors);
-        return null;
-    }
-    
-    // 探検家チーム勝利：全ての財宝を発見
-    if (gameData.treasureFound >= gameData.treasureGoal) {
-        return {
-            ended: true,
-            winner: 'adventurer',
-            reason: 'all_treasures_found',
-            message: `全ての子豚（${gameData.treasureGoal}匹）を救出しました！探検家チームの勝利です！`
-        };
-    }
-    
-    // 豚男チーム勝利：全ての罠を発動
-    if (gameData.trapTriggered >= gameData.trapGoal) {
-        return {
-            ended: true,
-            winner: 'guardian',
-            reason: 'all_traps_triggered',
-            message: `全ての罠（${gameData.trapGoal}個）が発動しました！豚男チームの勝利です！`
-        };
-    }
-    
-    // 豚男チーム勝利：最大ラウンド到達
-    if (gameData.currentRound > gameData.maxRounds) {
-        return {
-            ended: true,
-            winner: 'guardian',
-            reason: 'max_rounds_reached',
-            message: `${gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！`
-        };
-    }
-    
-    return {
-        ended: false,
-        winner: null,
-        reason: null,
-        message: null
-    };
-}
-
 module.exports = {
     generateRoomId,
     assignRoles,
@@ -476,5 +590,9 @@ module.exports = {
     validateGameState,
     getCardStatistics,
     getPlayerStatistics,
-    checkGameEndConditions
+    checkGameEndConditions,
+    // 恐怖の古代寺院ルール専用関数
+    getCardsPerPlayerForRound,
+    advanceToNextRound,
+    redistributeCardsForNewRound
 };
