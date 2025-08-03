@@ -1,4 +1,4 @@
-// 修正版 UIManager クラス - シンタックスエラー修正
+// 修正版 UIManager クラス - 恐怖の古代寺院ルール対応
 export class UIManager {
     static showSpectatorMode(isSpectator) {
         try {
@@ -249,15 +249,18 @@ export class UIManager {
                     
                     const gameId = game.id || 'GAME' + index;
                     const currentRound = game.currentRound || 1;
+                    const maxRounds = game.maxRounds || 4;
+                    const cardsPerPlayer = game.cardsPerPlayer || 5;
                     const playerCount = game.playerCount || 0;
                     const treasureFound = game.treasureFound || 0;
                     const treasureGoal = game.treasureGoal || 7;
                     const trapTriggered = game.trapTriggered || 0;
                     const trapGoal = game.trapGoal || 2;
                     
+                    // 恐怖の古代寺院ルール対応の情報表示
                     infoDiv.innerHTML = '<strong>ID: ' + gameId + '</strong><br>' +
-                                       'ラウンド: ' + currentRound + '/4 | プレイヤー: ' + playerCount + '/10<br>' +
-                                       '救出: ' + treasureFound + '/' + treasureGoal + ' | 罠: ' + trapTriggered + '/' + trapGoal;
+                                       'ラウンド: ' + currentRound + '/' + maxRounds + ' | プレイヤー: ' + playerCount + '/10<br>' +
+                                       '手札: ' + cardsPerPlayer + '枚 | 救出: ' + treasureFound + '/' + treasureGoal + ' | 罠: ' + trapTriggered + '/' + trapGoal;
                     
                     const spectateBtn = document.createElement('button');
                     spectateBtn.className = 'btn btn-small';
@@ -397,11 +400,13 @@ export class UIManager {
         }
     }
 
+    // 恐怖の古代寺院ルール対応のゲーム概要更新
     static updateGameOverview(playerCount) {
         try {
             let roleText = '';
             let cardText = '';
 
+            // 恐怖の古代寺院ルールに基づく役職とカード構成
             switch (playerCount) {
                 case 3:
                     roleText = '探検家 1-2人、豚男 1-2人';
@@ -491,6 +496,7 @@ export class UIManager {
         }
     }
 
+    // 恐怖の古代寺院ルール対応のゲーム情報更新
     static updateGameInfo(gameData) {
         try {
             if (!gameData || typeof gameData !== 'object') {
@@ -498,13 +504,50 @@ export class UIManager {
                 return;
             }
 
+            // 基本情報
             this.safeSetText('current-round', gameData.currentRound || 1);
             this.safeSetText('treasure-found', gameData.treasureFound || 0);
             this.safeSetText('trap-triggered', gameData.trapTriggered || 0);
             this.safeSetText('trap-goal', gameData.trapGoal || 2);
+            this.safeSetText('treasure-goal', gameData.treasureGoal || 7);
+            
+            // 恐怖の古代寺院ルール特有の情報
             this.safeSetText('cards-per-player', gameData.cardsPerPlayer || 5);
             this.safeSetText('cards-flipped', gameData.cardsFlippedThisRound || 0);
-            this.safeSetText('treasure-goal', gameData.treasureGoal || 7);
+            
+            // ラウンド情報の詳細表示
+            const roundDisplayEl = this.safeGetElement('current-round');
+            if (roundDisplayEl && gameData.maxRounds) {
+                roundDisplayEl.parentElement.innerHTML = 
+                    '<span class="label">R</span>' +
+                    '<span class="value">' + (gameData.currentRound || 1) + '/' + gameData.maxRounds + '</span>';
+            }
+            
+            // 手札枚数情報にラウンド対応の説明を追加
+            const cardsPerPlayerEl = this.safeGetElement('cards-per-player');
+            if (cardsPerPlayerEl) {
+                const currentRound = gameData.currentRound || 1;
+                let expectedCards = 5;
+                switch (currentRound) {
+                    case 1: expectedCards = 5; break;
+                    case 2: expectedCards = 4; break;
+                    case 3: expectedCards = 3; break;
+                    case 4: expectedCards = 2; break;
+                    default: expectedCards = 5; break;
+                }
+                
+                // 設定値と期待値が異なる場合の警告
+                if (gameData.cardsPerPlayer !== expectedCards) {
+                    console.warn(`手札枚数の不整合: ラウンド${currentRound}では${expectedCards}枚が期待されますが、実際は${gameData.cardsPerPlayer}枚です`);
+                }
+            }
+            
+            console.log('ゲーム情報更新完了（恐怖の古代寺院ルール）:', {
+                round: gameData.currentRound + '/' + gameData.maxRounds,
+                cardsPerPlayer: gameData.cardsPerPlayer,
+                progress: gameData.treasureFound + '/' + gameData.treasureGoal + ' | ' + gameData.trapTriggered + '/' + gameData.trapGoal
+            });
+            
         } catch (error) {
             console.error('ゲーム情報更新エラー:', error);
         }
@@ -516,7 +559,18 @@ export class UIManager {
             const message = this.safeGetElement('round-start-message');
             
             if (overlay && message) {
-                message.textContent = 'ラウンド ' + (roundNumber || 1) + ' スタート！';
+                // 恐怖の古代寺院ルールに対応したメッセージ
+                const roundNum = roundNumber || 1;
+                let cardsThisRound = 5;
+                switch (roundNum) {
+                    case 1: cardsThisRound = 5; break;
+                    case 2: cardsThisRound = 4; break;
+                    case 3: cardsThisRound = 3; break;
+                    case 4: cardsThisRound = 2; break;
+                    default: cardsThisRound = 5; break;
+                }
+                
+                message.innerHTML = 'ラウンド ' + roundNum + ' スタート！<br><small>手札 ' + cardsThisRound + ' 枚</small>';
                 overlay.style.display = 'flex';
                 
                 setTimeout(function() {
@@ -555,9 +609,33 @@ export class UIManager {
             
             messageEl.textContent = gameData.victoryMessage || 'ゲーム終了！';
             
+            // 恐怖の古代寺院ルール対応の勝利情報
             winnersList.innerHTML = '<h3>勝利チーム:</h3>';
             
+            // ゲーム統計情報を追加
+            const statsDiv = document.createElement('div');
+            statsDiv.style.marginTop = '15px';
+            statsDiv.style.fontSize = '14px';
+            statsDiv.style.color = '#87CEEB';
+            
+            const finalRound = gameData.currentRound || 1;
+            const maxRounds = gameData.maxRounds || 4;
+            const treasureFound = gameData.treasureFound || 0;
+            const treasureGoal = gameData.treasureGoal || 7;
+            const trapTriggered = gameData.trapTriggered || 0;
+            const trapGoal = gameData.trapGoal || 2;
+            
+            statsDiv.innerHTML = '<strong>ゲーム統計:</strong><br>' +
+                                '終了ラウンド: ' + finalRound + '/' + maxRounds + '<br>' +
+                                '救出された子豚: ' + treasureFound + '/' + treasureGoal + '<br>' +
+                                '発動した罠: ' + trapTriggered + '/' + trapGoal;
+            
+            winnersList.appendChild(statsDiv);
+            
             if (gameData.players && Array.isArray(gameData.players)) {
+                const winnersDiv = document.createElement('div');
+                winnersDiv.style.marginTop = '15px';
+                
                 gameData.players.forEach(function(player) {
                     try {
                         if (!player || typeof player !== 'object') return;
@@ -567,15 +645,26 @@ export class UIManager {
                             const div = document.createElement('div');
                             div.textContent = '🎉 ' + (player.name || '名前なし');
                             div.style.color = '#FFD700';
-                            winnersList.appendChild(div);
+                            div.style.marginBottom = '5px';
+                            winnersDiv.appendChild(div);
                         }
                     } catch (error) {
                         console.error('勝者表示エラー:', error, player);
                     }
                 });
+                
+                winnersList.appendChild(winnersDiv);
             }
             
             screen.style.display = 'flex';
+            
+            console.log('勝利画面表示完了（恐怖の古代寺院ルール）:', {
+                winner: gameData.winningTeam,
+                finalRound: finalRound + '/' + maxRounds,
+                treasures: treasureFound + '/' + treasureGoal,
+                traps: trapTriggered + '/' + trapGoal
+            });
+            
         } catch (error) {
             console.error('勝利画面表示エラー:', error);
         }
@@ -624,6 +713,72 @@ export class UIManager {
             container.scrollTop = container.scrollHeight;
         } catch (error) {
             console.error('メッセージ更新エラー:', error);
+        }
+    }
+
+    // 恐怖の古代寺院ルール対応の追加情報表示
+    static showRoundInfo(gameData) {
+        try {
+            if (!gameData || typeof gameData !== 'object') return;
+            
+            // ラウンド情報をより詳しく表示するための追加情報
+            const currentRound = gameData.currentRound || 1;
+            const maxRounds = gameData.maxRounds || 4;
+            const cardsPerPlayer = gameData.cardsPerPlayer || 5;
+            
+            // ラウンド別の期待手札枚数
+            const expectedCards = this.getExpectedCardsForRound(currentRound);
+            
+            // 不整合がある場合の警告表示
+            if (cardsPerPlayer !== expectedCards) {
+                console.warn(`手札枚数の不整合を検出: ラウンド${currentRound}では${expectedCards}枚が期待されますが、実際は${cardsPerPlayer}枚です`);
+                
+                // エラーメッセージとして表示
+                this.showError(`手札枚数の不整合: R${currentRound}では${expectedCards}枚が期待されます`, 'warning');
+            }
+            
+        } catch (error) {
+            console.error('ラウンド情報表示エラー:', error);
+        }
+    }
+    
+    // 恐怖の古代寺院ルール: ラウンド別期待手札枚数
+    static getExpectedCardsForRound(round) {
+        const cardsPerRound = {
+            1: 5,
+            2: 4,
+            3: 3,
+            4: 2
+        };
+        return cardsPerRound[round] || 5;
+    }
+
+    // デバッグ用: ゲーム状態の詳細表示
+    static logGameState(gameData, prefix = '') {
+        try {
+            if (!gameData) {
+                console.log(prefix + 'ゲームデータなし');
+                return;
+            }
+            
+            console.log(prefix + '=== ゲーム状態（恐怖の古代寺院ルール） ===');
+            console.log(prefix + 'ラウンド: ' + (gameData.currentRound || 1) + '/' + (gameData.maxRounds || 4));
+            console.log(prefix + '手札枚数: ' + (gameData.cardsPerPlayer || 5) + '枚');
+            console.log(prefix + 'このラウンドの公開数: ' + (gameData.cardsFlippedThisRound || 0));
+            console.log(prefix + '救出: ' + (gameData.treasureFound || 0) + '/' + (gameData.treasureGoal || 7));
+            console.log(prefix + '罠: ' + (gameData.trapTriggered || 0) + '/' + (gameData.trapGoal || 2));
+            console.log(prefix + 'ゲーム状態: ' + (gameData.gameState || '不明'));
+            
+            if (gameData.players && Array.isArray(gameData.players)) {
+                console.log(prefix + 'プレイヤー数: ' + gameData.players.filter(p => p && p.connected).length);
+            }
+            
+            const keyHolder = gameData.players && gameData.players.find(p => p && p.id === gameData.keyHolderId);
+            console.log(prefix + '鍵保持者: ' + (keyHolder ? keyHolder.name : '不明'));
+            console.log(prefix + '=======================================');
+            
+        } catch (error) {
+            console.error('ゲーム状態ログ出力エラー:', error);
         }
     }
 
