@@ -1,4 +1,4 @@
-// 恐怖の古代寺院ルール対応版 socketHandlers.js
+// 恐怖の古代寺院ルール完全対応版 socketHandlers.js
 const { 
     generateRoomId, 
     assignRoles, 
@@ -6,14 +6,17 @@ const {
     distributeCards, 
     calculateVictoryGoal,
     initializeGameData,
-    checkGameEndConditions
+    checkGameEndConditions,
+    getCardsPerPlayerForRound,
+    advanceToNextRound,
+    redistributeCardsForNewRound
 } = require('./game/game-Logic');
 
 const activeRooms = new Map();
 const socketRequestHistory = new Map();
 
 function setupSocketHandlers(io) {
-    console.log('🚀 Socket.io ハンドラー設定開始（恐怖の古代寺院ルール対応版）');
+    console.log('🚀 Socket.io ハンドラー設定開始（恐怖の古代寺院ルール完全対応版）');
     
     io.on('connection', (socket) => {
         console.log('✅ 新しい接続確認:', socket.id);
@@ -42,7 +45,7 @@ function setupSocketHandlers(io) {
             sendOngoingGames(socket);
         });
         
-        // ルーム作成
+        // ルーム作成（既存のコードをそのまま使用）
         socket.on('createRoom', (data) => {
             const now = Date.now();
             const history = socketRequestHistory.get(socket.id);
@@ -95,7 +98,7 @@ function setupSocketHandlers(io) {
                     totalTreasures: 7,
                     totalTraps: 2,
                     keyHolderId: null,
-                    cardsPerPlayer: 5,
+                    cardsPerPlayer: 5, // 初期値、ゲーム開始時に正しく設定される
                     cardsFlippedThisRound: 0,
                     maxRounds: 4,
                     turnInRound: 0,
@@ -241,9 +244,10 @@ function setupSocketHandlers(io) {
             console.log(`✅ ${playerName} がルーム ${roomId} に参加完了`);
         });
         
-        // ゲーム開始 - 恐怖の古代寺院ルール対応版
+        // ゲーム開始 - 恐怖の古代寺院ルール完全対応版
         socket.on('startGame', () => {
-            console.log('🎮 ゲーム開始要求:', socket.id);
+            console.log('🎮 ===== ゲーム開始要求（恐怖の古代寺院ルール） =====');
+            console.log('Socket ID:', socket.id);
             
             if (!socket.roomId) {
                 socket.emit('error', { message: 'ルームに参加していません' });
@@ -273,45 +277,58 @@ function setupSocketHandlers(io) {
             }
             
             try {
-                console.log('🎭 恐怖の古代寺院ルールでゲーム開始');
+                console.log('🎭 恐怖の古代寺院ルールでゲーム開始:', connectedCount, '人');
                 
                 // 恐怖の古代寺院ルールでゲーム初期化
                 const gameInitData = initializeGameData(connectedCount);
+                console.log('ゲーム初期化データ:', gameInitData);
                 
                 // ゲームデータに反映
                 Object.assign(roomData.gameData, gameInitData);
                 
                 // 役職割り当て
                 const connectedPlayers = roomData.gameData.players.filter(p => p.connected);
+                console.log('接続中プレイヤー:', connectedPlayers.map(p => p.name));
+                
                 connectedPlayers.forEach((player, index) => {
                     player.role = gameInitData.assignedRoles[index];
+                    console.log(`${player.name} → ${player.role}`);
                 });
                 
-                // カード配布
+                // 1ラウンド目のカード配布（5枚ずつ）
+                const round1CardsPerPlayer = getCardsPerPlayerForRound(1);
+                console.log(`1ラウンド目: ${round1CardsPerPlayer}枚ずつ配布`);
+                
                 const { playerHands } = distributeCards(
                     gameInitData.allCards, 
                     connectedCount, 
-                    gameInitData.cardsPerPlayer
+                    round1CardsPerPlayer
                 );
                 
                 // 各プレイヤーにカードを配布
                 connectedPlayers.forEach((player, index) => {
                     player.hand = playerHands[index] || [];
+                    console.log(`${player.name} に ${player.hand.length} 枚配布`);
                 });
                 
                 // 最初のプレイヤーに鍵を渡す
                 if (connectedPlayers.length > 0) {
                     roomData.gameData.keyHolderId = connectedPlayers[0].id;
+                    console.log(`🗝️ 初期鍵保持者: ${connectedPlayers[0].name}`);
                 }
                 
                 // ゲーム状態更新
                 roomData.gameData.gameState = 'playing';
+                roomData.gameData.cardsPerPlayer = round1CardsPerPlayer;
                 
-                console.log('ゲーム開始処理完了:', {
+                console.log('📊 ゲーム開始時の状態:', {
                     playerCount: connectedCount,
                     treasureGoal: roomData.gameData.treasureGoal,
                     trapGoal: roomData.gameData.trapGoal,
                     totalCards: roomData.gameData.allCards.length,
+                    cardsPerPlayer: roomData.gameData.cardsPerPlayer,
+                    currentRound: roomData.gameData.currentRound,
+                    maxRounds: roomData.gameData.maxRounds,
                     keyHolder: connectedPlayers[0]?.name
                 });
                 
@@ -322,17 +339,17 @@ function setupSocketHandlers(io) {
                 // ルーム一覧から削除（進行中ゲームは非表示）
                 broadcastRoomList(io);
                 
-                console.log(`ルーム ${socket.roomId} でゲーム開始`);
+                console.log(`✅ ルーム ${socket.roomId} でゲーム開始完了（恐怖の古代寺院ルール）`);
                 
             } catch (error) {
-                console.error('ゲーム開始エラー:', error);
-                socket.emit('error', { message: 'ゲーム開始に失敗しました' });
+                console.error('❌ ゲーム開始エラー:', error);
+                socket.emit('error', { message: 'ゲーム開始に失敗しました: ' + error.message });
             }
         });
         
-        // カード選択 - 恐怖の古代寺院ルール対応版
+        // カード選択 - 恐怖の古代寺院ルール完全対応版
         socket.on('selectCard', (data) => {
-            console.log('🃏 ===== カード選択要求受信 =====');
+            console.log('🃏 ===== カード選択要求受信（恐怖の古代寺院ルール） =====');
             console.log('選択者:', socket.playerName, '(', socket.id, ')');
             console.log('データ:', data);
             
@@ -389,16 +406,17 @@ function setupSocketHandlers(io) {
                 }
                 
                 // 🔧 カード公開前の状態をログ出力
-                console.log('=== カード公開前の状態 ===');
-                console.log('現在のラウンド:', roomData.gameData.currentRound);
+                console.log('=== カード公開前の状態（恐怖の古代寺院ルール） ===');
+                console.log('現在のラウンド:', roomData.gameData.currentRound, '/', roomData.gameData.maxRounds);
                 console.log('このラウンドで公開されたカード数:', roomData.gameData.cardsFlippedThisRound);
                 console.log('接続中プレイヤー数:', getConnectedPlayerCount(roomData));
+                console.log('現在の手札枚数設定:', roomData.gameData.cardsPerPlayer);
                 console.log('財宝発見数:', roomData.gameData.treasureFound, '/', roomData.gameData.treasureGoal);
                 console.log('罠発動数:', roomData.gameData.trapTriggered, '/', roomData.gameData.trapGoal);
                 
                 // カードを公開
                 selectedCard.revealed = true;
-                console.log('カードを公開しました:', selectedCard.type);
+                console.log('✅ カードを公開しました:', selectedCard.type);
                 
                 // 進捗更新
                 if (selectedCard.type === 'treasure') {
@@ -425,6 +443,7 @@ function setupSocketHandlers(io) {
                     
                     // 勝利画面表示
                     io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+                    console.log('✅ 勝利条件達成 - ゲーム終了');
                     return;
                 }
                 
@@ -435,25 +454,35 @@ function setupSocketHandlers(io) {
                 if (roomData.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
                     console.log('📋 ラウンド終了条件達成！');
                     
-                    // ラウンド終了処理
+                    // ラウンド終了処理（恐怖の古代寺院ルール）
                     const nextRoundResult = advanceToNextRound(roomData.gameData, connectedPlayerCount);
+                    
                     if (nextRoundResult.gameEnded) {
-                        console.log('🎮 ゲーム終了:', nextRoundResult.reason);
+                        console.log('🎮 4ラウンド終了によるゲーム終了:', nextRoundResult.reason);
+                        // ゲーム終了は既にadvanceToNextRoundで設定済み
                         io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
                         return;
                     }
                     
                     if (nextRoundResult.newRound) {
-                        console.log(`🆕 ラウンド ${nextRoundResult.newRound} 開始！`);
-                        // 新しいラウンド開始の通知
-                        io.to(socket.roomId).emit('roundStart', nextRoundResult.newRound);
+                        console.log(`🆕 ラウンド ${nextRoundResult.newRound} 開始準備`);
                         
                         // カードを再配布（恐怖の古代寺院ルール）
-                        redistributeCardsProper(roomData.gameData);
+                        const connectedPlayers = roomData.gameData.players.filter(p => p.connected);
+                        const redistributeSuccess = redistributeCardsForNewRound(roomData.gameData, connectedPlayers);
+                        
+                        if (redistributeSuccess) {
+                            console.log(`✅ ラウンド ${nextRoundResult.newRound} のカード再配布完了`);
+                            
+                            // 新しいラウンド開始の通知
+                            io.to(socket.roomId).emit('roundStart', nextRoundResult.newRound);
+                        } else {
+                            console.error('❌ カード再配布に失敗');
+                        }
                     }
                 } else {
                     // 通常のターン移行
-                    console.log('🔄 次のプレイヤーにターン移行');
+                    console.log('🔄 次のプレイヤーにターン移行（ラウンド継続）');
                 }
                 
                 // 鍵を次のプレイヤーに渡す（対象プレイヤーに）
@@ -462,20 +491,21 @@ function setupSocketHandlers(io) {
                 console.log('🗝️ 鍵の移動:', socket.playerName, '→', newKeyHolder?.name);
                 
                 // 🔧 カード公開後の状態をログ出力
-                console.log('=== カード公開後の状態 ===');
-                console.log('現在のラウンド:', roomData.gameData.currentRound);
+                console.log('=== カード公開後の状態（恐怖の古代寺院ルール） ===');
+                console.log('現在のラウンド:', roomData.gameData.currentRound, '/', roomData.gameData.maxRounds);
                 console.log('このラウンドで公開されたカード数:', roomData.gameData.cardsFlippedThisRound);
+                console.log('現在の手札枚数設定:', roomData.gameData.cardsPerPlayer);
                 console.log('現在の鍵保持者:', newKeyHolder?.name);
                 console.log('ゲーム状態:', roomData.gameData.gameState);
                 
                 // 全員に更新を送信
                 io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
                 
-                console.log('✅ カード選択処理完了');
+                console.log('✅ カード選択処理完了（恐怖の古代寺院ルール）');
                 
             } catch (error) {
                 console.error('❌ カード選択エラー:', error);
-                socket.emit('error', { message: 'カード選択に失敗しました' });
+                socket.emit('error', { message: 'カード選択に失敗しました: ' + error.message });
             }
         });
         
@@ -498,77 +528,7 @@ function setupSocketHandlers(io) {
         console.log('🎯 イベントハンドラー登録完了:', socket.id);
     });
     
-    console.log('🏁 Socket.io ハンドラー設定完了');
-}
-
-// 🔧 恐怖の古代寺院ルール対応のラウンド進行処理
-function advanceToNextRound(gameData, connectedPlayerCount) {
-    console.log('📋 ===== ラウンド進行処理開始（恐怖の古代寺院ルール） =====');
-    
-    // カード公開数をリセット
-    gameData.cardsFlippedThisRound = 0;
-    
-    // ラウンドを進める
-    gameData.currentRound++;
-    console.log(`📈 ラウンド進行: ${gameData.currentRound - 1} → ${gameData.currentRound}`);
-    
-    // 最大ラウンド到達チェック（4ラウンド終了で豚男チーム勝利）
-    if (gameData.currentRound > gameData.maxRounds) {
-        console.log('⏰ 最大ラウンド到達！豚男チームの勝利');
-        gameData.gameState = 'finished';
-        gameData.winningTeam = 'guardian';
-        gameData.victoryMessage = `${gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！`;
-        return { gameEnded: true, reason: 'max_rounds_reached' };
-    }
-    
-    console.log(`🆕 ラウンド ${gameData.currentRound} 開始準備完了`);
-    return { newRound: gameData.currentRound, gameEnded: false };
-}
-
-// 🔧 恐怖の古代寺院ルール対応のカード再配布処理
-function redistributeCardsProper(gameData) {
-    console.log('🃏 ===== カード再配布処理開始（恐怖の古代寺院ルール） =====');
-    
-    try {
-        const connectedPlayers = gameData.players.filter(p => p.connected);
-        const playerCount = connectedPlayers.length;
-        
-        // 恐怖の古代寺院ルールで新しいカードセットを生成
-        const { cards } = generateAllCards(playerCount);
-        const { playerHands } = distributeCards(cards, playerCount, gameData.cardsPerPlayer);
-        
-        // 各プレイヤーに新しいカードを配布
-        connectedPlayers.forEach((player, index) => {
-            player.hand = playerHands[index] || [];
-            console.log(`${player.name} に ${player.hand.length} 枚のカードを再配布`);
-        });
-        
-        // ラウンド開始時は最初のプレイヤーに鍵を渡す
-        if (connectedPlayers.length > 0) {
-            const firstPlayer = connectedPlayers[0];
-            gameData.keyHolderId = firstPlayer.id;
-            console.log(`🗝️ ラウンド ${gameData.currentRound} の最初の鍵保持者: ${firstPlayer.name}`);
-        }
-        
-        console.log('✅ カード再配布完了（恐怖の古代寺院ルール）');
-        
-    } catch (error) {
-        console.error('❌ カード再配布エラー:', error);
-        
-        // エラー時のフォールバック処理
-        gameData.players.forEach((player) => {
-            if (player.connected) {
-                player.hand = [];
-                for (let i = 0; i < 5; i++) {
-                    player.hand.push({
-                        type: 'empty',
-                        id: `empty-${player.id}-fallback-${i}`,
-                        revealed: false
-                    });
-                }
-            }
-        });
-    }
+    console.log('🏁 Socket.io ハンドラー設定完了（恐怖の古代寺院ルール）');
 }
 
 // その他のハンドラー設定
@@ -785,6 +745,8 @@ function sendOngoingGames(socket) {
             .map(roomData => ({
                 id: roomData.id,
                 currentRound: roomData.gameData.currentRound,
+                maxRounds: roomData.gameData.maxRounds,
+                cardsPerPlayer: roomData.gameData.cardsPerPlayer,
                 playerCount: getConnectedPlayerCount(roomData),
                 treasureFound: roomData.gameData.treasureFound,
                 treasureGoal: roomData.gameData.treasureGoal,
