@@ -1,4 +1,4 @@
-// UIManager クラス - UI操作の責任を持つ
+// UIManager クラス - UI操作の責任を持つ（修正版）
 export class UIManager {
     static showSpectatorMode(isSpectator) {
         const existingIndicator = document.getElementById('spectator-indicator');
@@ -92,7 +92,9 @@ export class UIManager {
         const displayTime = type === 'success' ? 3000 : 8000;
         
         setTimeout(() => {
-            errorEl.style.display = 'none';
+            if (errorEl.style.display === 'block') {
+                errorEl.style.display = 'none';
+            }
         }, displayTime);
     }
 
@@ -108,326 +110,520 @@ export class UIManager {
     }
 
     static updateRoomList(rooms) {
-        console.log(`ルーム一覧更新: ${rooms.length}個のルーム`);
+        console.log(`ルーム一覧更新: ${rooms ? rooms.length : 0}個のルーム`);
         const container = this.safeGetElement('room-list-container');
         if (!container) return;
         
-        container.innerHTML = '';
+        try {
+            container.innerHTML = '';
 
-        if (rooms.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #87CEEB;">現在開設中のルームはありません</p>';
-            return;
-        }
-
-        rooms.forEach(room => {
-            const roomDiv = document.createElement('div');
-            roomDiv.className = 'room-item';
-            
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'room-item-info';
-            infoDiv.innerHTML = `
-                <strong>ID: ${room.id}</strong>
-                ${room.hasPassword ? '<span class="password-icon">🔒</span>' : ''}
-                <br>
-                ホスト: ${room.hostName} | プレイヤー: ${room.playerCount}/10
-            `;
-            
-            const joinBtn = document.createElement('button');
-            joinBtn.className = 'btn btn-small';
-            joinBtn.textContent = '参加';
-            joinBtn.onclick = () => {
-                const roomIdInput = this.safeGetElement('room-id-input');
-                if (roomIdInput) roomIdInput.value = room.id;
-                if (room.hasPassword) {
-                    const passwordGroup = this.safeGetElement('join-password-group');
-                    if (passwordGroup) passwordGroup.style.display = 'block';
-                }
-            };
-            
-            roomDiv.appendChild(infoDiv);
-            roomDiv.appendChild(joinBtn);
-            container.appendChild(roomDiv);
-        });
-    }
-
-    static updateOngoingGames(games) {
-        console.log('updateOngoingGames called with:', games);
-        const container = this.safeGetElement('ongoing-games-container');
-        if (!container) {
-            console.warn('ongoing-games-container element not found');
-            return;
-        }
-        
-        container.innerHTML = '';
-
-        if (!games || games.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #32CD32;">現在進行中のゲームはありません</p>';
-            return;
-        }
-
-        games.forEach(game => {
-            try {
-                const gameDiv = document.createElement('div');
-                gameDiv.className = 'ongoing-game-item';
-                
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'ongoing-game-info';
-                infoDiv.innerHTML = `
-                    <strong>ID: ${game.id || 'N/A'}</strong>
-                    <br>
-                    ラウンド: ${game.currentRound || 1}/4 | プレイヤー: ${game.playerCount || 0}/10
-                    <br>
-                    救出: ${game.treasureFound || 0}/${game.treasureGoal || 7} | 罠: ${game.trapTriggered || 0}/${game.trapGoal || 2}
-                `;
-                
-                const spectateBtn = document.createElement('button');
-                spectateBtn.className = 'btn btn-small';
-                spectateBtn.textContent = '観戦する';
-                spectateBtn.onclick = () => {
-                    const spectateRoomInput = this.safeGetElement('spectate-room-id');
-                    const spectatorNameInput = this.safeGetElement('spectator-name');
-                    
-                    if (spectateRoomInput) spectateRoomInput.value = game.id || '';
-                    
-                    const spectatorName = `観戦者${Math.floor(Math.random() * 1000)}`;
-                    if (spectatorNameInput) spectatorNameInput.value = spectatorName;
-                    
-                    if (window.pigGame) {
-                        window.pigGame.spectateRoom();
-                    }
-                };
-                
-                gameDiv.appendChild(infoDiv);
-                gameDiv.appendChild(spectateBtn);
-                container.appendChild(gameDiv);
-            } catch (error) {
-                console.error('Error creating ongoing game item:', error, game);
+            if (!rooms || !Array.isArray(rooms) || rooms.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #87CEEB;">現在開設中のルームはありません</p>';
+                return;
             }
-        });
+
+            rooms.forEach((room, index) => {
+                try {
+                    if (!room || typeof room !== 'object') {
+                        console.warn('無効なルームデータ:', room);
+                        return;
+                    }
+
+                    const roomDiv = document.createElement('div');
+                    roomDiv.className = 'room-item';
+                    
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'room-item-info';
+                    
+                    const roomId = room.id || `ROOM${index}`;
+                    const hostName = room.hostName || '不明';
+                    const playerCount = room.playerCount || 0;
+                    const hasPassword = room.hasPassword || false;
+                    
+                    infoDiv.innerHTML = `
+                        <strong>ID: ${roomId}</strong>
+                        ${hasPassword ? '<span class="password-icon">🔒</span>' : ''}
+                        <br>
+                        ホスト: ${hostName} | プレイヤー: ${playerCount}/10
+                    `;
+                    
+                    const joinBtn = document.createElement('button');
+                    joinBtn.className = 'btn btn-small';
+                    joinBtn.textContent = '参加';
+                    
+                    // エラーハンドリング付きのクリックイベント
+                    joinBtn.onclick = () => {
+                        try {
+                            const roomIdInput = this.safeGetElement('room-id-input');
+                            if (roomIdInput) {
+                                roomIdInput.value = roomId;
+                            }
+                            
+                            if (hasPassword) {
+                                const passwordGroup = this.safeGetElement('join-password-group');
+                                if (passwordGroup) {
+                                    passwordGroup.style.display = 'block';
+                                }
+                            }
+                            
+                            // プレイヤー名にフォーカス
+                            const playerNameInput = this.safeGetElement('player-name-join');
+                            if (playerNameInput) {
+                                playerNameInput.focus();
+                            }
+                        } catch (error) {
+                            console.error('ルーム参加ボタンクリックエラー:', error);
+                            this.showError('ルーム参加の準備でエラーが発生しました');
+                        }
+                    };
+                    
+                    roomDiv.appendChild(infoDiv);
+                    roomDiv.appendChild(joinBtn);
+                    container.appendChild(roomDiv);
+                } catch (error) {
+                    console.error('ゲームアイテム作成エラー:', error, game);
+                }
+            });
+        } catch (error) {
+            console.error('進行中ゲーム一覧更新エラー:', error);
+            container.innerHTML = '<p style="text-align: center; color: #DC143C;">進行中ゲーム一覧の表示でエラーが発生しました</p>';
+        }
     }
 
     static showScreen(screenName) {
         console.log(`画面切り替え: ${screenName}`);
         const screens = ['lobby', 'room-info', 'game-board', 'victory-screen'];
         
-        screens.forEach(screen => {
-            const element = this.safeGetElement(screen);
-            if (element) {
-                element.style.display = 'none';
+        try {
+            screens.forEach(screen => {
+                const element = this.safeGetElement(screen);
+                if (element) {
+                    element.style.display = 'none';
+                }
+            });
+            
+            if (screenName) {
+                const screen = this.safeGetElement(screenName);
+                if (screen) {
+                    screen.style.display = 'block';
+                } else {
+                    console.warn(`画面要素が見つかりません: ${screenName}`);
+                }
             }
-        });
-        
-        if (screenName) {
-            const screen = this.safeGetElement(screenName);
-            if (screen) {
-                screen.style.display = 'block';
-            }
+        } catch (error) {
+            console.error('画面切り替えエラー:', error);
         }
     }
 
     static updatePlayersList(players, hostId) {
-        console.log(`プレイヤー一覧更新: ${players.length}人`);
+        console.log(`プレイヤー一覧更新: ${players ? players.length : 0}人`);
         const container = this.safeGetElement('players-list');
         const countEl = this.safeGetElement('player-count');
         
         if (!container || !countEl) return;
         
-        const count = players.filter(p => p.connected).length;
-        countEl.textContent = count;
-        
-        container.innerHTML = '';
-        players.forEach((player) => {
-            const div = document.createElement('div');
-            div.className = 'player-item';
-            if (player.id === hostId) {
-                div.classList.add('host');
+        try {
+            if (!players || !Array.isArray(players)) {
+                console.warn('無効なプレイヤーデータ:', players);
+                container.innerHTML = '<p>プレイヤー情報を取得できませんでした</p>';
+                countEl.textContent = '0';
+                return;
             }
             
-            const status = player.connected ? '🟢' : '🔴';
-            const disconnectedText = player.connected ? '' : ' (切断中)';
-            div.textContent = `${status} ${player.name}${disconnectedText}`;
+            const count = players.filter(p => p && p.connected).length;
+            countEl.textContent = count;
             
-            if (!player.connected) {
-                div.style.opacity = '0.6';
-                div.style.fontStyle = 'italic';
-            }
-            
-            container.appendChild(div);
-        });
+            container.innerHTML = '';
+            players.forEach((player) => {
+                try {
+                    if (!player || typeof player !== 'object') {
+                        console.warn('無効なプレイヤーオブジェクト:', player);
+                        return;
+                    }
+
+                    const div = document.createElement('div');
+                    div.className = 'player-item';
+                    
+                    if (player.id === hostId) {
+                        div.classList.add('host');
+                    }
+                    
+                    const status = player.connected ? '🟢' : '🔴';
+                    const playerName = player.name || '名前なし';
+                    const disconnectedText = player.connected ? '' : ' (切断中)';
+                    div.textContent = `${status} ${playerName}${disconnectedText}`;
+                    
+                    if (!player.connected) {
+                        div.style.opacity = '0.6';
+                        div.style.fontStyle = 'italic';
+                    }
+                    
+                    container.appendChild(div);
+                } catch (error) {
+                    console.error('プレイヤーアイテム作成エラー:', error, player);
+                }
+            });
+        } catch (error) {
+            console.error('プレイヤー一覧更新エラー:', error);
+            container.innerHTML = '<p style="color: #DC143C;">プレイヤー一覧の表示でエラーが発生しました</p>';
+        }
     }
 
     static updateGameOverview(playerCount) {
-        let roleText = '';
-        let cardText = '';
+        try {
+            let roleText = '';
+            let cardText = '';
 
-        switch (playerCount) {
-            case 3:
-                roleText = '探検家 1-2人、豚男 1-2人';
-                cardText = '子豚5匹、罠2個、空き部屋8個';
-                break;
-            case 4:
-                roleText = '探検家 2-3人、豚男 1-2人';
-                cardText = '子豚6匹、罠2個、空き部屋12個';
-                break;
-            case 5:
-                roleText = '探検家 3人、豚男 2人';
-                cardText = '子豚7匹、罠2個、空き部屋16個';
-                break;
-            case 6:
-                roleText = '探検家 4人、豚男 2人';
-                cardText = '子豚8匹、罠2個、空き部屋20個';
-                break;
-            case 7:
-                roleText = '探検家 4-5人、豚男 2-3人';
-                cardText = '子豚7匹、罠2個、空き部屋26個';
-                break;
-            case 8:
-                roleText = '探検家 5-6人、豚男 2-3人';
-                cardText = '子豚8匹、罠2個、空き部屋30個';
-                break;
-            case 9:
-                roleText = '探検家 6人、豚男 3人';
-                cardText = '子豚9匹、罠2個、空き部屋34個';
-                break;
-            case 10:
-                roleText = '探検家 6-7人、豚男 3-4人';
-                cardText = '子豚10匹、罠3個、空き部屋37個';
-                break;
+            switch (playerCount) {
+                case 3:
+                    roleText = '探検家 1-2人、豚男 1-2人';
+                    cardText = '子豚5匹、罠2個、空き部屋8個';
+                    break;
+                case 4:
+                    roleText = '探検家 2-3人、豚男 1-2人';
+                    cardText = '子豚6匹、罠2個、空き部屋12個';
+                    break;
+                case 5:
+                    roleText = '探検家 3人、豚男 2人';
+                    cardText = '子豚7匹、罠2個、空き部屋16個';
+                    break;
+                case 6:
+                    roleText = '探検家 4人、豚男 2人';
+                    cardText = '子豚8匹、罠2個、空き部屋20個';
+                    break;
+                case 7:
+                    roleText = '探検家 4-5人、豚男 2-3人';
+                    cardText = '子豚7匹、罠2個、空き部屋26個';
+                    break;
+                case 8:
+                    roleText = '探検家 5-6人、豚男 2-3人';
+                    cardText = '子豚8匹、罠2個、空き部屋30個';
+                    break;
+                case 9:
+                    roleText = '探検家 6人、豚男 3人';
+                    cardText = '子豚9匹、罠2個、空き部屋34個';
+                    break;
+                case 10:
+                    roleText = '探検家 6-7人、豚男 3-4人';
+                    cardText = '子豚10匹、罠3個、空き部屋37個';
+                    break;
+                default:
+                    roleText = `プレイヤー数: ${playerCount}人`;
+                    cardText = 'カード構成を計算中...';
+            }
+
+            this.safeSetText('role-possibility-text', roleText);
+            this.safeSetText('card-distribution-text', cardText);
+        } catch (error) {
+            console.error('ゲーム概要更新エラー:', error);
         }
-
-        this.safeSetText('role-possibility-text', roleText);
-        this.safeSetText('card-distribution-text', cardText);
     }
 
     static updateProgressBars(gameData) {
-        const treasureTotal = gameData.totalTreasures || gameData.treasureGoal || 7;
-        const trapTotal = gameData.totalTraps || gameData.trapGoal || 2;
-        const treasureFound = gameData.treasureFound || 0;
-        const trapTriggered = gameData.trapTriggered || 0;
-
-        // 財宝の進捗バー
-        const treasureContainer = this.safeGetElement('treasure-icons');
-        if (treasureContainer) {
-            treasureContainer.innerHTML = '';
-            for (let i = 0; i < treasureTotal; i++) {
-                const icon = document.createElement('div');
-                icon.className = 'progress-icon treasure';
-                if (i < treasureFound) {
-                    icon.classList.add('used');
-                }
-                treasureContainer.appendChild(icon);
+        try {
+            if (!gameData || typeof gameData !== 'object') {
+                console.warn('無効なゲームデータ:', gameData);
+                return;
             }
-        }
 
-        // 罠の進捗バー
-        const trapContainer = this.safeGetElement('trap-icons');
-        if (trapContainer) {
-            trapContainer.innerHTML = '';
-            for (let i = 0; i < trapTotal; i++) {
-                const icon = document.createElement('div');
-                icon.className = 'progress-icon trap';
-                if (i < trapTriggered) {
-                    icon.classList.add('used');
+            const treasureTotal = gameData.totalTreasures || gameData.treasureGoal || 7;
+            const trapTotal = gameData.totalTraps || gameData.trapGoal || 2;
+            const treasureFound = gameData.treasureFound || 0;
+            const trapTriggered = gameData.trapTriggered || 0;
+
+            // 財宝の進捗バー
+            const treasureContainer = this.safeGetElement('treasure-icons');
+            if (treasureContainer) {
+                treasureContainer.innerHTML = '';
+                for (let i = 0; i < treasureTotal; i++) {
+                    const icon = document.createElement('div');
+                    icon.className = 'progress-icon treasure';
+                    if (i < treasureFound) {
+                        icon.classList.add('used');
+                    }
+                    treasureContainer.appendChild(icon);
                 }
-                trapContainer.appendChild(icon);
             }
+
+            // 罠の進捗バー
+            const trapContainer = this.safeGetElement('trap-icons');
+            if (trapContainer) {
+                trapContainer.innerHTML = '';
+                for (let i = 0; i < trapTotal; i++) {
+                    const icon = document.createElement('div');
+                    icon.className = 'progress-icon trap';
+                    if (i < trapTriggered) {
+                        icon.classList.add('used');
+                    }
+                    trapContainer.appendChild(icon);
+                }
+            }
+        } catch (error) {
+            console.error('進捗バー更新エラー:', error);
         }
     }
 
     static updateGameInfo(gameData) {
-        this.safeSetText('current-round', gameData.currentRound);
-        this.safeSetText('treasure-found', gameData.treasureFound || 0);
-        this.safeSetText('trap-triggered', gameData.trapTriggered || 0);
-        this.safeSetText('trap-goal', gameData.trapGoal || 2);
-        this.safeSetText('cards-per-player', gameData.cardsPerPlayer || 5);
-        this.safeSetText('cards-flipped', gameData.cardsFlippedThisRound || 0);
-        this.safeSetText('treasure-goal', gameData.treasureGoal || 7);
+        try {
+            if (!gameData || typeof gameData !== 'object') {
+                console.warn('無効なゲームデータ:', gameData);
+                return;
+            }
+
+            this.safeSetText('current-round', gameData.currentRound || 1);
+            this.safeSetText('treasure-found', gameData.treasureFound || 0);
+            this.safeSetText('trap-triggered', gameData.trapTriggered || 0);
+            this.safeSetText('trap-goal', gameData.trapGoal || 2);
+            this.safeSetText('cards-per-player', gameData.cardsPerPlayer || 5);
+            this.safeSetText('cards-flipped', gameData.cardsFlippedThisRound || 0);
+            this.safeSetText('treasure-goal', gameData.treasureGoal || 7);
+        } catch (error) {
+            console.error('ゲーム情報更新エラー:', error);
+        }
     }
 
     static showRoundStart(roundNumber) {
-        const overlay = this.safeGetElement('round-start-overlay');
-        const message = this.safeGetElement('round-start-message');
-        
-        if (overlay && message) {
-            message.textContent = `ラウンド ${roundNumber} スタート！`;
-            overlay.style.display = 'flex';
+        try {
+            const overlay = this.safeGetElement('round-start-overlay');
+            const message = this.safeGetElement('round-start-message');
             
-            setTimeout(() => {
-                overlay.style.display = 'none';
-            }, 3000);
+            if (overlay && message) {
+                message.textContent = `ラウンド ${roundNumber || 1} スタート！`;
+                overlay.style.display = 'flex';
+                
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 3000);
+            }
+        } catch (error) {
+            console.error('ラウンド開始表示エラー:', error);
         }
     }
 
     static showVictoryScreen(gameData) {
-        const screen = this.safeGetElement('victory-screen');
-        const title = this.safeGetElement('victory-title');
-        const messageEl = this.safeGetElement('victory-message');
-        const winnersList = this.safeGetElement('winners-list');
-        
-        if (!screen || !title || !messageEl || !winnersList) return;
-        
-        if (gameData.winningTeam === 'adventurer') {
-            title.textContent = '⛏️ 探検家チームの勝利！';
-            title.style.color = '#FFD700';
-        } else {
-            title.textContent = '🐷 豚男チームの勝利！';
-            title.style.color = '#DC143C';
-        }
-        
-        messageEl.textContent = gameData.victoryMessage;
-        
-        winnersList.innerHTML = '<h3>勝利チーム:</h3>';
-        gameData.players.forEach((player) => {
-            if ((gameData.winningTeam === 'adventurer' && player.role === 'adventurer') ||
-                (gameData.winningTeam === 'guardian' && player.role === 'guardian')) {
-                const div = document.createElement('div');
-                div.textContent = `🎉 ${player.name}`;
-                div.style.color = '#FFD700';
-                winnersList.appendChild(div);
+        try {
+            if (!gameData || typeof gameData !== 'object') {
+                console.warn('無効な勝利データ:', gameData);
+                return;
             }
-        });
-        
-        screen.style.display = 'flex';
+
+            const screen = this.safeGetElement('victory-screen');
+            const title = this.safeGetElement('victory-title');
+            const messageEl = this.safeGetElement('victory-message');
+            const winnersList = this.safeGetElement('winners-list');
+            
+            if (!screen || !title || !messageEl || !winnersList) return;
+            
+            if (gameData.winningTeam === 'adventurer') {
+                title.textContent = '⛏️ 探検家チームの勝利！';
+                title.style.color = '#FFD700';
+            } else {
+                title.textContent = '🐷 豚男チームの勝利！';
+                title.style.color = '#DC143C';
+            }
+            
+            messageEl.textContent = gameData.victoryMessage || 'ゲーム終了！';
+            
+            winnersList.innerHTML = '<h3>勝利チーム:</h3>';
+            
+            if (gameData.players && Array.isArray(gameData.players)) {
+                gameData.players.forEach((player) => {
+                    try {
+                        if (!player || typeof player !== 'object') return;
+                        
+                        if ((gameData.winningTeam === 'adventurer' && player.role === 'adventurer') ||
+                            (gameData.winningTeam === 'guardian' && player.role === 'guardian')) {
+                            const div = document.createElement('div');
+                            div.textContent = `🎉 ${player.name || '名前なし'}`;
+                            div.style.color = '#FFD700';
+                            winnersList.appendChild(div);
+                        }
+                    } catch (error) {
+                        console.error('勝者表示エラー:', error, player);
+                    }
+                });
+            }
+            
+            screen.style.display = 'flex';
+        } catch (error) {
+            console.error('勝利画面表示エラー:', error);
+        }
     }
 
     static updateMessages(messages) {
-        const container = this.safeGetElement('chat-container');
-        if (!container) return;
-        
-        const recentMessages = messages.slice(-20);
-        
-        container.innerHTML = '';
-        recentMessages.forEach(msg => {
-            const div = document.createElement('div');
-            div.className = `chat-message ${msg.type}`;
+        try {
+            const container = this.safeGetElement('chat-container');
+            if (!container) return;
             
-            if (msg.type === 'player') {
-                div.textContent = `${msg.playerName}: ${msg.text}`;
-            } else {
-                div.textContent = msg.text;
+            if (!messages || !Array.isArray(messages)) {
+                console.warn('無効なメッセージデータ:', messages);
+                return;
             }
             
-            container.appendChild(div);
-        });
-        
-        container.scrollTop = container.scrollHeight;
+            const recentMessages = messages.slice(-20);
+            
+            container.innerHTML = '';
+            recentMessages.forEach((msg, index) => {
+                try {
+                    if (!msg || typeof msg !== 'object') {
+                        console.warn('無効なメッセージオブジェクト:', msg);
+                        return;
+                    }
+
+                    const div = document.createElement('div');
+                    div.className = `chat-message ${msg.type || 'player'}`;
+                    
+                    if (msg.type === 'player') {
+                        const playerName = msg.playerName || '名前なし';
+                        const text = msg.text || '';
+                        div.textContent = `${playerName}: ${text}`;
+                    } else {
+                        div.textContent = msg.text || '';
+                    }
+                    
+                    container.appendChild(div);
+                } catch (error) {
+                    console.error('メッセージアイテム作成エラー:', error, msg);
+                }
+            });
+            
+            container.scrollTop = container.scrollHeight;
+        } catch (error) {
+            console.error('メッセージ更新エラー:', error);
+        }
     }
 
     // ユーティリティメソッド
     static safeGetElement(id) {
-        const element = document.getElementById(id);
-        if (!element) {
-            console.warn(`⚠️ 要素が見つかりません: #${id}`);
+        try {
+            const element = document.getElementById(id);
+            if (!element) {
+                console.warn(`⚠️ 要素が見つかりません: #${id}`);
+            }
+            return element;
+        } catch (error) {
+            console.error(`要素取得エラー (#${id}):`, error);
+            return null;
         }
-        return element;
     }
 
     static safeSetText(id, text) {
-        const el = this.safeGetElement(id);
-        if (el) {
-            el.textContent = text;
-            return true;
+        try {
+            const el = this.safeGetElement(id);
+            if (el) {
+                el.textContent = String(text || '');
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error(`テキスト設定エラー (#${id}):`, error);
+            return false;
         }
-        return false;
     }
-}
+}ルームアイテム作成エラー:', error, room);
+                }
+            });
+        } catch (error) {
+            console.error('ルーム一覧更新エラー:', error);
+            container.innerHTML = '<p style="text-align: center; color: #DC143C;">ルーム一覧の表示でエラーが発生しました</p>';
+        }
+    }
+
+    static updateOngoingGames(games) {
+        console.log('進行中ゲーム一覧更新:', games ? games.length : 0);
+        const container = this.safeGetElement('ongoing-games-container');
+        if (!container) {
+            console.warn('ongoing-games-container element not found');
+            return;
+        }
+        
+        try {
+            container.innerHTML = '';
+
+            if (!games || !Array.isArray(games) || games.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #32CD32;">現在進行中のゲームはありません</p>';
+                return;
+            }
+
+            games.forEach((game, index) => {
+                try {
+                    if (!game || typeof game !== 'object') {
+                        console.warn('無効なゲームデータ:', game);
+                        return;
+                    }
+
+                    const gameDiv = document.createElement('div');
+                    gameDiv.className = 'ongoing-game-item';
+                    gameDiv.style.cssText = `
+                        background: rgba(4, 56, 76, 0.3);
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin-bottom: 10px;
+                        border: 1px solid rgba(135, 206, 235, 0.2);
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                    `;
+                    
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'ongoing-game-info';
+                    
+                    const gameId = game.id || `GAME${index}`;
+                    const currentRound = game.currentRound || 1;
+                    const playerCount = game.playerCount || 0;
+                    const treasureFound = game.treasureFound || 0;
+                    const treasureGoal = game.treasureGoal || 7;
+                    const trapTriggered = game.trapTriggered || 0;
+                    const trapGoal = game.trapGoal || 2;
+                    
+                    infoDiv.innerHTML = `
+                        <strong>ID: ${gameId}</strong>
+                        <br>
+                        ラウンド: ${currentRound}/4 | プレイヤー: ${playerCount}/10
+                        <br>
+                        救出: ${treasureFound}/${treasureGoal} | 罠: ${trapTriggered}/${trapGoal}
+                    `;
+                    
+                    const spectateBtn = document.createElement('button');
+                    spectateBtn.className = 'btn btn-small';
+                    spectateBtn.textContent = '観戦する';
+                    spectateBtn.style.width = '100%';
+                    
+                    // エラーハンドリング付きのクリックイベント
+                    spectateBtn.onclick = () => {
+                        try {
+                            const spectateRoomInput = this.safeGetElement('spectate-room-id');
+                            const spectatorNameInput = this.safeGetElement('spectator-name');
+                            
+                            if (spectateRoomInput) {
+                                spectateRoomInput.value = gameId;
+                            }
+                            
+                            if (spectatorNameInput && !spectatorNameInput.value.trim()) {
+                                const spectatorName = `観戦者${Math.floor(Math.random() * 1000)}`;
+                                spectatorNameInput.value = spectatorName;
+                            }
+                            
+                            // 観戦者名にフォーカス
+                            if (spectatorNameInput) {
+                                spectatorNameInput.focus();
+                            }
+                            
+                            // PigManGameのspectateRoom メソッドを呼び出し
+                            if (window.pigGame && typeof window.pigGame.spectateRoom === 'function') {
+                                window.pigGame.spectateRoom();
+                            } else {
+                                console.warn('PigManGame インスタンスまたはspectateRoomメソッドが見つかりません');
+                                this.showError('観戦機能を開始できませんでした');
+                            }
+                        } catch (error) {
+                            console.error('観戦ボタンクリックエラー:', error);
+                            this.showError('観戦の準備でエラーが発生しました');
+                        }
+                    };
+                    
+                    gameDiv.appendChild(infoDiv);
+                    gameDiv.appendChild(spectateBtn);
+                    container.appendChild(gameDiv);
+                } catch (error) {
+                    console.error('
