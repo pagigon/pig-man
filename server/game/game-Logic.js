@@ -1,4 +1,4 @@
-// 恐怖の古代寺院ルール完全対応版 game-Logic.js
+// 正しい恐怖の古代寺院ルール対応版 game-Logic.js
 
 function generateRoomId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -218,9 +218,10 @@ function shuffleArray(array) {
     return newArray;
 }
 
-// ラウンドに応じた手札枚数を計算（恐怖の古代寺院ルール）
+// ラウンドに応じた手札枚数を計算（正しい恐怖の古代寺院ルール）
 function getCardsPerPlayerForRound(round) {
-    // 恐怖の古代寺院ルール: 1ラウンド=5枚、2ラウンド=4枚、3ラウンド=3枚、4ラウンド=2枚
+    // 正しい恐怖の古代寺院ルール: 1ラウンド=5枚、2ラウンド=4枚、3ラウンド=3枚、4ラウンド=2枚
+    // ただし、これは各ラウンドでの手札枚数であり、新しいカードは配布されない
     const cardsPerRound = {
         1: 5,
         2: 4,
@@ -231,9 +232,10 @@ function getCardsPerPlayerForRound(round) {
     return cardsPerRound[round] || 5;
 }
 
-// カード配布（ラウンド対応版）
+// カード配布（ゲーム開始時の一回のみ）
 function distributeCards(allCards, playerCount, cardsPerPlayer) {
     console.log('🎴 カード配布開始:', `${playerCount}人に${cardsPerPlayer}枚ずつ`);
+    console.log('⚠️ 注意: これはゲーム開始時の一回のみの配布です');
     
     if (!Array.isArray(allCards) || allCards.length === 0) {
         console.warn('無効なカード配列:', allCards);
@@ -308,7 +310,7 @@ function calculateVictoryGoal(playerCount) {
 
 // 恐怖の古代寺院ゲームデータ初期化
 function initializeGameData(playerCount) {
-    console.log('🎮 ゲームデータ初期化:', playerCount, '人（恐怖の古代寺院ルール）');
+    console.log('🎮 ゲームデータ初期化:', playerCount, '人（正しい恐怖の古代寺院ルール）');
     
     const { cards, treasureCount, trapCount } = generateAllCards(playerCount);
     const { treasureGoal, trapGoal } = calculateVictoryGoal(playerCount);
@@ -329,10 +331,10 @@ function initializeGameData(playerCount) {
         // 役職
         assignedRoles: roles,
         
-        // ゲーム進行（恐怖の古代寺院ルール）
+        // ゲーム進行（正しい恐怖の古代寺院ルール）
         currentRound: 1,
         maxRounds: 4,  // 4ラウンド制
-        cardsPerPlayer: getCardsPerPlayerForRound(1), // 1ラウンド目は5枚
+        cardsPerPlayer: 5, // 1ラウンド目は5枚（以降は手札から減っていく）
         cardsFlippedThisRound: 0,
         
         // 進捗
@@ -343,81 +345,6 @@ function initializeGameData(playerCount) {
         keyHolderId: null,
         turnInRound: 0
     };
-}
-
-// ラウンド進行処理（恐怖の古代寺院ルール）
-function advanceToNextRound(gameData, connectedPlayerCount) {
-    console.log('📋 ===== ラウンド進行処理（恐怖の古代寺院ルール） =====');
-    console.log('現在のラウンド:', gameData.currentRound);
-    
-    // カード公開数をリセット
-    gameData.cardsFlippedThisRound = 0;
-    
-    // ラウンドを進める
-    gameData.currentRound++;
-    console.log(`📈 ラウンド進行: ${gameData.currentRound - 1} → ${gameData.currentRound}`);
-    
-    // 最大ラウンド到達チェック（4ラウンド終了で豚男チーム勝利）
-    if (gameData.currentRound > gameData.maxRounds) {
-        console.log('⏰ 4ラウンド終了！豚男チームの勝利');
-        gameData.gameState = 'finished';
-        gameData.winningTeam = 'guardian';
-        gameData.victoryMessage = `${gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！`;
-        return { gameEnded: true, reason: 'max_rounds_reached' };
-    }
-    
-    // 新しいラウンドの手札枚数を設定
-    const newCardsPerPlayer = getCardsPerPlayerForRound(gameData.currentRound);
-    gameData.cardsPerPlayer = newCardsPerPlayer;
-    
-    console.log(`🆕 ラウンド ${gameData.currentRound} 開始準備完了（手札${newCardsPerPlayer}枚）`);
-    return { newRound: gameData.currentRound, gameEnded: false, cardsPerPlayer: newCardsPerPlayer };
-}
-
-// カード再配布処理（恐怖の古代寺院ルール対応）
-function redistributeCardsForNewRound(gameData, connectedPlayers) {
-    console.log('🃏 ===== カード再配布処理（恐怖の古代寺院ルール） =====');
-    console.log(`ラウンド ${gameData.currentRound} 用のカード配布（${gameData.cardsPerPlayer}枚ずつ）`);
-    
-    try {
-        const playerCount = connectedPlayers.length;
-        
-        // 恐怖の古代寺院ルールで新しいカードセットを生成
-        const { cards } = generateAllCards(playerCount);
-        const { playerHands } = distributeCards(cards, playerCount, gameData.cardsPerPlayer);
-        
-        // 各プレイヤーに新しいカードを配布
-        connectedPlayers.forEach((player, index) => {
-            player.hand = playerHands[index] || [];
-            console.log(`${player.name} に ${player.hand.length} 枚のカードを再配布`);
-        });
-        
-        // ラウンド開始時は最初のプレイヤーに鍵を渡す
-        if (connectedPlayers.length > 0) {
-            const firstPlayer = connectedPlayers[0];
-            gameData.keyHolderId = firstPlayer.id;
-            console.log(`🗝️ ラウンド ${gameData.currentRound} の最初の鍵保持者: ${firstPlayer.name}`);
-        }
-        
-        console.log('✅ カード再配布完了（恐怖の古代寺院ルール）');
-        return true;
-        
-    } catch (error) {
-        console.error('❌ カード再配布エラー:', error);
-        
-        // エラー時のフォールバック処理
-        connectedPlayers.forEach((player) => {
-            player.hand = [];
-            for (let i = 0; i < gameData.cardsPerPlayer; i++) {
-                player.hand.push({
-                    type: 'empty',
-                    id: `empty-${player.id}-fallback-${i}`,
-                    revealed: false
-                });
-            }
-        });
-        return false;
-    }
 }
 
 // ゲーム終了条件チェック（恐怖の古代寺院ルール）
@@ -505,10 +432,10 @@ function validateGameState(gameData) {
         errors.push('現在ラウンドが最大ラウンドを超えています');
     }
     
-    // 恐怖の古代寺院ルール特有のチェック
+    // 正しい恐怖の古代寺院ルール特有のチェック
     const expectedCardsPerPlayer = getCardsPerPlayerForRound(gameData.currentRound);
     if (gameData.cardsPerPlayer !== expectedCardsPerPlayer) {
-        errors.push(`ラウンド${gameData.currentRound}の手札枚数が正しくありません（期待値: ${expectedCardsPerPlayer}、実際: ${gameData.cardsPerPlayer}）`);
+        console.warn(`手札枚数の不整合: ラウンド${gameData.currentRound}では${expectedCardsPerPlayer}枚が期待されますが、実際は${gameData.cardsPerPlayer}枚です`);
     }
     
     return {
@@ -591,8 +518,6 @@ module.exports = {
     getCardStatistics,
     getPlayerStatistics,
     checkGameEndConditions,
-    // 恐怖の古代寺院ルール専用関数
-    getCardsPerPlayerForRound,
-    advanceToNextRound,
-    redistributeCardsForNewRound
+    // 正しい恐怖の古代寺院ルール専用関数
+    getCardsPerPlayerForRound
 };
