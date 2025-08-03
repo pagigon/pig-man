@@ -181,6 +181,112 @@ export class UIManager {
                     roomDiv.appendChild(joinBtn);
                     container.appendChild(roomDiv);
                 } catch (error) {
+                    console.error('ルームアイテム作成エラー:', error, room);
+                }
+            });
+        } catch (error) {
+            console.error('ルーム一覧更新エラー:', error);
+            container.innerHTML = '<p style="text-align: center; color: #DC143C;">ルーム一覧の表示でエラーが発生しました</p>';
+        }
+    }
+
+    static updateOngoingGames(games) {
+        console.log('進行中ゲーム一覧更新:', games ? games.length : 0);
+        const container = this.safeGetElement('ongoing-games-container');
+        if (!container) {
+            console.warn('ongoing-games-container element not found');
+            return;
+        }
+        
+        try {
+            container.innerHTML = '';
+
+            if (!games || !Array.isArray(games) || games.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #32CD32;">現在進行中のゲームはありません</p>';
+                return;
+            }
+
+            games.forEach((game, index) => {
+                try {
+                    if (!game || typeof game !== 'object') {
+                        console.warn('無効なゲームデータ:', game);
+                        return;
+                    }
+
+                    const gameDiv = document.createElement('div');
+                    gameDiv.className = 'ongoing-game-item';
+                    gameDiv.style.cssText = `
+                        background: rgba(4, 56, 76, 0.3);
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin-bottom: 10px;
+                        border: 1px solid rgba(135, 206, 235, 0.2);
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                    `;
+                    
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'ongoing-game-info';
+                    
+                    const gameId = game.id || `GAME${index}`;
+                    const currentRound = game.currentRound || 1;
+                    const playerCount = game.playerCount || 0;
+                    const treasureFound = game.treasureFound || 0;
+                    const treasureGoal = game.treasureGoal || 7;
+                    const trapTriggered = game.trapTriggered || 0;
+                    const trapGoal = game.trapGoal || 2;
+                    
+                    infoDiv.innerHTML = `
+                        <strong>ID: ${gameId}</strong>
+                        <br>
+                        ラウンド: ${currentRound}/4 | プレイヤー: ${playerCount}/10
+                        <br>
+                        救出: ${treasureFound}/${treasureGoal} | 罠: ${trapTriggered}/${trapGoal}
+                    `;
+                    
+                    const spectateBtn = document.createElement('button');
+                    spectateBtn.className = 'btn btn-small';
+                    spectateBtn.textContent = '観戦する';
+                    spectateBtn.style.width = '100%';
+                    
+                    // エラーハンドリング付きのクリックイベント
+                    spectateBtn.onclick = () => {
+                        try {
+                            const spectateRoomInput = this.safeGetElement('spectate-room-id');
+                            const spectatorNameInput = this.safeGetElement('spectator-name');
+                            
+                            if (spectateRoomInput) {
+                                spectateRoomInput.value = gameId;
+                            }
+                            
+                            if (spectatorNameInput && !spectatorNameInput.value.trim()) {
+                                const spectatorName = `観戦者${Math.floor(Math.random() * 1000)}`;
+                                spectatorNameInput.value = spectatorName;
+                            }
+                            
+                            // 観戦者名にフォーカス
+                            if (spectatorNameInput) {
+                                spectatorNameInput.focus();
+                            }
+                            
+                            // PigManGameのspectateRoom メソッドを呼び出し
+                            if (window.pigGame && typeof window.pigGame.spectateRoom === 'function') {
+                                window.pigGame.spectateRoom();
+                            } else {
+                                console.warn('PigManGame インスタンスまたはspectateRoomメソッドが見つかりません');
+                                this.showError('観戦機能を開始できませんでした');
+                            }
+                        } catch (error) {
+                            console.error('観戦ボタンクリックエラー:', error);
+                            this.showError('観戦の準備でエラーが発生しました');
+                        }
+                    };
+                    
+                    gameDiv.appendChild(infoDiv);
+                    gameDiv.appendChild(spectateBtn);
+                    container.appendChild(gameDiv);
+                } catch (error) {
                     console.error('ゲームアイテム作成エラー:', error, game);
                 }
             });
@@ -520,110 +626,4 @@ export class UIManager {
             return false;
         }
     }
-}ルームアイテム作成エラー:', error, room);
-                }
-            });
-        } catch (error) {
-            console.error('ルーム一覧更新エラー:', error);
-            container.innerHTML = '<p style="text-align: center; color: #DC143C;">ルーム一覧の表示でエラーが発生しました</p>';
-        }
-    }
-
-    static updateOngoingGames(games) {
-        console.log('進行中ゲーム一覧更新:', games ? games.length : 0);
-        const container = this.safeGetElement('ongoing-games-container');
-        if (!container) {
-            console.warn('ongoing-games-container element not found');
-            return;
-        }
-        
-        try {
-            container.innerHTML = '';
-
-            if (!games || !Array.isArray(games) || games.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #32CD32;">現在進行中のゲームはありません</p>';
-                return;
-            }
-
-            games.forEach((game, index) => {
-                try {
-                    if (!game || typeof game !== 'object') {
-                        console.warn('無効なゲームデータ:', game);
-                        return;
-                    }
-
-                    const gameDiv = document.createElement('div');
-                    gameDiv.className = 'ongoing-game-item';
-                    gameDiv.style.cssText = `
-                        background: rgba(4, 56, 76, 0.3);
-                        padding: 15px;
-                        border-radius: 8px;
-                        margin-bottom: 10px;
-                        border: 1px solid rgba(135, 206, 235, 0.2);
-                        display: flex;
-                        flex-direction: column;
-                        gap: 10px;
-                    `;
-                    
-                    const infoDiv = document.createElement('div');
-                    infoDiv.className = 'ongoing-game-info';
-                    
-                    const gameId = game.id || `GAME${index}`;
-                    const currentRound = game.currentRound || 1;
-                    const playerCount = game.playerCount || 0;
-                    const treasureFound = game.treasureFound || 0;
-                    const treasureGoal = game.treasureGoal || 7;
-                    const trapTriggered = game.trapTriggered || 0;
-                    const trapGoal = game.trapGoal || 2;
-                    
-                    infoDiv.innerHTML = `
-                        <strong>ID: ${gameId}</strong>
-                        <br>
-                        ラウンド: ${currentRound}/4 | プレイヤー: ${playerCount}/10
-                        <br>
-                        救出: ${treasureFound}/${treasureGoal} | 罠: ${trapTriggered}/${trapGoal}
-                    `;
-                    
-                    const spectateBtn = document.createElement('button');
-                    spectateBtn.className = 'btn btn-small';
-                    spectateBtn.textContent = '観戦する';
-                    spectateBtn.style.width = '100%';
-                    
-                    // エラーハンドリング付きのクリックイベント
-                    spectateBtn.onclick = () => {
-                        try {
-                            const spectateRoomInput = this.safeGetElement('spectate-room-id');
-                            const spectatorNameInput = this.safeGetElement('spectator-name');
-                            
-                            if (spectateRoomInput) {
-                                spectateRoomInput.value = gameId;
-                            }
-                            
-                            if (spectatorNameInput && !spectatorNameInput.value.trim()) {
-                                const spectatorName = `観戦者${Math.floor(Math.random() * 1000)}`;
-                                spectatorNameInput.value = spectatorName;
-                            }
-                            
-                            // 観戦者名にフォーカス
-                            if (spectatorNameInput) {
-                                spectatorNameInput.focus();
-                            }
-                            
-                            // PigManGameのspectateRoom メソッドを呼び出し
-                            if (window.pigGame && typeof window.pigGame.spectateRoom === 'function') {
-                                window.pigGame.spectateRoom();
-                            } else {
-                                console.warn('PigManGame インスタンスまたはspectateRoomメソッドが見つかりません');
-                                this.showError('観戦機能を開始できませんでした');
-                            }
-                        } catch (error) {
-                            console.error('観戦ボタンクリックエラー:', error);
-                            this.showError('観戦の準備でエラーが発生しました');
-                        }
-                    };
-                    
-                    gameDiv.appendChild(infoDiv);
-                    gameDiv.appendChild(spectateBtn);
-                    container.appendChild(gameDiv);
-                } catch (error) {
-                    console.error('
+}
