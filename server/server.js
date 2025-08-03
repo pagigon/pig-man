@@ -3,19 +3,16 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: "*",  // 本番では具体的なドメインを指定推奨
+        origin: "*",
         methods: ["GET", "POST"],
         allowedHeaders: ["*"],
         credentials: false
     },
-    // Render対応の設定
     transports: ['polling', 'websocket'],
     allowEIO3: true,
     pingTimeout: 30000,
     pingInterval: 30000,
-    // 接続タイムアウト
     connectTimeout: 20000,
-    // アップグレード許可
     allowUpgrades: true
 });
 const path = require('path');
@@ -24,7 +21,6 @@ const fs = require('fs');
 // エラーハンドリング
 process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
-    process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -35,7 +31,6 @@ process.on('unhandledRejection', (reason, promise) => {
 const publicPath = path.join(__dirname, '../public');
 console.log('Static files path:', publicPath);
 
-// 静的ファイルの存在確認
 if (!fs.existsSync(publicPath)) {
     console.error('Public directory does not exist:', publicPath);
     process.exit(1);
@@ -95,18 +90,15 @@ app.get('/', (req, res) => {
     }
 });
 
-// Socket.ioハンドラーの設定（分割版）
+// Socket.ioハンドラーの設定（統合版を使用）
 try {
-    const { setupConnectionHandlers } = require('./handlers/connection-handlers');
-    const { setupRateLimitCleanup } = require('./utils/rate-limiter');
-    
-    const socketRequestHistory = setupConnectionHandlers(io);
-    setupRateLimitCleanup(socketRequestHistory);
-    
-    console.log('Socket handlers initialized (分割版)');
+    // 完全版のsocketHandlersを使用
+    const { setupSocketHandlers } = require('./socketHandlers');
+    setupSocketHandlers(io);
+    console.log('Socket handlers initialized (統合版)');
 } catch (error) {
     console.error('Error initializing socket handlers:', error);
-    // Socket.ioなしでも起動できるようにする
+    console.log('Socket.ioなしでサーバーを起動します');
 }
 
 // 404ハンドラー
@@ -132,7 +124,7 @@ const PORT = process.env.PORT || 3000;
 
 // サーバー起動
 const server = http.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ サーバーがポート ${PORT} で起動しました (分割版)`);
+    console.log(`✅ サーバーがポート ${PORT} で起動しました`);
     console.log(`📁 Public files served from: ${publicPath}`);
     console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`💾 Memory usage:`, process.memoryUsage());
