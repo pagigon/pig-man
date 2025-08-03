@@ -1,4 +1,4 @@
-// 恐怖の古代寺院ルール完全対応版 socketHandlers.js
+// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - カードリサイクルシステム統合
 const { 
     generateRoomId, 
     assignRoles, 
@@ -9,14 +9,17 @@ const {
     checkGameEndConditions,
     getCardsPerPlayerForRound,
     advanceToNextRound,
-    redistributeCardsForNewRound
+    redistributeCardsForNewRound,
+    // 🆕 カードリサイクルシステム関数
+    recycleCardsAfterRound,
+    validateGameStateWithRecycling
 } = require('./game/game-Logic');
 
 const activeRooms = new Map();
 const socketRequestHistory = new Map();
 
 function setupSocketHandlers(io) {
-    console.log('🚀 Socket.io ハンドラー設定開始（恐怖の古代寺院ルール完全対応版）');
+    console.log('🚀 Socket.io ハンドラー設定開始（カードリサイクルシステム対応版）');
     
     io.on('connection', (socket) => {
         console.log('✅ 新しい接続確認:', socket.id);
@@ -27,6 +30,263 @@ function setupSocketHandlers(io) {
             lastCreateRequest: 0,
             requestCooldown: 3000 // 3秒
         });
+    
+    // 観戦
+    socket.on('spectateRoom', (data) => {
+        console.log('👁️ 観戦要求:', data);
+        const { roomId, spectatorName } = data;
+        
+        const roomData = activeRooms.get(roomId);
+        if (!roomData) {
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        if (roomData.gameData.gameState !== 'playing') {
+            socket.emit('error', { message: 'このルームはゲーム中ではありません' });
+            return;
+        }
+        
+        socket.join(roomId);
+        socket.roomId = roomId;
+        socket.playerName = spectatorName;
+        socket.isSpectator = true;
+        
+        socket.emit('spectateSuccess', {
+            roomId: roomId,
+            gameData: roomData.gameData
+        });
+        
+        console.log(`✅ ${spectatorName} がルーム ${roomId} を観戦開始`);
+    });
+    
+    // 一時退出
+    socket.on('tempLeaveRoom', () => {
+        console.log('🚶 一時退出:', socket.id);
+        handlePlayerTempLeave(socket, io);
+    });
+    
+    // ルーム退出
+    socket.on('leaveRoom', () => {
+        console.log('🚪 ルーム退出:', socket.id);
+        handlePlayerLeave(socket, io);
+    });
+    
+    // ルーム再接続
+    socket.on('reconnectToRoom', (data) => {
+        console.log('🔄 ルーム再接続要求:', data);
+        const { roomId, playerName } = data;
+        
+        const roomData = activeRooms.get(roomId);
+        if (!roomData) {
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        const player = findPlayerByName(roomData, playerName);
+        if (!player) {
+            socket.emit('error', { message: 'プレイヤーデータが見つかりません' });
+            return;
+        }
+        
+        if (!player.connected) {
+            player.id = socket.id;
+            player.connected = true;
+            player.lastConnected = Date.now();
+            
+            socket.join(roomId);
+            socket.roomId = roomId;
+            socket.playerName = playerName;
+            
+            socket.emit('reconnectSuccess', {
+                roomId: roomId,
+                gameData: roomData.gameData,
+                isHost: roomData.gameData.host === socket.id
+            });
+            
+            io.to(roomId).emit('gameUpdate', roomData.gameData);
+            
+            console.log(`✅ ${playerName} がルーム ${roomId} に再接続完了`);
+        }
+    });
+}
+
+// ユーティリティ関数群
+function createPlayer(socketId, playerName) {
+    return {
+        id: socketId,
+        name: playerName,
+        connected: true,
+        role: null,
+        hand: [],
+        joinedAt: Date.now(),
+        lastConnected: Date.now()
+    };
+}
+
+function isPlayerInAnyRoom(socketId) {
+    for (const roomData of activeRooms.values()) {
+        if (isPlayerInRoom(roomData, socketId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function isPlayerInRoom(roomData, socketId) {
+    return roomData.gameData.players.some(p => p.id === socketId);
+}
+
+function isPlayerNameActiveInRoom(roomData, playerName) {
+    return roomData.gameData.players.some(p => p.name === playerName && p.connected);
+}
+
+function findPlayerByName(roomData, playerName) {
+    return roomData.gameData.players.find(p => p.name === playerName);
+}
+
+function findDisconnectedPlayerByName(roomData, playerName) {
+    return roomData.gameData.players.find(p => p.name === playerName && !p.connected);
+}
+
+function getConnectedPlayerCount(roomData) {
+    return roomData.gameData.players.filter(p => p.connected).length;
+}
+
+function sendRoomList(socket) {
+    try {
+        const roomList = Array.from(activeRooms.values())
+            .filter(roomData => roomData.gameData.gameState === 'waiting')
+            .map(roomData => ({
+                id: roomData.id,
+                hostName: roomData.hostName,
+                playerCount: getConnectedPlayerCount(roomData),
+                hasPassword: !!roomData.gameData.password
+            }));
+        
+        console.log(`📋 ルーム一覧送信: ${roomList.length}個のルーム`);
+        socket.emit('roomList', roomList);
+    } catch (error) {
+        console.error('ルーム一覧送信エラー:', error);
+        socket.emit('roomList', []);
+    }
+}
+
+function sendOngoingGames(socket) {
+    try {
+        const ongoingGames = Array.from(activeRooms.values())
+            .filter(roomData => roomData.gameData.gameState === 'playing')
+            .map(roomData => ({
+                id: roomData.id,
+                currentRound: roomData.gameData.currentRound,
+                maxRounds: roomData.gameData.maxRounds,
+                cardsPerPlayer: roomData.gameData.cardsPerPlayer,
+                playerCount: getConnectedPlayerCount(roomData),
+                treasureFound: roomData.gameData.treasureFound,
+                treasureGoal: roomData.gameData.treasureGoal,
+                trapTriggered: roomData.gameData.trapTriggered,
+                trapGoal: roomData.gameData.trapGoal
+            }));
+        
+        console.log(`📋 進行中ゲーム送信: ${ongoingGames.length}個のゲーム`);
+        socket.emit('ongoingGames', ongoingGames);
+    } catch (error) {
+        console.error('進行中ゲーム送信エラー:', error);
+        socket.emit('ongoingGames', []);
+    }
+}
+
+function broadcastRoomList(io) {
+    try {
+        const roomList = Array.from(activeRooms.values())
+            .filter(roomData => roomData.gameData.gameState === 'waiting')
+            .map(roomData => ({
+                id: roomData.id,
+                hostName: roomData.hostName,
+                playerCount: getConnectedPlayerCount(roomData),
+                hasPassword: !!roomData.gameData.password
+            }));
+        
+        io.emit('roomList', roomList);
+        console.log(`📋 全体ルーム一覧更新: ${roomList.length}個のルーム`);
+    } catch (error) {
+        console.error('全体ルーム一覧更新エラー:', error);
+    }
+}
+
+// プレイヤー処理関数
+function handlePlayerTempLeave(socket, io) {
+    if (!socket.roomId) return;
+    
+    const roomData = activeRooms.get(socket.roomId);
+    if (!roomData) return;
+    
+    const player = roomData.gameData.players.find(p => p.id === socket.id);
+    if (player) {
+        player.connected = false;
+        player.lastDisconnected = Date.now();
+        console.log(`${player.name} が一時退出しました`);
+    }
+    
+    io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+    broadcastRoomList(io);
+}
+
+function handlePlayerLeave(socket, io) {
+    if (!socket.roomId) return;
+    
+    const roomData = activeRooms.get(socket.roomId);
+    if (!roomData) return;
+    
+    roomData.gameData.players = roomData.gameData.players.filter(p => p.id !== socket.id);
+    
+    console.log(`プレイヤー ${socket.playerName} (${socket.id}) をルーム ${socket.roomId} から完全削除`);
+    
+    if (roomData.gameData.host === socket.id) {
+        const nextHost = roomData.gameData.players.find(p => p.connected);
+        if (nextHost) {
+            roomData.gameData.host = nextHost.id;
+            console.log(`新しいホスト: ${nextHost.name}`);
+        }
+    }
+    
+    if (roomData.gameData.players.length === 0) {
+        activeRooms.delete(socket.roomId);
+        console.log('空のルームを削除:', socket.roomId);
+    } else {
+        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+    }
+    
+    broadcastRoomList(io);
+}
+
+function handlePlayerDisconnect(socket, io) {
+    if (!socket.roomId) return;
+    
+    const roomData = activeRooms.get(socket.roomId);
+    if (!roomData) return;
+    
+    const player = roomData.gameData.players.find(p => p.id === socket.id);
+    if (player) {
+        player.connected = false;
+        player.lastDisconnected = Date.now();
+        console.log(`${player.name} が切断しました`);
+    }
+    
+    if (roomData.gameData.players.every(p => !p.connected)) {
+        activeRooms.delete(socket.roomId);
+        console.log('全員切断のためルームを削除:', socket.roomId);
+    } else {
+        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+    }
+    
+    broadcastRoomList(io);
+}
+
+// エクスポート
+module.exports = { 
+    setupSocketHandlers
+};
         
         // 接続直後にルーム一覧を送信
         setTimeout(() => {
@@ -347,9 +607,9 @@ function setupSocketHandlers(io) {
             }
         });
         
-        // カード選択 - 恐怖の古代寺院ルール完全対応版
+        // 🔧 カード選択 - カードリサイクルシステム完全対応版
         socket.on('selectCard', (data) => {
-            console.log('🃏 ===== カード選択要求受信（恐怖の古代寺院ルール） =====');
+            console.log('🃏 ===== カード選択要求受信（カードリサイクル対応版） =====');
             console.log('選択者:', socket.playerName, '(', socket.id, ')');
             console.log('データ:', data);
             
@@ -406,7 +666,7 @@ function setupSocketHandlers(io) {
                 }
                 
                 // 🔧 カード公開前の状態をログ出力
-                console.log('=== カード公開前の状態（恐怖の古代寺院ルール） ===');
+                console.log('=== カード公開前の状態（カードリサイクル対応版） ===');
                 console.log('現在のラウンド:', roomData.gameData.currentRound, '/', roomData.gameData.maxRounds);
                 console.log('このラウンドで公開されたカード数:', roomData.gameData.cardsFlippedThisRound);
                 console.log('接続中プレイヤー数:', getConnectedPlayerCount(roomData));
@@ -447,14 +707,19 @@ function setupSocketHandlers(io) {
                     return;
                 }
                 
-                // ラウンド終了チェック（接続中プレイヤー数と比較）
+                // 鍵を次のプレイヤーに渡す（対象プレイヤーに）
+                roomData.gameData.keyHolderId = data.targetPlayerId;
+                const newKeyHolder = roomData.gameData.players.find(p => p.id === data.targetPlayerId);
+                console.log('🗝️ 鍵の移動:', socket.playerName, '→', newKeyHolder?.name);
+                
+                // 🆕 ラウンド終了チェック（カードリサイクルシステム対応）
                 const connectedPlayerCount = getConnectedPlayerCount(roomData);
                 console.log(`🔄 ラウンド終了チェック: ${roomData.gameData.cardsFlippedThisRound} >= ${connectedPlayerCount} ?`);
                 
                 if (roomData.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
-                    console.log('📋 ラウンド終了条件達成！');
+                    console.log('📋 ===== ラウンド終了条件達成！カードリサイクル開始 =====');
                     
-                    // ラウンド終了処理（恐怖の古代寺院ルール）
+                    // ラウンド終了処理（カードリサイクルシステム使用）
                     const nextRoundResult = advanceToNextRound(roomData.gameData, connectedPlayerCount);
                     
                     if (nextRoundResult.gameEnded) {
@@ -464,20 +729,29 @@ function setupSocketHandlers(io) {
                         return;
                     }
                     
-                    if (nextRoundResult.newRound) {
-                        console.log(`🆕 ラウンド ${nextRoundResult.newRound} 開始準備`);
+                    if (nextRoundResult.newRound && nextRoundResult.needsCardRecycle) {
+                        console.log(`🆕 ラウンド ${nextRoundResult.newRound} 開始準備 - カードリサイクル実行`);
                         
-                        // カードを再配布（恐怖の古代寺院ルール）
+                        // 🔧 カードリサイクルシステムを使用して再配布
                         const connectedPlayers = roomData.gameData.players.filter(p => p.connected);
                         const redistributeSuccess = redistributeCardsForNewRound(roomData.gameData, connectedPlayers);
                         
                         if (redistributeSuccess) {
-                            console.log(`✅ ラウンド ${nextRoundResult.newRound} のカード再配布完了`);
+                            console.log(`✅ ラウンド ${nextRoundResult.newRound} のカードリサイクル完了`);
+                            
+                            // ゲーム状態の検証
+                            const validation = validateGameStateWithRecycling(roomData.gameData);
+                            if (!validation.valid) {
+                                console.warn('⚠️ ゲーム状態検証で問題発見:', validation.errors);
+                            } else {
+                                console.log('✅ ゲーム状態検証OK');
+                            }
                             
                             // 新しいラウンド開始の通知
                             io.to(socket.roomId).emit('roundStart', nextRoundResult.newRound);
                         } else {
-                            console.error('❌ カード再配布に失敗');
+                            console.error('❌ カードリサイクルに失敗');
+                            // エラーの場合でもゲームは継続
                         }
                     }
                 } else {
@@ -485,13 +759,8 @@ function setupSocketHandlers(io) {
                     console.log('🔄 次のプレイヤーにターン移行（ラウンド継続）');
                 }
                 
-                // 鍵を次のプレイヤーに渡す（対象プレイヤーに）
-                roomData.gameData.keyHolderId = data.targetPlayerId;
-                const newKeyHolder = roomData.gameData.players.find(p => p.id === data.targetPlayerId);
-                console.log('🗝️ 鍵の移動:', socket.playerName, '→', newKeyHolder?.name);
-                
                 // 🔧 カード公開後の状態をログ出力
-                console.log('=== カード公開後の状態（恐怖の古代寺院ルール） ===');
+                console.log('=== カード公開後の状態（カードリサイクル対応版） ===');
                 console.log('現在のラウンド:', roomData.gameData.currentRound, '/', roomData.gameData.maxRounds);
                 console.log('このラウンドで公開されたカード数:', roomData.gameData.cardsFlippedThisRound);
                 console.log('現在の手札枚数設定:', roomData.gameData.cardsPerPlayer);
@@ -501,7 +770,7 @@ function setupSocketHandlers(io) {
                 // 全員に更新を送信
                 io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
                 
-                console.log('✅ カード選択処理完了（恐怖の古代寺院ルール）');
+                console.log('✅ カード選択処理完了（カードリサイクルシステム対応）');
                 
             } catch (error) {
                 console.error('❌ カード選択エラー:', error);
@@ -528,10 +797,10 @@ function setupSocketHandlers(io) {
         console.log('🎯 イベントハンドラー登録完了:', socket.id);
     });
     
-    console.log('🏁 Socket.io ハンドラー設定完了（恐怖の古代寺院ルール）');
+    console.log('🏁 Socket.io ハンドラー設定完了（カードリサイクルシステム対応）');
 }
 
-// その他のハンドラー設定
+// その他のハンドラー設定（既存のまま）
 function setupOtherHandlers(socket, io) {
     // チャット送信
     socket.on('sendChat', (message) => {
@@ -566,290 +835,3 @@ function setupOtherHandlers(socket, io) {
             socket.emit('error', { message: 'ルームが見つかりません' });
             return;
         }
-        
-        const existingPlayer = findPlayerByName(roomData, playerName);
-        if (!existingPlayer) {
-            socket.emit('error', { message: 'このルームにあなたのデータが見つかりません' });
-            return;
-        }
-        
-        if (existingPlayer.connected) {
-            socket.emit('error', { message: 'このプレイヤーは既に接続中です' });
-            return;
-        }
-        
-        existingPlayer.id = socket.id;
-        existingPlayer.connected = true;
-        existingPlayer.lastConnected = Date.now();
-        
-        socket.join(roomId);
-        socket.roomId = roomId;
-        socket.playerName = playerName;
-        
-        socket.emit('rejoinSuccess', {
-            roomId: roomId,
-            gameData: roomData.gameData,
-            isHost: roomData.gameData.host === socket.id
-        });
-        
-        io.to(roomId).emit('gameUpdate', roomData.gameData);
-        
-        console.log(`✅ ${playerName} がルーム ${roomId} に再入場完了`);
-    });
-    
-    // 観戦
-    socket.on('spectateRoom', (data) => {
-        console.log('👁️ 観戦要求:', data);
-        const { roomId, spectatorName } = data;
-        
-        const roomData = activeRooms.get(roomId);
-        if (!roomData) {
-            socket.emit('error', { message: 'ルームが見つかりません' });
-            return;
-        }
-        
-        if (roomData.gameData.gameState !== 'playing') {
-            socket.emit('error', { message: 'このルームはゲーム中ではありません' });
-            return;
-        }
-        
-        socket.join(roomId);
-        socket.roomId = roomId;
-        socket.playerName = spectatorName;
-        socket.isSpectator = true;
-        
-        socket.emit('spectateSuccess', {
-            roomId: roomId,
-            gameData: roomData.gameData
-        });
-        
-        console.log(`✅ ${spectatorName} がルーム ${roomId} を観戦開始`);
-    });
-    
-    // 一時退出
-    socket.on('tempLeaveRoom', () => {
-        console.log('🚶 一時退出:', socket.id);
-        handlePlayerTempLeave(socket, io);
-    });
-    
-    // ルーム退出
-    socket.on('leaveRoom', () => {
-        console.log('🚪 ルーム退出:', socket.id);
-        handlePlayerLeave(socket, io);
-    });
-    
-    // ルーム再接続
-    socket.on('reconnectToRoom', (data) => {
-        console.log('🔄 ルーム再接続要求:', data);
-        const { roomId, playerName } = data;
-        
-        const roomData = activeRooms.get(roomId);
-        if (!roomData) {
-            socket.emit('error', { message: 'ルームが見つかりません' });
-            return;
-        }
-        
-        const player = findPlayerByName(roomData, playerName);
-        if (!player) {
-            socket.emit('error', { message: 'プレイヤーデータが見つかりません' });
-            return;
-        }
-        
-        if (!player.connected) {
-            player.id = socket.id;
-            player.connected = true;
-            player.lastConnected = Date.now();
-            
-            socket.join(roomId);
-            socket.roomId = roomId;
-            socket.playerName = playerName;
-            
-            socket.emit('reconnectSuccess', {
-                roomId: roomId,
-                gameData: roomData.gameData,
-                isHost: roomData.gameData.host === socket.id
-            });
-            
-            io.to(roomId).emit('gameUpdate', roomData.gameData);
-            
-            console.log(`✅ ${playerName} がルーム ${roomId} に再接続完了`);
-        }
-    });
-}
-
-// ユーティリティ関数群
-function createPlayer(socketId, playerName) {
-    return {
-        id: socketId,
-        name: playerName,
-        connected: true,
-        role: null,
-        hand: [],
-        joinedAt: Date.now(),
-        lastConnected: Date.now()
-    };
-}
-
-function isPlayerInAnyRoom(socketId) {
-    for (const roomData of activeRooms.values()) {
-        if (isPlayerInRoom(roomData, socketId)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function isPlayerInRoom(roomData, socketId) {
-    return roomData.gameData.players.some(p => p.id === socketId);
-}
-
-function isPlayerNameActiveInRoom(roomData, playerName) {
-    return roomData.gameData.players.some(p => p.name === playerName && p.connected);
-}
-
-function findPlayerByName(roomData, playerName) {
-    return roomData.gameData.players.find(p => p.name === playerName);
-}
-
-function findDisconnectedPlayerByName(roomData, playerName) {
-    return roomData.gameData.players.find(p => p.name === playerName && !p.connected);
-}
-
-function getConnectedPlayerCount(roomData) {
-    return roomData.gameData.players.filter(p => p.connected).length;
-}
-
-function sendRoomList(socket) {
-    try {
-        const roomList = Array.from(activeRooms.values())
-            .filter(roomData => roomData.gameData.gameState === 'waiting')
-            .map(roomData => ({
-                id: roomData.id,
-                hostName: roomData.hostName,
-                playerCount: getConnectedPlayerCount(roomData),
-                hasPassword: !!roomData.gameData.password
-            }));
-        
-        console.log(`📋 ルーム一覧送信: ${roomList.length}個のルーム`);
-        socket.emit('roomList', roomList);
-    } catch (error) {
-        console.error('ルーム一覧送信エラー:', error);
-        socket.emit('roomList', []);
-    }
-}
-
-function sendOngoingGames(socket) {
-    try {
-        const ongoingGames = Array.from(activeRooms.values())
-            .filter(roomData => roomData.gameData.gameState === 'playing')
-            .map(roomData => ({
-                id: roomData.id,
-                currentRound: roomData.gameData.currentRound,
-                maxRounds: roomData.gameData.maxRounds,
-                cardsPerPlayer: roomData.gameData.cardsPerPlayer,
-                playerCount: getConnectedPlayerCount(roomData),
-                treasureFound: roomData.gameData.treasureFound,
-                treasureGoal: roomData.gameData.treasureGoal,
-                trapTriggered: roomData.gameData.trapTriggered,
-                trapGoal: roomData.gameData.trapGoal
-            }));
-        
-        console.log(`📋 進行中ゲーム送信: ${ongoingGames.length}個のゲーム`);
-        socket.emit('ongoingGames', ongoingGames);
-    } catch (error) {
-        console.error('進行中ゲーム送信エラー:', error);
-        socket.emit('ongoingGames', []);
-    }
-}
-
-function broadcastRoomList(io) {
-    try {
-        const roomList = Array.from(activeRooms.values())
-            .filter(roomData => roomData.gameData.gameState === 'waiting')
-            .map(roomData => ({
-                id: roomData.id,
-                hostName: roomData.hostName,
-                playerCount: getConnectedPlayerCount(roomData),
-                hasPassword: !!roomData.gameData.password
-            }));
-        
-        io.emit('roomList', roomList);
-        console.log(`📋 全体ルーム一覧更新: ${roomList.length}個のルーム`);
-    } catch (error) {
-        console.error('全体ルーム一覧更新エラー:', error);
-    }
-}
-
-// プレイヤー処理関数
-function handlePlayerTempLeave(socket, io) {
-    if (!socket.roomId) return;
-    
-    const roomData = activeRooms.get(socket.roomId);
-    if (!roomData) return;
-    
-    const player = roomData.gameData.players.find(p => p.id === socket.id);
-    if (player) {
-        player.connected = false;
-        player.lastDisconnected = Date.now();
-        console.log(`${player.name} が一時退出しました`);
-    }
-    
-    io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
-    broadcastRoomList(io);
-}
-
-function handlePlayerLeave(socket, io) {
-    if (!socket.roomId) return;
-    
-    const roomData = activeRooms.get(socket.roomId);
-    if (!roomData) return;
-    
-    roomData.gameData.players = roomData.gameData.players.filter(p => p.id !== socket.id);
-    
-    console.log(`プレイヤー ${socket.playerName} (${socket.id}) をルーム ${socket.roomId} から完全削除`);
-    
-    if (roomData.gameData.host === socket.id) {
-        const nextHost = roomData.gameData.players.find(p => p.connected);
-        if (nextHost) {
-            roomData.gameData.host = nextHost.id;
-            console.log(`新しいホスト: ${nextHost.name}`);
-        }
-    }
-    
-    if (roomData.gameData.players.length === 0) {
-        activeRooms.delete(socket.roomId);
-        console.log('空のルームを削除:', socket.roomId);
-    } else {
-        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
-    }
-    
-    broadcastRoomList(io);
-}
-
-function handlePlayerDisconnect(socket, io) {
-    if (!socket.roomId) return;
-    
-    const roomData = activeRooms.get(socket.roomId);
-    if (!roomData) return;
-    
-    const player = roomData.gameData.players.find(p => p.id === socket.id);
-    if (player) {
-        player.connected = false;
-        player.lastDisconnected = Date.now();
-        console.log(`${player.name} が切断しました`);
-    }
-    
-    if (roomData.gameData.players.every(p => !p.connected)) {
-        activeRooms.delete(socket.roomId);
-        console.log('全員切断のためルームを削除:', socket.roomId);
-    } else {
-        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
-    }
-    
-    broadcastRoomList(io);
-}
-
-// エクスポート
-module.exports = { 
-    setupSocketHandlers
-};
