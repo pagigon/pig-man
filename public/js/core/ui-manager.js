@@ -174,13 +174,13 @@ export class UIManager {
         }
     }
 
-    // ゲーム概要更新（カードリサイクル対応版）
+    // ゲーム概要更新（元のルール通り）
     static updateGameOverview(playerCount) {
         try {
             let roleText = '';
             let cardText = '';
 
-            // バランス調整済みの役職とカード構成
+            // 元の恐怖の古代寺院ルールに従った役職とカード構成
             switch (playerCount) {
                 case 3:
                     roleText = '探検家 1-2人、豚男 1-2人';
@@ -192,34 +192,34 @@ export class UIManager {
                     break;
                 case 5:
                     roleText = '探検家 3人、豚男 2人';
-                    cardText = '子豚7匹、罠3個、空き部屋15個'; // 調整済み
+                    cardText = '子豚7匹、罠2個、空き部屋16個';
                     break;
                 case 6:
                     roleText = '探検家 4人、豚男 2人';
-                    cardText = '子豚8匹、罠3個、空き部屋19個'; // 調整済み
+                    cardText = '子豚8匹、罠2個、空き部屋20個';
                     break;
                 case 7:
                     roleText = '探検家 4-5人、豚男 2-3人';
-                    cardText = '子豚7匹、罠3個、空き部屋25個'; // 調整済み
+                    cardText = '子豚7匹、罠2個、空き部屋26個';
                     break;
                 case 8:
                     roleText = '探検家 5-6人、豚男 2-3人';
-                    cardText = '子豚8匹、罠3個、空き部屋29個'; // 調整済み
+                    cardText = '子豚8匹、罠2個、空き部屋30個';
                     break;
                 case 9:
                     roleText = '探検家 6人、豚男 3人';
-                    cardText = '子豚9匹、罠4個、空き部屋32個'; // 調整済み
+                    cardText = '子豚9匹、罠2個、空き部屋34個';
                     break;
                 case 10:
                     roleText = '探検家 6-7人、豚男 3-4人';
-                    cardText = '子豚10匹、罠4個、空き部屋36個'; // 調整済み
+                    cardText = '子豚10匹、罠3個、空き部屋37個';
                     break;
                 default:
                     roleText = 'プレイヤー数: ' + playerCount + '人';
                     cardText = 'カード構成を計算中...';
             }
 
-            // 🆕 カードリサイクルの説明を追加
+            // カードリサイクルの説明を追加
             cardText += '<br><small style="color: #FFA500;">※ラウンド終了時、公開カードは除去され空き部屋で補充</small>';
 
             this.safeSetText('role-possibility-text', roleText);
