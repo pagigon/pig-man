@@ -1,5 +1,38 @@
-// 修正版 UIManager クラス - 恐怖の古代寺院ルール対応
+// 修正版 UIManager クラス - シンプルなラウンド表示
 export class UIManager {
+    // 恐怖の古代寺院ルール対応のゲーム情報更新（シンプル版）
+    static updateGameInfo(gameData) {
+        try {
+            if (!gameData || typeof gameData !== 'object') {
+                console.warn('無効なゲームデータ:', gameData);
+                return;
+            }
+
+            console.log('📊 ゲーム情報更新開始:', gameData);
+
+            // シンプルに個別要素を更新（親要素は変更しない）
+            this.safeSetText('current-round', gameData.currentRound || 1);
+            this.safeSetText('treasure-found', gameData.treasureFound || 0);
+            this.safeSetText('trap-triggered', gameData.trapTriggered || 0);
+            this.safeSetText('trap-goal', gameData.trapGoal || 2);
+            this.safeSetText('treasure-goal', gameData.treasureGoal || 7);
+            this.safeSetText('cards-per-player', gameData.cardsPerPlayer || 5);
+            this.safeSetText('cards-flipped', gameData.cardsFlippedThisRound || 0);
+            
+            console.log('✅ ゲーム情報更新完了:', {
+                round: (gameData.currentRound || 1) + '/4',
+                cardsPerPlayer: gameData.cardsPerPlayer || 5,
+                treasures: (gameData.treasureFound || 0) + '/' + (gameData.treasureGoal || 7),
+                traps: (gameData.trapTriggered || 0) + '/' + (gameData.trapGoal || 2)
+            });
+            
+        } catch (error) {
+            console.error('❌ ゲーム情報更新エラー:', error);
+            // エラーが起きても処理を継続
+        }
+    }
+
+    // その他の既存メソッドはそのまま...
     static showSpectatorMode(isSpectator) {
         try {
             const existingIndicator = document.getElementById('spectator-indicator');
@@ -496,63 +529,6 @@ export class UIManager {
         }
     }
 
-    // 恐怖の古代寺院ルール対応のゲーム情報更新
-    static updateGameInfo(gameData) {
-        try {
-            if (!gameData || typeof gameData !== 'object') {
-                console.warn('無効なゲームデータ:', gameData);
-                return;
-            }
-
-            // 基本情報
-            this.safeSetText('current-round', gameData.currentRound || 1);
-            this.safeSetText('treasure-found', gameData.treasureFound || 0);
-            this.safeSetText('trap-triggered', gameData.trapTriggered || 0);
-            this.safeSetText('trap-goal', gameData.trapGoal || 2);
-            this.safeSetText('treasure-goal', gameData.treasureGoal || 7);
-            
-            // 恐怖の古代寺院ルール特有の情報
-            this.safeSetText('cards-per-player', gameData.cardsPerPlayer || 5);
-            this.safeSetText('cards-flipped', gameData.cardsFlippedThisRound || 0);
-            
-            // ラウンド情報の詳細表示
-            const roundDisplayEl = this.safeGetElement('current-round');
-            if (roundDisplayEl && gameData.maxRounds) {
-                roundDisplayEl.parentElement.innerHTML = 
-                    '<span class="label">R</span>' +
-                    '<span class="value">' + (gameData.currentRound || 1) + '/' + gameData.maxRounds + '</span>';
-            }
-            
-            // 手札枚数情報にラウンド対応の説明を追加
-            const cardsPerPlayerEl = this.safeGetElement('cards-per-player');
-            if (cardsPerPlayerEl) {
-                const currentRound = gameData.currentRound || 1;
-                let expectedCards = 5;
-                switch (currentRound) {
-                    case 1: expectedCards = 5; break;
-                    case 2: expectedCards = 4; break;
-                    case 3: expectedCards = 3; break;
-                    case 4: expectedCards = 2; break;
-                    default: expectedCards = 5; break;
-                }
-                
-                // 設定値と期待値が異なる場合の警告
-                if (gameData.cardsPerPlayer !== expectedCards) {
-                    console.warn(`手札枚数の不整合: ラウンド${currentRound}では${expectedCards}枚が期待されますが、実際は${gameData.cardsPerPlayer}枚です`);
-                }
-            }
-            
-            console.log('ゲーム情報更新完了（恐怖の古代寺院ルール）:', {
-                round: gameData.currentRound + '/' + gameData.maxRounds,
-                cardsPerPlayer: gameData.cardsPerPlayer,
-                progress: gameData.treasureFound + '/' + gameData.treasureGoal + ' | ' + gameData.trapTriggered + '/' + gameData.trapGoal
-            });
-            
-        } catch (error) {
-            console.error('ゲーム情報更新エラー:', error);
-        }
-    }
-
     static showRoundStart(roundNumber) {
         try {
             const overlay = this.safeGetElement('round-start-overlay');
@@ -658,13 +634,6 @@ export class UIManager {
             
             screen.style.display = 'flex';
             
-            console.log('勝利画面表示完了（恐怖の古代寺院ルール）:', {
-                winner: gameData.winningTeam,
-                finalRound: finalRound + '/' + maxRounds,
-                treasures: treasureFound + '/' + treasureGoal,
-                traps: trapTriggered + '/' + trapGoal
-            });
-            
         } catch (error) {
             console.error('勝利画面表示エラー:', error);
         }
@@ -713,72 +682,6 @@ export class UIManager {
             container.scrollTop = container.scrollHeight;
         } catch (error) {
             console.error('メッセージ更新エラー:', error);
-        }
-    }
-
-    // 恐怖の古代寺院ルール対応の追加情報表示
-    static showRoundInfo(gameData) {
-        try {
-            if (!gameData || typeof gameData !== 'object') return;
-            
-            // ラウンド情報をより詳しく表示するための追加情報
-            const currentRound = gameData.currentRound || 1;
-            const maxRounds = gameData.maxRounds || 4;
-            const cardsPerPlayer = gameData.cardsPerPlayer || 5;
-            
-            // ラウンド別の期待手札枚数
-            const expectedCards = this.getExpectedCardsForRound(currentRound);
-            
-            // 不整合がある場合の警告表示
-            if (cardsPerPlayer !== expectedCards) {
-                console.warn(`手札枚数の不整合を検出: ラウンド${currentRound}では${expectedCards}枚が期待されますが、実際は${cardsPerPlayer}枚です`);
-                
-                // エラーメッセージとして表示
-                this.showError(`手札枚数の不整合: R${currentRound}では${expectedCards}枚が期待されます`, 'warning');
-            }
-            
-        } catch (error) {
-            console.error('ラウンド情報表示エラー:', error);
-        }
-    }
-    
-    // 恐怖の古代寺院ルール: ラウンド別期待手札枚数
-    static getExpectedCardsForRound(round) {
-        const cardsPerRound = {
-            1: 5,
-            2: 4,
-            3: 3,
-            4: 2
-        };
-        return cardsPerRound[round] || 5;
-    }
-
-    // デバッグ用: ゲーム状態の詳細表示
-    static logGameState(gameData, prefix = '') {
-        try {
-            if (!gameData) {
-                console.log(prefix + 'ゲームデータなし');
-                return;
-            }
-            
-            console.log(prefix + '=== ゲーム状態（恐怖の古代寺院ルール） ===');
-            console.log(prefix + 'ラウンド: ' + (gameData.currentRound || 1) + '/' + (gameData.maxRounds || 4));
-            console.log(prefix + '手札枚数: ' + (gameData.cardsPerPlayer || 5) + '枚');
-            console.log(prefix + 'このラウンドの公開数: ' + (gameData.cardsFlippedThisRound || 0));
-            console.log(prefix + '救出: ' + (gameData.treasureFound || 0) + '/' + (gameData.treasureGoal || 7));
-            console.log(prefix + '罠: ' + (gameData.trapTriggered || 0) + '/' + (gameData.trapGoal || 2));
-            console.log(prefix + 'ゲーム状態: ' + (gameData.gameState || '不明'));
-            
-            if (gameData.players && Array.isArray(gameData.players)) {
-                console.log(prefix + 'プレイヤー数: ' + gameData.players.filter(p => p && p.connected).length);
-            }
-            
-            const keyHolder = gameData.players && gameData.players.find(p => p && p.id === gameData.keyHolderId);
-            console.log(prefix + '鍵保持者: ' + (keyHolder ? keyHolder.name : '不明'));
-            console.log(prefix + '=======================================');
-            
-        } catch (error) {
-            console.error('ゲーム状態ログ出力エラー:', error);
         }
     }
 
