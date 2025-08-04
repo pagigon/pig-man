@@ -230,7 +230,12 @@ export class SocketClient {
 
         this.socket.on('roundStart', (roundNumber) => {
             try {
-                UIManager.showRoundStart(roundNumber);
+                // 🔧 正しいカードリサイクル対応のラウンド開始表示
+                if (UIManager.showRoundStartWithRecycle) {
+                    UIManager.showRoundStartWithRecycle(roundNumber);
+                } else {
+                    UIManager.showRoundStart(roundNumber);
+                }
             } catch (error) {
                 console.error('ラウンド開始表示エラー:', error);
             }
