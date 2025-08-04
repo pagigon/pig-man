@@ -119,7 +119,7 @@ setupEventListeners() {
     // 接続成功
     this.socket.on('connect', () => {
         console.log('✅ Socket.io 接続成功:', this.socket.id);
-        console.log('Transport:', this.socket.io.engine.transport.name);
+        console.log('Transport:', this.socket && this.socket.io && this.socket.io.engine && this.socket.io.engine.transport ? this.socket.io.engine.transport.name : 'unknown');
         
         this.game.mySocketId = this.socket.id;
         UIManager.showConnectionStatus('connected');
@@ -525,14 +525,77 @@ setupEventListeners() {
         }, 1000);
     }
 
-    // デバッグ用メソッド
-    getDebugInfo() {
+    // デバッグ用メソッドの修正
+getDebugInfo() {
+    try {
         return {
-            socketId: this.socket?.id || 'なし',
+            socketId: this.socket && this.socket.id ? this.socket.id : 'なし',
             connected: this.isConnected(),
             connecting: this.isConnecting,
-            transport: this.socket?.io?.engine?.transport?.name || 'なし',
+            transport: this.socket && this.socket.io && this.socket.io.engine && this.socket.io.engine.transport ? this.socket.io.engine.transport.name : 'なし',
             reconnectAttempts: this.reconnectAttempts
+        };
+    } catch (error) {
+        console.error('デバッグ情報取得エラー:', error);
+        return {
+            error: 'デバッグ情報取得失敗',
+            socketId: 'エラー',
+            connected: false,
+            connecting: false,
+            transport: 'エラー',
+            reconnectAttempts: 0
         };
     }
 }
+
+// setupEventListeners内の接続成功処理も修正
+this.socket.on('connect', () => {
+    console.log('✅ Socket.io 接続成功:', this.socket.id);
+    
+    // Transport情報の安全な取得
+    let transportName = 'unknown';
+    try {
+        if (this.socket && this.socket.io && this.socket.io.engine && this.socket.io.engine.transport) {
+            transportName = this.socket.io.engine.transport.name;
+        }
+    } catch (e) {
+        console.warn('Transport名取得エラー:', e);
+    }
+    console.log('Transport:', transportName);
+    
+    this.game.mySocketId = this.socket.id;
+    UIManager.showConnectionStatus('connected');
+    this.reconnectAttempts = 0;
+    this.isConnecting = false;
+    
+    // 接続後の処理を遅延実行
+    setTimeout(() => {
+        this.getRoomList();
+        this.getOngoingGames();
+    }, 2000);
+});
+
+// エラーハンドリングでのオプショナルチェーニング修正
+this.socket.on('connect_error', (error) => {
+    console.error('❌ Socket.io 接続エラー:', error);
+    this.reconnectAttempts++;
+    this.isConnecting = false;
+    
+    // エラーメッセージの安全な取得
+    let errorMessage = '';
+    try {
+        errorMessage = error && error.message ? error.message : 'Unknown error';
+    } catch (e) {
+        errorMessage = 'Error parsing failed';
+    }
+    
+    // 400エラーの検出
+    if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {
+        console.warn('🔧 Render.com環境での400エラーを検出');
+        UIManager.showError('サーバーが一時的に利用できません。しばらく待ってから再試行してください。', 'warning');
+    } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        UIManager.showError('サーバーに接続できません。ページをリロードしてください。');
+    } else {
+        UIManager.showError(`接続エラー (${this.reconnectAttempts}/${this.maxReconnectAttempts}): ${errorMessage}`, 'warning');
+    }
+});
