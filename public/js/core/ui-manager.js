@@ -79,6 +79,15 @@ export class UIManager {
                 message.innerHTML = roundMessage + '<br>' + subMessage;
                 overlay.style.display = 'flex';
                 
+                // 🔧 バイブレーション追加
+                if (navigator.vibrate) {
+                    if (roundNum > 1) {
+                        navigator.vibrate([100, 50, 100, 50, 100, 50, 200]); // リサイクル完了
+                    } else {
+                        navigator.vibrate([100, 50, 100, 50, 200]); // 初期開始
+                    }
+                }
+                
                 setTimeout(function() {
                     overlay.style.display = 'none';
                 }, 3500);
