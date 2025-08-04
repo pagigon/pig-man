@@ -1,3 +1,9 @@
+function setupGameHandlers(io, socket) {
+    const activeRooms = getActiveRooms();
+    
+    // 🔧 【追加】チャットハンドラーからゲームログ機能を取得
+    const { sendGameLog } = require('./chat-handlers');
+
 // ゲーム関連のSocket.ioイベントハンドラー
 const { getActiveRooms, updateRoomList } = require('./room-handlers');
 
@@ -112,6 +118,25 @@ function setupGameHandlers(io, socket) {
             
             // カードを公開
             selectedCard.revealed = true;
+            // 🔧 【追加】ゲームログをチャットに送信
+            const selectorName = room.gameData.players.find(p => p.id === socket.id)?.name || '不明';
+            const targetName = targetPlayer.name;
+            let logMessage = '';
+            
+            if (selectedCard.type === 'treasure') {
+                room.gameData.treasureFound++;
+                logMessage = `🐷 ${selectorName} が ${targetName} のカードを選択 → 子豚発見！ (${room.gameData.treasureFound}/${room.gameData.treasureGoal})`;
+            } else if (selectedCard.type === 'trap') {
+                room.gameData.trapTriggered++;
+                logMessage = `💀 ${selectorName} が ${targetName} のカードを選択 → 罠発動！ (${room.gameData.trapTriggered}/${room.gameData.trapGoal})`;
+            } else {
+                logMessage = `🏠 ${selectorName} が ${targetName} のカードを選択 → 空き部屋でした`;
+            }
+            
+            // ゲームログをチャットに送信
+            sendGameLog(io, socket.roomId, logMessage);
+            
+            room.gameData.cardsFlippedThisRound++;
             
             // 進捗更新
             if (selectedCard.type === 'treasure') {
