@@ -162,44 +162,54 @@ export class PigManGame {
         }
     }
 
-    addManualReconnectButton() {
-        try {
-            // 既存のボタンがあれば削除
-            const existingBtn = document.getElementById('manual-reconnect');
-            if (existingBtn) {
-                existingBtn.remove();
-            }
+// public/js/core/game.js の addManualReconnectButton メソッドを修正
 
-            const reconnectBtn = document.createElement('button');
-            reconnectBtn.id = 'manual-reconnect';
-            reconnectBtn.className = 'btn btn-small';
-            reconnectBtn.textContent = '🔄 再接続';
-            reconnectBtn.style.cssText = `
-                position: fixed;
-                top: 10px;
-                left: 200px;
-                z-index: 1000;
-                width: auto;
-                font-size: 12px;
-                padding: 6px 12px;
-            `;
-            
-            reconnectBtn.onclick = () => {
-                console.log('手動再接続ボタンクリック');
-                try {
-                    this.socketClient.forceReconnect();
-                    UIManager.showError('再接続を試行中...', 'warning');
-                } catch (error) {
-                    console.error('手動再接続エラー:', error);
-                    UIManager.showError('再接続に失敗しました');
-                }
-            };
-            
-            document.body.appendChild(reconnectBtn);
-        } catch (error) {
-            console.error('手動再接続ボタン追加エラー:', error);
+addManualReconnectButton() {
+    try {
+        // 既存のボタンがあれば削除
+        const existingBtn = document.getElementById('manual-reconnect');
+        if (existingBtn) {
+            existingBtn.remove();
         }
+
+        const reconnectBtn = document.createElement('button');
+        reconnectBtn.id = 'manual-reconnect';
+        reconnectBtn.className = 'btn btn-small';
+        reconnectBtn.textContent = '🔄 再接続';
+        reconnectBtn.style.cssText = `
+            position: fixed;
+            top: 10px;
+            left: 200px;
+            z-index: 1000;
+            width: auto;
+            font-size: 12px;
+            padding: 6px 12px;
+        `;
+        
+        reconnectBtn.onclick = () => {
+            console.log('手動再接続ボタンクリック');
+            
+            // 🔧 ゲーム中の再接続を防止
+            if (this.roomId && this.gameData) {
+                console.warn('⚠️ ゲーム中の手動再接続はスキップします');
+                UIManager.showError('ゲーム中は再接続ボタンを使用できません', 'warning');
+                return;
+            }
+            
+            try {
+                this.socketClient.forceReconnect();
+                UIManager.showError('再接続を試行中...', 'warning');
+            } catch (error) {
+                console.error('手動再接続エラー:', error);
+                UIManager.showError('再接続に失敗しました');
+            }
+        };
+        
+        document.body.appendChild(reconnectBtn);
+    } catch (error) {
+        console.error('手動再接続ボタン追加エラー:', error);
     }
+}
 
     // サーバーからのイベント処理 - roomManagerに委譲（エラーハンドリング強化）
     onRoomCreated(data) {
