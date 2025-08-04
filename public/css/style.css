@@ -894,6 +894,14 @@ body {
     font-style: italic;
 }
 
+.chat-message.game-log {
+    color: #32CD32;
+    background: rgba(50, 205, 50, 0.1);
+    border-left: 3px solid #32CD32;
+    font-weight: bold;
+    padding-left: 12px;
+}
+
 .chat-message.player {
     color: #FFD700;
     background: rgba(4, 56, 76, 0.3);
