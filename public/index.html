@@ -108,7 +108,8 @@
                         <li><strong>探検家チーム</strong>：豚に変えられた子供をすべて救出することが目標</li>
                         <li><strong>豚男チーム</strong>：罠をすべて発動させるか、4ラウンド終了まで子供たちを守る（隠す）ことが目標</li>
                         <li><strong style="color: #FFA500;">ラウンド制</strong>：全4ラウンド。手札は1R→5枚、2R→4枚、3R→3枚、4R→2枚と減少</li>
-                        <li><strong style="color: #87CEEB;">カードリサイクル</strong>：ラウンド終了時、公開されたカードは除去され、空き部屋カードで補充</li>
+                        <li><strong style="color: #32CD32;">正しいカードリサイクル</strong>：ラウンド終了時、全カード回収→残存カード保証→再配布</li>
+                        <li><strong style="color: #FFD700;">カード保証システム</strong>：未発見の子豚・未発動の罠は必ず手札に含まれます</li>
                         <li>各プレイヤーには最初5枚のカードが配られます</li>
                         <li>自分のカードの内訳は分かりますが、位置は分かりません</li>
                         <li>鍵を持った人が、他のプレイヤーのカードを1枚選んで公開します</li>
@@ -182,7 +183,7 @@
                 </div>
             </div>
 
-            <!-- ラウンド別手札枚数対応のゲーム情報 -->
+            <!-- 正しいカードリサイクル対応のゲーム情報 -->
             <div class="game-info mobile-compact">
                 <div class="info-row">
                     <div class="info-item">
@@ -206,9 +207,9 @@
                         <span class="value"><span id="cards-flipped">0</span>枚</span>
                     </div>
                 </div>
-                <!-- カードリサイクル情報 -->
+                <!-- 正しいカードリサイクル情報 -->
                 <div class="recycle-info" style="text-align: center; margin-top: 8px; font-size: 11px; color: #FFA500;">
-                    <span id="recycle-status">ラウンド終了時、公開カードは空き部屋で補充されます</span>
+                    <span id="recycle-status">ラウンド終了時：全カード回収→残存カード保証→再配布</span>
                 </div>
             </div>
 
@@ -267,7 +268,7 @@
             </div>
         </div>
 
-        <!-- ラウンド開始演出（カードリサイクル情報付き） -->
+        <!-- 正しいカードリサイクル対応のラウンド開始演出 -->
         <div id="round-start-overlay" class="round-start-overlay">
             <div class="round-start-text">
                 <h1 id="round-start-message">ラウンド 1 スタート！</h1>
