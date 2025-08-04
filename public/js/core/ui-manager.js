@@ -635,7 +635,11 @@ export class UIManager {
                         const playerName = msg.playerName || '名前なし';
                         const text = msg.text || '';
                         div.textContent = playerName + ': ' + text;
+                     } else if (msg.type === 'game-log') {
+                        // 🔧 【追加】ゲームログの表示
+                        div.textContent = msg.text || '';
                     } else {
+                        // システムメッセージ
                         div.textContent = msg.text || '';
                     }
                     
