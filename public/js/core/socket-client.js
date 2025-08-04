@@ -14,7 +14,7 @@ export class SocketClient {
     }
 
 initializeSocket() {
-    console.log('Socket.io 初期化開始 (Render対応)');
+    console.log('Socket.io 初期化開始 (Render.com最適化)');
     
     if (typeof io === 'undefined') {
         console.error('❌ Socket.io が読み込まれていません');
@@ -30,34 +30,53 @@ initializeSocket() {
     this.isConnecting = true;
 
     try {
+        // 🔧 Render.com環境に最適化されたSocket.io設定
         const socketConfig = {
-            transports: ['polling', 'websocket'],
-            timeout: 20000,
+            // Render.comでの接続問題を回避
+            transports: ['polling'],          // pollingのみ使用（WebSocket無効）
+            forceNew: true,                   // 強制的に新しい接続を作成
+            
+            // タイムアウト設定
+            timeout: 30000,                   // 接続タイムアウトを30秒に延長
+            pingTimeout: 60000,               // pingタイムアウトを60秒に延長
+            pingInterval: 25000,              // pingを25秒間隔で送信
+            
+            // 再接続設定
             reconnection: true,
-            reconnectionAttempts: this.maxReconnectAttempts,
-            reconnectionDelay: 2000,
+            reconnectionAttempts: 5,          // 再接続試行回数を削減
+            reconnectionDelay: 3000,          // 再接続間隔を3秒に延長
             reconnectionDelayMax: 10000,
-            forceNew: false,
-            pingInterval: 25000,
-            pingTimeout: 20000,
-            upgrade: true,
-            autoConnect: true,
-            // 🔧 Render.com 対応の追加設定
+            
+            // Render.com固有の設定
+            upgrade: false,                   // transport upgradeを無効化
             rememberUpgrade: false,
-            transports: ['polling'], // WebSocket接続エラーを避けるため polling のみ使用
+            autoConnect: true,
+            
+            // 追加のステーブル化設定
+            withCredentials: false,
+            timestampRequests: true,
+            timestampParam: 't'
         };
 
-        console.log('Socket.io 設定:', socketConfig);
+        console.log('Socket.io 設定 (Render.com最適化):', socketConfig);
         
-        // 既存のSocketがあれば切断
+        // 既存のSocketがあれば完全に切断
         if (this.socket) {
-            this.socket.disconnect();
+            console.log('既存Socket切断中...');
+            try {
+                this.socket.removeAllListeners();
+                this.socket.disconnect();
+                this.socket.close();
+            } catch (e) {
+                console.warn('既存Socket切断時のエラー:', e);
+            }
             this.socket = null;
         }
 
+        // 新しいSocket接続を作成
         this.socket = io(socketConfig);
 
-        console.log('Socket.io インスタンス作成成功');
+        console.log('Socket.io インスタンス作成成功 (Render.com対応)');
         this.setupEventListeners();
         this.setupConnectionMonitoring();
         
@@ -68,73 +87,105 @@ initializeSocket() {
     }
 }
 
-    setupEventListeners() {
-        console.log('Socket イベントリスナー設定開始');
-        
-        if (!this.socket) {
-            console.error('❌ Socket が存在しません');
+// 🔧 接続監視の改良
+setupConnectionMonitoring() {
+    this.connectionTimeout = setTimeout(() => {
+        if (!this.isConnected()) {
+            console.warn('⚠️ 初期接続がタイムアウトしました');
+            UIManager.showError('サーバー接続に時間がかかっています...', 'warning');
             this.isConnecting = false;
-            return;
         }
+    }, 30000); // タイムアウトを30秒に延長
 
-        // 接続イベント
-        this.socket.on('connect', () => {
-            console.log('✅ Socket.io 接続成功:', this.socket.id);
-            console.log('Transport:', this.socket.io.engine.transport.name);
+    // 🔧 定期的な接続チェックの頻度を削減（負荷軽減）
+    setInterval(() => {
+        if (this.socket && !this.socket.connected && !this.isConnecting) {
+            console.warn('⚠️ Socket接続が切れています - 自動再接続中...');
+            // 自動再接続を無効化（Render.comでは手動制御の方が安定）
+        }
+    }, 60000); // 60秒間隔に変更
+}
+
+// 🔧 エラーハンドリングの強化
+setupEventListeners() {
+    console.log('Socket イベントリスナー設定開始 (Render.com対応)');
+    
+    if (!this.socket) {
+        console.error('❌ Socket が存在しません');
+        this.isConnecting = false;
+        return;
+    }
+
+    // 接続成功
+    this.socket.on('connect', () => {
+        console.log('✅ Socket.io 接続成功:', this.socket.id);
+        console.log('Transport:', this.socket.io.engine.transport.name);
+        
+        this.game.mySocketId = this.socket.id;
+        UIManager.showConnectionStatus('connected');
+        this.reconnectAttempts = 0;
+        this.isConnecting = false;
+        
+        // 接続後の処理を遅延実行（Render.com環境での安定化）
+        setTimeout(() => {
+            this.getRoomList();
+            this.getOngoingGames();
+        }, 2000); // 2秒遅延
+    });
+
+    // 切断イベント（改良版）
+    this.socket.on('disconnect', (reason) => {
+        console.log('❌ Socket.io 切断:', reason);
+        UIManager.showConnectionStatus('disconnected');
+        this.isConnecting = false;
+        
+        // Render.com環境でよくある切断理由への対応
+        if (reason === 'transport close' || reason === 'transport error') {
+            console.log('🔄 Render.com環境での切断を検出 - 再接続準備中...');
+            UIManager.showError('接続が不安定です。自動的に再接続します...', 'warning');
             
-            this.game.mySocketId = this.socket.id;
-            UIManager.showConnectionStatus('connected');
-            this.reconnectAttempts = 0;
-            this.isConnecting = false;
-            
-            // 接続後少し待ってからルーム一覧を取得
+            // 3秒後に再接続を試行
             setTimeout(() => {
-                this.getRoomList();
-                this.getOngoingGames();
-            }, 1000);
-        });
+                if (!this.socket.connected && !this.isConnecting) {
+                    this.forceReconnect();
+                }
+            }, 3000);
+        } else if (reason !== 'io client disconnect') {
+            UIManager.showError('サーバーとの接続が切断されました。再接続を試行中...', 'warning');
+        }
+    });
 
-        // Transport変更を監視
-        this.socket.io.on('upgrade', (transport) => {
-            console.log('🔄 Transport アップグレード:', transport.name);
-        });
+    // エラーイベント（改良版）
+    this.socket.on('connect_error', (error) => {
+        console.error('❌ Socket.io 接続エラー:', error);
+        this.reconnectAttempts++;
+        this.isConnecting = false;
+        
+        // Render.com環境での一般的なエラーへの対応
+        if (error.message.includes('400') || error.message.includes('Bad Request')) {
+            console.warn('🔧 Render.com環境での400エラーを検出');
+            UIManager.showError('サーバーが一時的に利用できません。しばらく待ってから再試行してください。', 'warning');
+        } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            UIManager.showError('サーバーに接続できません。ページをリロードしてください。');
+        } else {
+            UIManager.showError(`接続エラー (${this.reconnectAttempts}/${this.maxReconnectAttempts}): ${error.message}`, 'warning');
+        }
+    });
 
-        // 切断イベント
-        this.socket.on('disconnect', (reason) => {
-            console.log('❌ Socket.io 切断:', reason);
-            UIManager.showConnectionStatus('disconnected');
-            this.isConnecting = false;
-            
-            if (reason !== 'io client disconnect') {
-                UIManager.showError('サーバーとの接続が切断されました。再接続を試行中...', 'warning');
-            }
-        });
+    // 再接続試行（改良版）
+    this.socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`🔄 再接続試行 ${attemptNumber}/${this.maxReconnectAttempts} (Render.com対応)`);
+        UIManager.showError(`再接続中... (${attemptNumber}/${this.maxReconnectAttempts})`, 'warning');
+    });
 
-        // エラーイベント
-        this.socket.on('connect_error', (error) => {
-            console.error('❌ Socket.io 接続エラー:', error);
-            this.reconnectAttempts++;
-            this.isConnecting = false;
-            
-            if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                UIManager.showError('サーバーに接続できません。ページをリロードしてください。');
-            } else {
-                UIManager.showError(`接続エラー (${this.reconnectAttempts}/${this.maxReconnectAttempts}): ${error.message}`, 'warning');
-            }
-        });
+    // 再接続成功
+    this.socket.on('reconnect', (attemptNumber) => {
+        console.log(`✅ 再接続成功 (試行回数: ${attemptNumber})`);
+        UIManager.showError('サーバーに再接続しました！', 'success');
+        this.isConnecting = false;
+    });
 
-        // 再接続試行
-        this.socket.on('reconnect_attempt', (attemptNumber) => {
-            console.log(`🔄 再接続試行 ${attemptNumber}/${this.maxReconnectAttempts}`);
-            UIManager.showError(`再接続中... (${attemptNumber}/${this.maxReconnectAttempts})`, 'warning');
-        });
-
-        // 再接続成功
-        this.socket.on('reconnect', (attemptNumber) => {
-            console.log(`✅ 再接続成功 (試行回数: ${attemptNumber})`);
-            UIManager.showError('サーバーに再接続しました！', 'success');
-            this.isConnecting = false;
-        });
+}
 
         // ゲーム関連イベント
         this.socket.on('roomList', (rooms) => {
