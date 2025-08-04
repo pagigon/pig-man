@@ -22,6 +22,8 @@ export class GameBoard {
             this.safeUpdateGameOverview();
             this.safeUpdateProgressBars();
             this.safeUpdateGameInfo();
+            // 🔧 正しいカードリサイクル情報も更新
+           UIManager.updateRoundDisplayWithCards(this.game.gameData);
             this.safeUpdateKeyHolder();
             this.safeShowPlayerRole();
             this.safeRenderMyCards();
