@@ -1,6 +1,8 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
+// server/server.js のSocket.io設定を以下に置き換え
+
 const io = require('socket.io')(http, {
     cors: {
         origin: "*",
@@ -8,13 +10,52 @@ const io = require('socket.io')(http, {
         allowedHeaders: ["*"],
         credentials: false
     },
-    transports: ['polling', 'websocket'],
+    // 🔧 Render.com環境に最適化されたSocket.io設定
+    transports: ['polling'],           // pollingのみ許可（WebSocket無効）
     allowEIO3: true,
-    pingTimeout: 30000,
-    pingInterval: 30000,
-    connectTimeout: 20000,
-    allowUpgrades: true
+    
+    // タイムアウト設定の最適化
+    pingTimeout: 60000,                // pingタイムアウトを60秒に延長
+    pingInterval: 25000,               // pingを25秒間隔で送信
+    connectTimeout: 30000,             // 接続タイムアウトを30秒に延長
+    
+    // Render.com環境での安定性向上設定
+    allowUpgrades: false,              // transport upgradeを無効化
+    maxHttpBufferSize: 1e6,           // HTTPバッファサイズを1MBに制限
+    
+    // 接続管理の最適化
+    serveClient: false,                // クライアント配信を無効化
+    cookie: false,                     // cookieを無効化
+    
+    // エラー処理の改善
+    destroyUpgrade: false,
+    destroyUpgradeTimeout: 1000
 });
+
+// 🔧 サーバー側の接続監視とクリーンアップ
+io.engine.on('connection_error', (err) => {
+    console.log('Socket.io Engine 接続エラー:', {
+        req: err.req?.url || 'unknown',      // リクエストURL
+        code: err.code,                      // エラーコード
+        message: err.message,                // エラーメッセージ
+        context: err.context,                // エラーコンテキスト
+        type: err.type                       // エラータイプ
+    });
+});
+
+// 定期的なクリーンアップ（Render.com環境での推奨設定）
+setInterval(() => {
+    const connectedSockets = io.sockets.sockets.size;
+    console.log(`📊 Socket統計: ${connectedSockets}個の接続中`);
+    
+    // 非アクティブな接続のクリーンアップ
+    io.sockets.sockets.forEach((socket) => {
+        if (!socket.connected) {
+            console.log(`🧹 非アクティブSocket切断: ${socket.id}`);
+            socket.disconnect(true);
+        }
+    });
+}, 5 * 60 * 1000); // 5分間隔
 const path = require('path');
 const fs = require('fs');
 
