@@ -1,4 +1,4 @@
-// 恐怖の古代寺院ルール完全対応版 game-Logic.js - カードリサイクル修正
+// 恐怖の古代寺院ルール完全対応版 game-Logic.js - カードリサイクルシステム完全版
 
 function generateRoomId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -275,9 +275,9 @@ function distributeCards(allCards, playerCount, cardsPerPlayer) {
     return { playerHands, remainingCards: shuffledCards };
 }
 
-// 🔧 修正版：カードリサイクルシステム
+// カードリサイクルシステム - 完全版
 function recycleCardsAfterRound(gameData, connectedPlayers) {
-    console.log('♻️ ===== カードリサイクル処理開始（修正版） =====');
+    console.log('♻️ ===== カードリサイクル処理開始（完全版） =====');
     console.log(`ラウンド ${gameData.currentRound} 終了後のカード処理`);
     
     try {
@@ -433,7 +433,7 @@ function calculateVictoryGoal(playerCount) {
     return { treasureGoal, trapGoal };
 }
 
-// ラウンド進行処理（修正版）
+// ラウンド進行処理（カードリサイクル対応版）
 function advanceToNextRound(gameData, connectedPlayerCount) {
     console.log('📋 ===== ラウンド進行処理 =====');
     console.log('現在のラウンド:', gameData.currentRound);
@@ -465,6 +465,49 @@ function advanceToNextRound(gameData, connectedPlayerCount) {
         cardsPerPlayer: newCardsPerPlayer,
         needsCardRecycle: true 
     };
+}
+
+// カード再配布処理（リサイクルシステム統合）
+function redistributeCardsForNewRound(gameData, connectedPlayers) {
+    console.log('🃏 ===== 新ラウンド用カード再配布処理 =====');
+    console.log(`ラウンド ${gameData.currentRound} 用のカード処理`);
+    
+    try {
+        // 1. カードリサイクル処理を実行
+        const recycleResult = recycleCardsAfterRound(gameData, connectedPlayers);
+        
+        if (!recycleResult.success) {
+            console.error('カードリサイクル処理に失敗:', recycleResult.error);
+            return false;
+        }
+        
+        // 2. 最初のプレイヤーに鍵を渡す
+        if (connectedPlayers.length > 0) {
+            const firstPlayer = connectedPlayers[0];
+            gameData.keyHolderId = firstPlayer.id;
+            console.log(`🗝️ ラウンド ${gameData.currentRound} の最初の鍵保持者: ${firstPlayer.name}`);
+        }
+        
+        // 3. リサイクル結果をログ出力
+        console.log('📊 リサイクル統計:', {
+            removedCards: recycleResult.removedCards,
+            newCardsPerPlayer: recycleResult.newCardsPerPlayer,
+            revealedStats: recycleResult.stats
+        });
+        
+        console.log('✅ 新ラウンド用カード再配布完了（リサイクルシステム使用）');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ カード再配布エラー:', error);
+        
+        // エラー時のフォールバック処理
+        const cardsPerPlayer = gameData.cardsPerPlayer || 5;
+        connectedPlayers.forEach((player) => {
+            player.hand = generateEmptyCards(cardsPerPlayer, `${player.id}-fallback`);
+        });
+        return false;
+    }
 }
 
 // ゲーム終了条件チェック
@@ -558,6 +601,130 @@ function initializeGameData(playerCount) {
     };
 }
 
+// ゲーム状態の詳細検証（リサイクルシステム対応）
+function validateGameStateWithRecycling(gameData) {
+    if (!gameData || typeof gameData !== 'object') {
+        return { valid: false, errors: ['ゲームデータが無効'] };
+    }
+    
+    const errors = [];
+    
+    // 必須フィールドチェック
+    const requiredFields = [
+        'treasureGoal', 'trapGoal', 'currentRound', 'maxRounds',
+        'treasureFound', 'trapTriggered', 'cardsFlippedThisRound', 'cardsPerPlayer'
+    ];
+    
+    requiredFields.forEach(field => {
+        if (typeof gameData[field] !== 'number') {
+            errors.push(`${field}が数値ではありません`);
+        }
+    });
+    
+    // 論理チェック
+    if (gameData.treasureFound > gameData.treasureGoal) {
+        errors.push('発見済み財宝数が目標を超えています');
+    }
+    
+    if (gameData.trapTriggered > gameData.trapGoal) {
+        errors.push('発動済み罠数が目標を超えています');
+    }
+    
+    if (gameData.currentRound > gameData.maxRounds) {
+        errors.push('現在ラウンドが最大ラウンドを超えています');
+    }
+    
+    // 恐怖の古代寺院ルール特有のチェック
+    const expectedCardsPerPlayer = getCardsPerPlayerForRound(gameData.currentRound);
+    if (gameData.cardsPerPlayer !== expectedCardsPerPlayer) {
+        errors.push(`ラウンド${gameData.currentRound}の手札枚数が正しくありません（期待値: ${expectedCardsPerPlayer}、実際: ${gameData.cardsPerPlayer}）`);
+    }
+    
+    // カードリサイクル関連のチェック
+    if (gameData.players && Array.isArray(gameData.players)) {
+        gameData.players.forEach((player, index) => {
+            if (player.hand && Array.isArray(player.hand)) {
+                // 手札枚数チェック
+                if (player.hand.length !== gameData.cardsPerPlayer) {
+                    errors.push(`プレイヤー${index}の手札枚数が不正です（期待値: ${gameData.cardsPerPlayer}、実際: ${player.hand.length}）`);
+                }
+                
+                // 公開済みカードの不整合チェック
+                const revealedCount = player.hand.filter(card => card.revealed).length;
+                if (revealedCount > 0 && gameData.cardsFlippedThisRound === 0) {
+                    console.warn(`プレイヤー${index}に公開済みカードが残っています（リサイクル漏れの可能性）`);
+                }
+            }
+        });
+    }
+    
+    return {
+        valid: errors.length === 0,
+        errors: errors
+    };
+}
+
+// その他のユーティリティ関数
+function getCardStatistics(players) {
+    const stats = {
+        revealed: { treasure: 0, trap: 0, empty: 0 },
+        hidden: { treasure: 0, trap: 0, empty: 0 },
+        total: { treasure: 0, trap: 0, empty: 0 }
+    };
+    
+    if (!Array.isArray(players)) {
+        return stats;
+    }
+    
+    players.forEach(player => {
+        if (player && Array.isArray(player.hand)) {
+            player.hand.forEach(card => {
+                if (card && card.type) {
+                    stats.total[card.type]++;
+                    if (card.revealed) {
+                        stats.revealed[card.type]++;
+                    } else {
+                        stats.hidden[card.type]++;
+                    }
+                }
+            });
+        }
+    });
+    
+    return stats;
+}
+
+function getPlayerStatistics(players) {
+    if (!Array.isArray(players)) {
+        return { connected: 0, adventurers: 0, guardians: 0 };
+    }
+    
+    const stats = {
+        connected: 0,
+        adventurers: 0,
+        guardians: 0,
+        withCards: 0
+    };
+    
+    players.forEach(player => {
+        if (player && player.connected) {
+            stats.connected++;
+            
+            if (player.role === 'adventurer') {
+                stats.adventurers++;
+            } else if (player.role === 'guardian') {
+                stats.guardians++;
+            }
+            
+            if (player.hand && player.hand.length > 0) {
+                stats.withCards++;
+            }
+        }
+    });
+    
+    return stats;
+}
+
 module.exports = {
     generateRoomId,
     assignRoles,
@@ -566,9 +733,15 @@ module.exports = {
     distributeCards,
     calculateVictoryGoal,
     initializeGameData,
+    validateGameStateWithRecycling,
+    getCardStatistics,
+    getPlayerStatistics,
     checkGameEndConditions,
+    // 恐怖の古代寺院ルール専用関数
     getCardsPerPlayerForRound,
     advanceToNextRound,
+    redistributeCardsForNewRound,
+    // カードリサイクルシステム関数
     recycleCardsAfterRound,
     generateEmptyCards,
     getRevealedCardStatistics
