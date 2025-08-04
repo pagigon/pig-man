@@ -1,129 +1,8 @@
-// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - カードリサイクル完全対応版
-const { 
-    generateRoomId, 
-    assignRoles, 
-    generateAllCards, 
-    distributeCards, 
-    calculateVictoryGoal,
-    initializeGameData,
-    checkGameEndConditions,
-    getCardsPerPlayerForRound,
-    advanceToNextRound,
-    recycleCardsAfterRound
-} = require('./game/game-Logic');
-
-const activeRooms = new Map();
-const socketRequestHistory = new Map();
-
-function setupSocketHandlers(io) {
-    console.log('🚀 Socket.io ハンドラー設定開始（カードリサイクル完全対応版）');
-    
-    io.on('connection', (socket) => {
-        console.log('✅ 新しい接続確認:', socket.id);
-        
-        // Socket毎の要求履歴を初期化
-        socketRequestHistory.set(socket.id, {
-            lastJoinRequest: 0,
-            lastCreateRequest: 0,
-            requestCooldown: 3000 // 3秒
-        });
-        
-        // 接続直後にルーム一覧を送信
-        setTimeout(() => {
-            sendRoomList(socket);
-        }, 1000);
-        
-        // ルーム一覧要求
-        socket.on('getRoomList', () => {
-            console.log('📋 ルーム一覧要求受信:', socket.id);
-            sendRoomList(socket);
-        });
-        
-        // 進行中ゲーム一覧要求
-        socket.on('getOngoingGames', () => {
-            console.log('📋 進行中ゲーム一覧要求受信:', socket.id);
-            sendOngoingGames(socket);
-        });
-        
-        // ルーム作成
-        socket.on('createRoom', (data) => {
-            const now = Date.now();
-            const history = socketRequestHistory.get(socket.id);
-            
-            // クールダウンチェック
-            if (history && (now - history.lastCreateRequest) < history.requestCooldown) {
-                console.warn(`⚠️ Socket ${socket.id} 作成クールダウン中`);
-                socket.emit('error', { 
-                    message: 'しばらく待ってから再試行してください' 
-                });
-                return;
-            }
-            
-            // 履歴更新
-            if (history) {
-                history.lastCreateRequest = now;
-            }
-            
-            console.log('🏠 ===== ルーム作成要求受信 =====');
-            console.log('Socket ID:', socket.id);
-            console.log('データ:', JSON.stringify(data, null, 2));
-            
-            // 既に他のルームにいないかチェック
-            if (isPlayerInAnyRoom(socket.id)) {
-                socket.emit('error', { 
-                    message: '既に他のルームに参加しています' 
-                });
-                return;
-            }
-            
-            try {
-                const roomId = generateRoomId();
-                console.log('生成ルームID:', roomId);
-                
-                // プレイヤーデータ作成
-                const hostPlayer = createPlayer(socket.id, data.playerName || 'プレイヤー');
-                
-                const gameData = {
-                    id: roomId,
-                    players: [hostPlayer],
-                    gameState: 'waiting',
-                    host: socket.id,
-                    password: data.hasPassword ? data.password : null,
-                    messages: [],
-                    currentRound: 1,
-                    treasureFound: 0,
-                    trapTriggered: 0,
-                    treasureGoal: 7,
-                    trapGoal: 2,
-                    totalTreasures: 7,
-                    totalTraps: 2,
-                    keyHolderId: null,
-                    cardsPerPlayer: 5,
-                    cardsFlippedThisRound: 0,
-                    maxRounds: 4,
-                    turnInRound: 0,
-                    allCards: [],
-                    playerHands: {},
-                    remainingCards: []
-                };
-                
-                // ルームを保存
-                const roomData = {
-                    id: roomId,
-                    hostName: data.playerName || 'プレイヤー',
-                    gameData: gameData,
-                    createdAt: Date.now()
-                };
-                
-                activeRooms.set(roomId, roomData);
-                
-                // ソケットルーム参加
-                socket.join(roomId);
+socket.join(roomId);
                 socket.roomId = roomId;
                 socket.playerName = data.playerName;
                 console.log('ソケットルーム参加完了:', roomId);
                 
-                // 応答データ作成
                 const responseData = {
                     roomId: roomId,
                     gameData: gameData,
@@ -134,13 +13,10 @@ function setupSocketHandlers(io) {
                     }
                 };
                 
-                // クライアントに応答送信
                 socket.emit('roomCreated', responseData);
                 console.log('✅ roomCreated イベント送信完了');
                 
-                // 全クライアントにルーム一覧更新を送信
                 broadcastRoomList(io);
-                
                 console.log('🎉 ===== ルーム作成処理完了 =====');
                 
             } catch (error) {
@@ -279,14 +155,11 @@ function setupSocketHandlers(io) {
             try {
                 console.log('🎭 ゲーム開始:', connectedCount, '人');
                 
-                // ゲーム初期化
                 const gameInitData = initializeGameData(connectedCount);
                 console.log('ゲーム初期化データ:', gameInitData);
                 
-                // ゲームデータに反映
                 Object.assign(roomData.gameData, gameInitData);
                 
-                // 役職割り当て
                 const connectedPlayers = roomData.gameData.players.filter(p => p.connected);
                 console.log('接続中プレイヤー:', connectedPlayers.map(p => p.name));
                 
@@ -295,7 +168,6 @@ function setupSocketHandlers(io) {
                     console.log(`${player.name} → ${player.role}`);
                 });
                 
-                // 1ラウンド目のカード配布（5枚ずつ）
                 const round1CardsPerPlayer = getCardsPerPlayerForRound(1);
                 console.log(`1ラウンド目: ${round1CardsPerPlayer}枚ずつ配布`);
                 
@@ -305,19 +177,16 @@ function setupSocketHandlers(io) {
                     round1CardsPerPlayer
                 );
                 
-                // 各プレイヤーにカードを配布
                 connectedPlayers.forEach((player, index) => {
                     player.hand = playerHands[index] || [];
                     console.log(`${player.name} に ${player.hand.length} 枚配布`);
                 });
                 
-                // 最初のプレイヤーに鍵を渡す
                 if (connectedPlayers.length > 0) {
                     roomData.gameData.keyHolderId = connectedPlayers[0].id;
                     console.log(`🗝️ 初期鍵保持者: ${connectedPlayers[0].name}`);
                 }
                 
-                // ゲーム状態更新
                 roomData.gameData.gameState = 'playing';
                 roomData.gameData.cardsPerPlayer = round1CardsPerPlayer;
                 
@@ -331,11 +200,9 @@ function setupSocketHandlers(io) {
                     keyHolder: connectedPlayers[0]?.name
                 });
                 
-                // 全プレイヤーにゲーム開始を通知
                 io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
                 io.to(socket.roomId).emit('roundStart', 1);
                 
-                // ルーム一覧から削除（進行中ゲームは非表示）
                 broadcastRoomList(io);
                 
                 console.log(`✅ ルーム ${socket.roomId} でゲーム開始完了`);
@@ -346,9 +213,9 @@ function setupSocketHandlers(io) {
             }
         });
         
-        // カード選択 - カードリサイクル完全対応版
+        // 🔧 カード選択 - 正しいカードリサイクル対応版
         socket.on('selectCard', (data) => {
-            console.log('🃏 ===== カード選択要求受信（リサイクル完全対応版） =====');
+            console.log('🃏 ===== カード選択要求受信（正しいリサイクル対応版） =====');
             console.log('選択者:', socket.playerName, '(', socket.id, ')');
             console.log('データ:', data);
             
@@ -363,20 +230,17 @@ function setupSocketHandlers(io) {
                 return;
             }
             
-            // 観戦者チェック
             if (socket.isSpectator) {
                 socket.emit('error', { message: '観戦者はカードを選択できません' });
                 return;
             }
             
-            // ターンチェック
             if (roomData.gameData.keyHolderId !== socket.id) {
                 socket.emit('error', { message: 'あなたのターンではありません' });
                 return;
             }
             
             try {
-                // 対象プレイヤーを検索
                 const targetPlayer = roomData.gameData.players.find(p => p.id === data.targetPlayerId);
                 if (!targetPlayer) {
                     console.error('対象プレイヤーが見つかりません:', data.targetPlayerId);
@@ -387,7 +251,6 @@ function setupSocketHandlers(io) {
                 console.log('対象プレイヤー:', targetPlayer.name);
                 console.log('カードインデックス:', data.cardIndex);
                 
-                // カードの存在チェック
                 if (!targetPlayer.hand || !targetPlayer.hand[data.cardIndex]) {
                     console.error('カードが存在しません');
                     socket.emit('error', { message: '無効なカード選択です' });
@@ -397,14 +260,12 @@ function setupSocketHandlers(io) {
                 const selectedCard = targetPlayer.hand[data.cardIndex];
                 console.log('選択されたカード:', selectedCard);
                 
-                // 既に公開済みかチェック
                 if (selectedCard.revealed) {
                     console.warn('既に公開済みのカード');
                     socket.emit('error', { message: 'そのカードは既に公開されています' });
                     return;
                 }
                 
-                // カード公開前の状態をログ出力
                 console.log('=== カード公開前の状態 ===');
                 console.log('現在のラウンド:', roomData.gameData.currentRound, '/', roomData.gameData.maxRounds);
                 console.log('このラウンドで公開されたカード数:', roomData.gameData.cardsFlippedThisRound);
@@ -428,7 +289,6 @@ function setupSocketHandlers(io) {
                     console.log('🏠 空き部屋でした');
                 }
                 
-                // このラウンドで公開されたカード数を増加
                 roomData.gameData.cardsFlippedThisRound++;
                 console.log(`📊 このラウンドでのカード公開数: ${roomData.gameData.cardsFlippedThisRound}`);
                 
@@ -440,25 +300,23 @@ function setupSocketHandlers(io) {
                     roomData.gameData.winningTeam = endResult.winner;
                     roomData.gameData.victoryMessage = endResult.message;
                     
-                    // 勝利画面表示
                     io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
                     console.log('✅ 勝利条件達成 - ゲーム終了');
                     return;
                 }
                 
-                // 鍵を次のプレイヤーに渡す（対象プレイヤーに）
+                // 鍵を次のプレイヤーに渡す
                 roomData.gameData.keyHolderId = data.targetPlayerId;
                 const newKeyHolder = roomData.gameData.players.find(p => p.id === data.targetPlayerId);
                 console.log('🗝️ 鍵の移動:', socket.playerName, '→', newKeyHolder?.name);
                 
-                // ラウンド終了チェック（カードリサイクル完全対応）
+                // 🔧 ラウンド終了チェック（正しいカードリサイクル対応）
                 const connectedPlayerCount = getConnectedPlayerCount(roomData);
                 console.log(`🔄 ラウンド終了チェック: ${roomData.gameData.cardsFlippedThisRound} >= ${connectedPlayerCount} ?`);
                 
                 if (roomData.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
-                    console.log('📋 ===== ラウンド終了条件達成！カードリサイクル開始 =====');
+                    console.log('📋 ===== ラウンド終了条件達成！正しいカードリサイクル開始 =====');
                     
-                    // ラウンド終了処理
                     const nextRoundResult = advanceToNextRound(roomData.gameData, connectedPlayerCount);
                     
                     if (nextRoundResult.gameEnded) {
@@ -468,15 +326,16 @@ function setupSocketHandlers(io) {
                     }
                     
                     if (nextRoundResult.newRound) {
-                        console.log(`🆕 ラウンド ${nextRoundResult.newRound} 開始準備 - カードリサイクル実行`);
+                        console.log(`🆕 ラウンド ${nextRoundResult.newRound} 開始準備 - 正しいカードリサイクル実行`);
                         
-                        // カードリサイクル処理を実行
+                        // 🔧 正しいカードリサイクルシステムを実行
                         const connectedPlayers = roomData.gameData.players.filter(p => p.connected);
-                        const recycleResult = recycleCardsAfterRound(roomData.gameData, connectedPlayers);
+                        const recycleResult = correctCardRecycleSystem(roomData.gameData, connectedPlayers);
                         
                         if (recycleResult.success) {
-                            console.log(`✅ ラウンド ${nextRoundResult.newRound} のカードリサイクル完了`);
+                            console.log(`✅ ラウンド ${nextRoundResult.newRound} の正しいカードリサイクル完了`);
                             console.log('リサイクル統計:', recycleResult);
+                            console.log('カード保証検証:', recycleResult.verification);
                             
                             // 最初のプレイヤーに鍵を渡す
                             if (connectedPlayers.length > 0) {
@@ -487,15 +346,13 @@ function setupSocketHandlers(io) {
                             // 新しいラウンド開始の通知
                             io.to(socket.roomId).emit('roundStart', nextRoundResult.newRound);
                         } else {
-                            console.error('❌ カードリサイクルに失敗:', recycleResult.error);
+                            console.error('❌ 正しいカードリサイクルに失敗:', recycleResult.error);
                         }
                     }
                 } else {
-                    // 通常のターン移行
                     console.log('🔄 次のプレイヤーにターン移行（ラウンド継続）');
                 }
                 
-                // カード公開後の状態をログ出力
                 console.log('=== カード公開後の状態 ===');
                 console.log('現在のラウンド:', roomData.gameData.currentRound, '/', roomData.gameData.maxRounds);
                 console.log('このラウンドで公開されたカード数:', roomData.gameData.cardsFlippedThisRound);
@@ -506,7 +363,7 @@ function setupSocketHandlers(io) {
                 // 全員に更新を送信
                 io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
                 
-                console.log('✅ カード選択処理完了（カードリサイクル完全対応）');
+                console.log('✅ カード選択処理完了（正しいカードリサイクル対応）');
                 
             } catch (error) {
                 console.error('❌ カード選択エラー:', error);
@@ -533,7 +390,7 @@ function setupSocketHandlers(io) {
         console.log('🎯 イベントハンドラー登録完了:', socket.id);
     });
     
-    console.log('🏁 Socket.io ハンドラー設定完了（カードリサイクル完全対応）');
+    console.log('🏁 Socket.io ハンドラー設定完了（正しいカードリサイクル対応）');
 }
 
 // その他のハンドラー設定
@@ -796,6 +653,26 @@ function handlePlayerTempLeave(socket, io) {
     if (player) {
         player.connected = false;
         player.lastDisconnected = Date.now();
+        console.log(`${player.name} が切断しました`);
+    }
+    
+    if (roomData.gameData.players.every(p => !p.connected)) {
+        activeRooms.delete(socket.roomId);
+        console.log('全員切断のためルームを削除:', socket.roomId);
+    } else {
+        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+    }
+    
+    broadcastRoomList(io);
+}
+
+// エクスポート
+module.exports = { 
+    setupSocketHandlers
+};
+    if (player) {
+        player.connected = false;
+        player.lastDisconnected = Date.now();
         console.log(`${player.name} が一時退出しました`);
     }
     
@@ -837,24 +714,120 @@ function handlePlayerDisconnect(socket, io) {
     const roomData = activeRooms.get(socket.roomId);
     if (!roomData) return;
     
-    const player = roomData.gameData.players.find(p => p.id === socket.id);
-    if (player) {
-        player.connected = false;
-        player.lastDisconnected = Date.now();
-        console.log(`${player.name} が切断しました`);
-    }
-    
-    if (roomData.gameData.players.every(p => !p.connected)) {
-        activeRooms.delete(socket.roomId);
-        console.log('全員切断のためルームを削除:', socket.roomId);
-    } else {
-        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
-    }
-    
-    broadcastRoomList(io);
-}
+    const player = roomData.gameData.players.find(p => p.id === socket.id);// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - 正しいカードリサイクル対応版
+const { 
+    generateRoomId, 
+    assignRoles, 
+    generateAllCards, 
+    distributeCards, 
+    calculateVictoryGoal,
+    initializeGameData,
+    checkGameEndConditions,
+    getCardsPerPlayerForRound,
+    advanceToNextRound,
+    correctCardRecycleSystem  // 🔧 正しいカードリサイクルシステム
+} = require('./game/game-Logic');
 
-// エクスポート
-module.exports = { 
-    setupSocketHandlers
-};
+const activeRooms = new Map();
+const socketRequestHistory = new Map();
+
+function setupSocketHandlers(io) {
+    console.log('🚀 Socket.io ハンドラー設定開始（正しいカードリサイクル対応版）');
+    
+    io.on('connection', (socket) => {
+        console.log('✅ 新しい接続確認:', socket.id);
+        
+        // Socket毎の要求履歴を初期化
+        socketRequestHistory.set(socket.id, {
+            lastJoinRequest: 0,
+            lastCreateRequest: 0,
+            requestCooldown: 3000
+        });
+        
+        // 接続直後にルーム一覧を送信
+        setTimeout(() => {
+            sendRoomList(socket);
+        }, 1000);
+        
+        // ルーム一覧要求
+        socket.on('getRoomList', () => {
+            console.log('📋 ルーム一覧要求受信:', socket.id);
+            sendRoomList(socket);
+        });
+        
+        // 進行中ゲーム一覧要求
+        socket.on('getOngoingGames', () => {
+            console.log('📋 進行中ゲーム一覧要求受信:', socket.id);
+            sendOngoingGames(socket);
+        });
+        
+        // ルーム作成
+        socket.on('createRoom', (data) => {
+            const now = Date.now();
+            const history = socketRequestHistory.get(socket.id);
+            
+            if (history && (now - history.lastCreateRequest) < history.requestCooldown) {
+                console.warn(`⚠️ Socket ${socket.id} 作成クールダウン中`);
+                socket.emit('error', { 
+                    message: 'しばらく待ってから再試行してください' 
+                });
+                return;
+            }
+            
+            if (history) {
+                history.lastCreateRequest = now;
+            }
+            
+            console.log('🏠 ===== ルーム作成要求受信 =====');
+            console.log('Socket ID:', socket.id);
+            console.log('データ:', JSON.stringify(data, null, 2));
+            
+            if (isPlayerInAnyRoom(socket.id)) {
+                socket.emit('error', { 
+                    message: '既に他のルームに参加しています' 
+                });
+                return;
+            }
+            
+            try {
+                const roomId = generateRoomId();
+                console.log('生成ルームID:', roomId);
+                
+                const hostPlayer = createPlayer(socket.id, data.playerName || 'プレイヤー');
+                
+                const gameData = {
+                    id: roomId,
+                    players: [hostPlayer],
+                    gameState: 'waiting',
+                    host: socket.id,
+                    password: data.hasPassword ? data.password : null,
+                    messages: [],
+                    currentRound: 1,
+                    treasureFound: 0,
+                    trapTriggered: 0,
+                    treasureGoal: 7,
+                    trapGoal: 2,
+                    totalTreasures: 7,
+                    totalTraps: 2,
+                    keyHolderId: null,
+                    cardsPerPlayer: 5,
+                    cardsFlippedThisRound: 0,
+                    maxRounds: 4,
+                    turnInRound: 0,
+                    allCards: [],
+                    playerHands: {},
+                    remainingCards: []
+                };
+                
+                const roomData = {
+                    id: roomId,
+                    hostName: data.playerName || 'プレイヤー',
+                    gameData: gameData,
+                    createdAt: Date.now()
+                };
+                
+                activeRooms.set(roomId, roomData);
+                
+                socket.join(roomId);
+                socket.roomId = roomId;
+                socket.playerName = data.
