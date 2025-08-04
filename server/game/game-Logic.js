@@ -588,3 +588,94 @@ module.exports = {
     // 🔧 正しいカードリサイクルシステム
     correctCardRecycleSystem
 };
+
+// 既存の server/game/game-Logic.js の末尾に以下を追加してください
+// （既存のコードはそのまま残して、この部分だけ追加）
+
+// 🔧 正しいカードリサイクルシステム - 既存コードに追加
+function correctCardRecycleSystem(gameData, connectedPlayers) {
+    console.log('♻️ ===== 正しいカードリサイクルシステム開始 =====');
+    console.log(`ラウンド ${gameData.currentRound} 終了後の処理`);
+    
+    try {
+        // 1. 現在のゲーム状況を確認
+        const remainingTreasures = gameData.totalTreasures - gameData.treasureFound;
+        const remainingTraps = gameData.totalTraps - gameData.trapTriggered;
+        
+        console.log(`残り子豚: ${remainingTreasures}, 残り罠: ${remainingTraps}`);
+        
+        // 2. 全プレイヤーの手札を回収
+        connectedPlayers.forEach((player) => {
+            player.hand = []; // 手札を空にする
+        });
+        
+        // 3. 次ラウンドの必要カード数を計算
+        const nextRoundCardsPerPlayer = getCardsPerPlayerForRound(gameData.currentRound);
+        const totalNeededCards = connectedPlayers.length * nextRoundCardsPerPlayer;
+        
+        // 4. 新しいカードプールを作成（残存カード保証付き）
+        const newCardPool = [];
+        
+        // 4-1. 残りの子豚カードを必ず含める
+        for (let i = 0; i < remainingTreasures; i++) {
+            newCardPool.push({
+                type: 'treasure',
+                id: `treasure-${i}-${Date.now()}`,
+                revealed: false
+            });
+        }
+        
+        // 4-2. 残りの罠カードを必ず含める
+        for (let i = 0; i < remainingTraps; i++) {
+            newCardPool.push({
+                type: 'trap',
+                id: `trap-${i}-${Date.now()}`,
+                revealed: false
+            });
+        }
+        
+        // 4-3. 残りを空き部屋カードで埋める
+        const remainingSlots = totalNeededCards - remainingTreasures - remainingTraps;
+        for (let i = 0; i < remainingSlots; i++) {
+            newCardPool.push({
+                type: 'empty',
+                id: `empty-${i}-${Date.now()}`,
+                revealed: false
+            });
+        }
+        
+        // 5. カードプールをシャッフル
+        const shuffledPool = shuffleArray(newCardPool);
+        
+        // 6. 各プレイヤーにランダム配布
+        connectedPlayers.forEach((player) => {
+            const newHand = [];
+            for (let i = 0; i < nextRoundCardsPerPlayer; i++) {
+                if (shuffledPool.length > 0) {
+                    newHand.push(shuffledPool.pop());
+                }
+            }
+            player.hand = shuffleArray(newHand);
+        });
+        
+        // 7. ゲームデータの更新
+        gameData.cardsPerPlayer = nextRoundCardsPerPlayer;
+        
+        console.log('✅ 正しいカードリサイクル処理完了');
+        return {
+            success: true,
+            newCardsPerPlayer: nextRoundCardsPerPlayer
+        };
+        
+    } catch (error) {
+        console.error('❌ カードリサイクル処理エラー:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+// module.exports に追加（既存のexportsの中に以下を追加）
+// 既存の module.exports = { ... }; の中に以下を追加してください
+//     correctCardRecycleSystem
