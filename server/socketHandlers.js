@@ -1,4 +1,4 @@
-// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - カードリサイクル修正版
+// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - カードリサイクル完全対応版
 const { 
     generateRoomId, 
     assignRoles, 
@@ -14,19 +14,6 @@ const {
 
 const activeRooms = new Map();
 const socketRequestHistory = new Map();
-
-// 配列シャッフル関数（内部用）
-function shuffleArray(array) {
-    if (!Array.isArray(array)) {
-        return [];
-    }
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
-}
 
 function setupSocketHandlers(io) {
     console.log('🚀 Socket.io ハンドラー設定開始（カードリサイクル完全対応版）');
@@ -359,9 +346,9 @@ function setupSocketHandlers(io) {
             }
         });
         
-        // 🔧 カード選択 - カードリサイクル完全対応版
+        // カード選択 - カードリサイクル完全対応版
         socket.on('selectCard', (data) => {
-            console.log('🃏 ===== カード選択要求受信（リサイクル対応版） =====');
+            console.log('🃏 ===== カード選択要求受信（リサイクル完全対応版） =====');
             console.log('選択者:', socket.playerName, '(', socket.id, ')');
             console.log('データ:', data);
             
@@ -464,7 +451,7 @@ function setupSocketHandlers(io) {
                 const newKeyHolder = roomData.gameData.players.find(p => p.id === data.targetPlayerId);
                 console.log('🗝️ 鍵の移動:', socket.playerName, '→', newKeyHolder?.name);
                 
-                // 🆕 ラウンド終了チェック（カードリサイクル完全対応）
+                // ラウンド終了チェック（カードリサイクル完全対応）
                 const connectedPlayerCount = getConnectedPlayerCount(roomData);
                 console.log(`🔄 ラウンド終了チェック: ${roomData.gameData.cardsFlippedThisRound} >= ${connectedPlayerCount} ?`);
                 
@@ -483,7 +470,7 @@ function setupSocketHandlers(io) {
                     if (nextRoundResult.newRound) {
                         console.log(`🆕 ラウンド ${nextRoundResult.newRound} 開始準備 - カードリサイクル実行`);
                         
-                        // 🔧 カードリサイクル処理を実行
+                        // カードリサイクル処理を実行
                         const connectedPlayers = roomData.gameData.players.filter(p => p.connected);
                         const recycleResult = recycleCardsAfterRound(roomData.gameData, connectedPlayers);
                         
