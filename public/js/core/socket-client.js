@@ -340,13 +340,25 @@ export class SocketClient {
             }
         });
 
-        this.socket.on('error', function(error) {
+            this.socket.on('error', function(error) {
             console.error('❌ サーバーエラー:', error);
             try {
                 self.game.onError(error);
             } catch (e) {
                 console.error('エラー処理中のエラー:', e);
                 UIManager.showError(error.message || 'サーバーエラーが発生しました');
+            }
+        });
+
+        // 🔧 【追加】プレイヤー切断時の待機処理
+        this.socket.on('waitingForReconnect', function(data) {
+            console.log('⏸️ プレイヤー切断により待機中:', data);
+            
+            if (data && data.disconnectedPlayers) {
+                const playerNames = data.disconnectedPlayers.join(', ');
+                UIManager.showError(`${playerNames} が切断されました。復帰をお待ちください...`, 'warning');
+            } else {
+                UIManager.showError('プレイヤーの復帰をお待ちください...', 'warning');
             }
         });
 
