@@ -272,19 +272,28 @@ function correctCardRecycleSystem(gameData, connectedPlayers) {
         console.log(`総罠数: ${gameData.totalTraps}, 発動済み: ${gameData.trapTriggered}, 残り: ${remainingTraps}`);
         
         // 2. 全プレイヤーの手札を回収（公開・未公開問わず）
-        console.log('=== 全カード回収 ===');
+// server/game/game-Logic.js の correctCardRecycleSystem 関数内
+// 既存の「2. 全プレイヤーの手札を回収」部分を以下に置き換え：
+
+        // 2. 接続中プレイヤーの手札のみ回収（🔧 修正）
+        console.log('=== 手札回収（接続プレイヤーのみ） ===');
         let totalRecoveredCards = 0;
         
         connectedPlayers.forEach((player, index) => {
-            const handSize = player.hand ? player.hand.length : 0;
-            totalRecoveredCards += handSize;
-            console.log(`${player.name}: ${handSize}枚回収`);
-            
-            // 手札を空にする
-            player.hand = [];
+            if (player.connected) {  // 🔧 接続中プレイヤーのみ
+                const handSize = player.hand ? player.hand.length : 0;
+                totalRecoveredCards += handSize;
+                console.log(`${player.name}: ${handSize}枚回収`);
+                
+                // 手札を空にする
+                player.hand = [];
+            } else {
+                // 🔧 切断プレイヤーの手札は保持
+                console.log(`${player.name} (切断中): 手札保持`);
+            }
         });
         
-        console.log(`合計回収カード数: ${totalRecoveredCards}枚`);
+        console.log(`合計回収カード数: ${totalRecoveredCards}枚（接続プレイヤーのみ）`);
         
         // 3. 次ラウンドの必要カード数を計算
         const nextRoundCardsPerPlayer = getCardsPerPlayerForRound(gameData.currentRound);
