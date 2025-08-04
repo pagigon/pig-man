@@ -1173,3 +1173,310 @@ body {
         }
     }
 }
+
+/* 正しいカードリサイクルシステム対応 CSS追加スタイル */
+
+/* リサイクル情報表示エリア */
+.recycle-info {
+    transition: all 0.3s ease;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(255, 165, 0, 0.1);
+    border: 1px solid rgba(255, 165, 0, 0.3);
+}
+
+.recycle-info.recycled {
+    background: rgba(50, 205, 50, 0.1);
+    border-color: rgba(50, 205, 50, 0.3);
+    color: #32CD32 !important;
+}
+
+.recycle-info small {
+    display: block;
+    margin-top: 2px;
+    font-size: 9px;
+    opacity: 0.8;
+}
+
+/* カード保証インジケーター */
+.card-guarantee-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #FFD700;
+    box-shadow: 0 0 4px rgba(255, 215, 0, 0.6);
+    animation: guarantee-pulse 2s infinite;
+}
+
+@keyframes guarantee-pulse {
+    0%, 100% {
+        opacity: 0.6;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+/* ラウンド開始演出の改良 */
+.round-start-overlay {
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(5px);
+}
+
+.round-start-text h1 {
+    margin-bottom: 15px;
+}
+
+.round-start-text small {
+    font-size: 0.6em;
+    display: block;
+    margin-top: 10px;
+    opacity: 0.9;
+}
+
+/* 進行中ゲーム一覧のリサイクル情報 */
+.ongoing-game-item .recycle-stats {
+    margin-top: 8px;
+    padding: 6px;
+    background: rgba(50, 205, 50, 0.1);
+    border-radius: 4px;
+    border: 1px solid rgba(50, 205, 50, 0.2);
+}
+
+.ongoing-game-item .recycle-stats small {
+    font-size: 10px;
+    color: #32CD32;
+    line-height: 1.3;
+}
+
+/* カード残存表示 */
+.remaining-cards-info {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin: 8px 0;
+    padding: 6px;
+    background: rgba(255, 215, 0, 0.1);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.remaining-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 11px;
+}
+
+.remaining-item .icon {
+    font-size: 16px;
+    margin-bottom: 2px;
+}
+
+.remaining-item .count {
+    font-weight: bold;
+    color: #FFD700;
+}
+
+/* ゲーム概要のリサイクル説明 */
+.recycle-explanation {
+    margin-top: 10px;
+    padding: 8px;
+    background: rgba(50, 205, 50, 0.1);
+    border-radius: 4px;
+    border-left: 3px solid #32CD32;
+}
+
+.recycle-explanation h5 {
+    color: #32CD32;
+    margin-bottom: 5px;
+    font-size: 12px;
+}
+
+.recycle-explanation ul {
+    margin: 0;
+    padding-left: 15px;
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+.recycle-explanation li {
+    margin: 3px 0;
+    color: #87CEEB;
+}
+
+/* 勝利画面のリサイクル統計 */
+.victory-recycle-stats {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(50, 205, 50, 0.1);
+    border-radius: 6px;
+    border: 1px solid rgba(50, 205, 50, 0.3);
+}
+
+.victory-recycle-stats h4 {
+    color: #32CD32;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.victory-recycle-stats .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+    font-size: 12px;
+}
+
+.victory-recycle-stats .stat-label {
+    color: #87CEEB;
+}
+
+.victory-recycle-stats .stat-value {
+    color: #FFD700;
+    font-weight: bold;
+}
+
+/* モバイル対応の改良 */
+@media (max-width: 768px) {
+    .recycle-info {
+        font-size: 10px;
+    }
+    
+    .recycle-info small {
+        font-size: 8px;
+    }
+    
+    .remaining-cards-info {
+        margin: 6px 0;
+        padding: 4px;
+    }
+    
+    .remaining-item {
+        font-size: 10px;
+    }
+    
+    .remaining-item .icon {
+        font-size: 14px;
+    }
+    
+    .recycle-explanation {
+        padding: 6px;
+    }
+    
+    .recycle-explanation ul {
+        font-size: 9px;
+    }
+}
+
+@media (max-width: 480px) {
+    .recycle-info {
+        padding: 2px 4px;
+        font-size: 9px;
+    }
+    
+    .recycle-info small {
+        font-size: 7px;
+    }
+    
+    .remaining-cards-info {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .remaining-item {
+        flex-direction: row;
+        gap: 8px;
+    }
+    
+    .card-guarantee-indicator {
+        width: 6px;
+        height: 6px;
+    }
+    
+    .victory-recycle-stats {
+        padding: 8px;
+    }
+    
+    .victory-recycle-stats .stat-row {
+        font-size: 11px;
+    }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+    .recycle-info {
+        background: rgba(255, 165, 0, 0.2);
+        border-color: rgba(255, 165, 0, 0.4);
+    }
+    
+    .recycle-info.recycled {
+        background: rgba(50, 205, 50, 0.2);
+        border-color: rgba(50, 205, 50, 0.4);
+    }
+    
+    .remaining-cards-info {
+        background: rgba(255, 215, 0, 0.2);
+        border-color: rgba(255, 215, 0, 0.4);
+    }
+    
+    .recycle-explanation {
+        background: rgba(50, 205, 50, 0.2);
+        border-left-color: #32CD32;
+    }
+    
+    .victory-recycle-stats {
+        background: rgba(50, 205, 50, 0.2);
+        border-color: rgba(50, 205, 50, 0.4);
+    }
+}
+
+/* アニメーション無効化対応 */
+@media (prefers-reduced-motion: reduce) {
+    .card-guarantee-indicator {
+        animation: none;
+    }
+    
+    .recycle-info {
+        transition: none;
+    }
+    
+    @keyframes guarantee-pulse {
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+}
+
+/* 高コントラスト対応 */
+@media (prefers-contrast: high) {
+    .recycle-info {
+        border-width: 2px;
+        background: rgba(255, 165, 0, 0.3);
+    }
+    
+    .recycle-info.recycled {
+        background: rgba(50, 205, 50, 0.3);
+        border-width: 2px;
+    }
+    
+    .card-guarantee-indicator {
+        border: 2px solid #000;
+        box-shadow: 0 0 6px rgba(255, 215, 0, 0.8);
+    }
+    
+    .remaining-cards-info {
+        background: rgba(255, 215, 0, 0.3);
+        border-width: 2px;
+    }
+    
+    .recycle-explanation {
+        background: rgba(50, 205, 50, 0.3);
+        border-left-width: 4px;
+    }
+}
