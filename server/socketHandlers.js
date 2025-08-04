@@ -452,10 +452,8 @@ function setupSocketHandlers(io) {
                             console.log('カード保証検証:', recycleResult.verification);
                             
                             // 最初のプレイヤーに鍵を渡す
-                            if (connectedPlayers.length > 0) {
-                                roomData.gameData.keyHolderId = connectedPlayers[0].id;
-                                console.log(`🗝️ ラウンド ${nextRoundResult.newRound} の最初の鍵保持者: ${connectedPlayers[0].name}`);
-                            }
+                            // 🗝️ 最後にカードを捲られた人が次ラウンドも鍵を持つ
+                            roomData.gameData.keyHolderId = data.targetPlayerId;
                             
                             // 新しいラウンド開始の通知
                             io.to(socket.roomId).emit('roundStart', nextRoundResult.newRound);
