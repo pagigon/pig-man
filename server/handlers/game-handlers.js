@@ -85,6 +85,16 @@ function setupGameHandlers(io, socket) {
             socket.emit('error', { message: 'あなたのターンではありません' });
             return;
         }
+
+        // 🔧 【追加】全プレイヤーの接続状態チェック
+        const disconnectedPlayers = room.gameData.players.filter(p => !p.connected);
+        if (disconnectedPlayers.length > 0) {
+            const disconnectedNames = disconnectedPlayers.map(p => p.name);
+            socket.emit('error', { 
+                message: `${disconnectedNames.join(', ')} が切断されています。復帰をお待ちください。` 
+            });
+            return;
+        }
         
         try {
             // カード選択処理
