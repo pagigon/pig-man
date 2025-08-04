@@ -13,57 +13,60 @@ export class SocketClient {
         this.initializeSocket();
     }
 
-    initializeSocket() {
-        console.log('Socket.io 初期化開始 (Render対応)');
-        
-        if (typeof io === 'undefined') {
-            console.error('❌ Socket.io が読み込まれていません');
-            UIManager.showError('Socket.io ライブラリが読み込まれていません');
-            return;
-        }
-
-        if (this.isConnecting) {
-            console.warn('⚠️ Socket初期化中のため処理をスキップ');
-            return;
-        }
-
-        this.isConnecting = true;
-
-        try {
-            const socketConfig = {
-                transports: ['polling', 'websocket'],
-                timeout: 20000,
-                reconnection: true,
-                reconnectionAttempts: this.maxReconnectAttempts,
-                reconnectionDelay: 2000,
-                reconnectionDelayMax: 10000,
-                forceNew: false,
-                pingInterval: 25000,
-                pingTimeout: 20000,
-                upgrade: true,
-                autoConnect: true
-            };
-
-            console.log('Socket.io 設定:', socketConfig);
-            
-            // 既存のSocketがあれば切断
-            if (this.socket) {
-                this.socket.disconnect();
-                this.socket = null;
-            }
-
-            this.socket = io(socketConfig);
-
-            console.log('Socket.io インスタンス作成成功');
-            this.setupEventListeners();
-            this.setupConnectionMonitoring();
-            
-        } catch (error) {
-            console.error('❌ Socket.io 初期化エラー:', error);
-            UIManager.showError('サーバー接続の初期化に失敗しました');
-            this.isConnecting = false;
-        }
+initializeSocket() {
+    console.log('Socket.io 初期化開始 (Render対応)');
+    
+    if (typeof io === 'undefined') {
+        console.error('❌ Socket.io が読み込まれていません');
+        UIManager.showError('Socket.io ライブラリが読み込まれていません');
+        return;
     }
+
+    if (this.isConnecting) {
+        console.warn('⚠️ Socket初期化中のため処理をスキップ');
+        return;
+    }
+
+    this.isConnecting = true;
+
+    try {
+        const socketConfig = {
+            transports: ['polling', 'websocket'],
+            timeout: 20000,
+            reconnection: true,
+            reconnectionAttempts: this.maxReconnectAttempts,
+            reconnectionDelay: 2000,
+            reconnectionDelayMax: 10000,
+            forceNew: false,
+            pingInterval: 25000,
+            pingTimeout: 20000,
+            upgrade: true,
+            autoConnect: true,
+            // 🔧 Render.com 対応の追加設定
+            rememberUpgrade: false,
+            transports: ['polling'], // WebSocket接続エラーを避けるため polling のみ使用
+        };
+
+        console.log('Socket.io 設定:', socketConfig);
+        
+        // 既存のSocketがあれば切断
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+        }
+
+        this.socket = io(socketConfig);
+
+        console.log('Socket.io インスタンス作成成功');
+        this.setupEventListeners();
+        this.setupConnectionMonitoring();
+        
+    } catch (error) {
+        console.error('❌ Socket.io 初期化エラー:', error);
+        UIManager.showError('サーバー接続の初期化に失敗しました');
+        this.isConnecting = false;
+    }
+}
 
     setupEventListeners() {
         console.log('Socket イベントリスナー設定開始');
