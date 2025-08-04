@@ -1,6 +1,6 @@
-// 完全版 UIManager クラス - カードリサイクルシステム対応
+// UIManager - 正しいカードリサイクルシステム完全対応版
 export class UIManager {
-    // ゲーム情報更新（ラウンド別手札枚数対応）
+    // ゲーム情報更新（正しいカードリサイクル対応）
     static updateGameInfo(gameData) {
         try {
             if (!gameData || typeof gameData !== 'object') {
@@ -35,7 +35,7 @@ export class UIManager {
             if (roundElement && roundElement.parentElement) {
                 const parentEl = roundElement.parentElement;
                 if (parentEl.classList.contains('info-item')) {
-                    // info-itemの構造を維持して更新（ラウンドと手札枚数を表示）
+                    // info-itemの構造を維持して更新
                     parentEl.innerHTML = 
                         '<span class="label">R' + currentRound + '</span>' +
                         '<span class="value">' + currentRound + '/' + maxRounds + '</span>';
@@ -48,15 +48,19 @@ export class UIManager {
             // 個別の手札枚数表示も更新
             this.safeSetText('cards-per-player', cardsThisRound);
             
-            // カードリサイクル情報の更新
+            // 🔧 正しいカードリサイクル情報の更新
             const recycleStatus = this.safeGetElement('recycle-status');
             if (recycleStatus) {
+                const remainingTreasures = (gameData.totalTreasures || gameData.treasureGoal || 7) - (gameData.treasureFound || 0);
+                const remainingTraps = (gameData.totalTraps || gameData.trapGoal || 2) - (gameData.trapTriggered || 0);
+                
                 if (currentRound > 1) {
-                    recycleStatus.textContent = `ラウンド${currentRound}: 手札${cardsThisRound}枚 (リサイクル済み)`;
+                    recycleStatus.innerHTML = `R${currentRound}: 手札${cardsThisRound}枚<br><small>残り子豚${remainingTreasures}匹・罠${remainingTraps}個を全回収→再配布済み</small>`;
+                    recycleStatus.style.color = '#32CD32';
                 } else {
-                    recycleStatus.textContent = 'ラウンド終了時、公開カードは空き部屋で補充されます';
+                    recycleStatus.innerHTML = `ラウンド終了時：全カード回収→残存カード保証→再配布<br><small>子豚・罠カードは必ず手札に含まれます</small>`;
+                    recycleStatus.style.color = '#FFA500';
                 }
-                recycleStatus.style.color = currentRound > 1 ? '#32CD32' : '#FFA500';
             }
             
         } catch (error) {
@@ -67,7 +71,7 @@ export class UIManager {
         }
     }
 
-    // 新ラウンド開始時の特別表示（カードリサイクル通知付き）
+    // 新ラウンド開始時の特別表示（正しいカードリサイクル通知付き）
     static showRoundStart(roundNumber) {
         try {
             const overlay = this.safeGetElement('round-start-overlay');
@@ -81,20 +85,26 @@ export class UIManager {
                 let subMessage = '手札 ' + cardsThisRound + ' 枚';
                 
                 if (roundNum > 1) {
-                    subMessage += ' (カードリサイクル済み)';
+                    subMessage += '<br><small style="color: #32CD32;">✅ 全カード回収→残存カード保証→再配布完了</small>';
+                } else {
+                    subMessage += '<br><small style="color: #87CEEB;">初期配布完了</small>';
                 }
                 
-                message.innerHTML = roundMessage + '<br><small>' + subMessage + '</small>';
+                message.innerHTML = roundMessage + '<br>' + subMessage;
                 overlay.style.display = 'flex';
                 
                 // バイブレーション
                 if (navigator.vibrate) {
-                    navigator.vibrate([100, 50, 100, 50, 200]);
+                    if (roundNum > 1) {
+                        navigator.vibrate([100, 50, 100, 50, 100, 50, 200]); // リサイクル完了
+                    } else {
+                        navigator.vibrate([100, 50, 100, 50, 200]); // 初期開始
+                    }
                 }
                 
                 setTimeout(function() {
                     overlay.style.display = 'none';
-                }, 3000);
+                }, 3500); // 少し長めに表示
             }
         } catch (error) {
             console.error('ラウンド開始表示エラー:', error);
@@ -107,7 +117,7 @@ export class UIManager {
         return cardsPerRound[round] || 5;
     }
 
-    // ゲーム概要更新（カードリサイクル説明付き）
+    // ゲーム概要更新（正しいカードリサイクル説明付き）
     static updateGameOverview(playerCount) {
         try {
             let roleText = '';
@@ -151,9 +161,10 @@ export class UIManager {
                     cardText = 'カード構成を計算中...';
             }
 
-            // カードリサイクルの説明を追加
-            cardText += '<br><small style="color: #FFA500;">※ラウンド終了時、公開カードは除去され空き部屋で補充</small>';
+            // 正しいカードリサイクルの説明を追加
+            cardText += '<br><small style="color: #32CD32;">✅ 正しいカードリサイクル：全カード回収→残存カード保証→再配布</small>';
             cardText += '<br><small style="color: #87CEEB;">各ラウンドの手札: 1R→5枚, 2R→4枚, 3R→3枚, 4R→2枚</small>';
+            cardText += '<br><small style="color: #FFD700;">⚠️ 未発見の子豚・未発動の罠は必ず手札に含まれます</small>';
 
             this.safeSetText('role-possibility-text', roleText);
             
@@ -211,7 +222,7 @@ export class UIManager {
         }
     }
 
-    // 勝利画面表示（カードリサイクル統計付き）
+    // 勝利画面表示（正しいカードリサイクル統計付き）
     static showVictoryScreen(gameData) {
         try {
             if (!gameData || typeof gameData !== 'object') {
@@ -242,7 +253,7 @@ export class UIManager {
             // 勝利チーム表示
             winnersList.innerHTML = '<h3>勝利チーム:</h3>';
             
-            // ゲーム統計（カードリサイクル情報付き）
+            // ゲーム統計（正しいカードリサイクル情報付き）
             const statsDiv = document.createElement('div');
             statsDiv.style.marginTop = '15px';
             statsDiv.style.fontSize = '14px';
@@ -255,14 +266,17 @@ export class UIManager {
             const trapTriggered = gameData.trapTriggered || 0;
             const trapGoal = gameData.trapGoal || 2;
             
-            // カードリサイクル回数を計算
+            // 正しいカードリサイクル回数を計算
             const recycleCount = Math.max(0, finalRound - 1);
+            const remainingTreasures = treasureGoal - treasureFound;
+            const remainingTraps = trapGoal - trapTriggered;
             
             statsDiv.innerHTML = '<strong>ゲーム統計:</strong><br>' +
                                 '終了ラウンド: ' + finalRound + '/' + maxRounds + '<br>' +
                                 '救出された子豚: ' + treasureFound + '/' + treasureGoal + '<br>' +
                                 '発動した罠: ' + trapTriggered + '/' + trapGoal + '<br>' +
-                                '<small style="color: #FFA500;">カードリサイクル回数: ' + recycleCount + '回</small>';
+                                '<small style="color: #32CD32;">✅ 全カード回収→再配布回数: ' + recycleCount + '回</small><br>' +
+                                '<small style="color: #FFD700;">最終残存: 子豚' + remainingTreasures + '匹、罠' + remainingTraps + '個</small>';
             
             winnersList.appendChild(statsDiv);
             
@@ -298,7 +312,91 @@ export class UIManager {
         }
     }
 
-    // 観戦モード表示
+    // 進行中ゲーム一覧更新（正しいカードリサイクル情報付き）
+    static updateOngoingGames(games) {
+        try {
+            const container = this.safeGetElement('ongoing-games-container');
+            if (!container) return;
+            
+            container.innerHTML = '';
+
+            if (!games || !Array.isArray(games) || games.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #32CD32;">現在進行中のゲームはありません</p>';
+                return;
+            }
+
+            const self = this;
+            games.forEach(function(game, index) {
+                try {
+                    if (!game || typeof game !== 'object') return;
+
+                    const gameDiv = document.createElement('div');
+                    gameDiv.className = 'ongoing-game-item';
+                    gameDiv.style.cssText = 'background: rgba(4, 56, 76, 0.3); padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid rgba(135, 206, 235, 0.2); display: flex; flex-direction: column; gap: 10px;';
+                    
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'ongoing-game-info';
+                    
+                    const gameId = game.id || 'GAME' + index;
+                    const currentRound = game.currentRound || 1;
+                    const maxRounds = game.maxRounds || 4;
+                    const cardsPerPlayer = game.cardsPerPlayer || 5;
+                    const playerCount = game.playerCount || 0;
+                    const treasureFound = game.treasureFound || 0;
+                    const treasureGoal = game.treasureGoal || 7;
+                    const trapTriggered = game.trapTriggered || 0;
+                    const trapGoal = game.trapGoal || 2;
+                    
+                    // 正しいカードリサイクル情報を表示
+                    const remainingTreasures = treasureGoal - treasureFound;
+                    const remainingTraps = trapGoal - trapTriggered;
+                    const recycleCount = Math.max(0, currentRound - 1);
+                    
+                    infoDiv.innerHTML = '<strong>ID: ' + gameId + '</strong><br>' +
+                                       'ラウンド: ' + currentRound + '/' + maxRounds + ' | プレイヤー: ' + playerCount + '/10<br>' +
+                                       '手札: ' + cardsPerPlayer + '枚 | 救出: ' + treasureFound + '/' + treasureGoal + ' | 罠: ' + trapTriggered + '/' + trapGoal + '<br>' +
+                                       '<small style="color: #32CD32;">✅ リサイクル' + recycleCount + '回 | 残存: 子豚' + remainingTreasures + '匹・罠' + remainingTraps + '個</small>';
+                    
+                    const spectateBtn = document.createElement('button');
+                    spectateBtn.className = 'btn btn-small';
+                    spectateBtn.textContent = '観戦する';
+                    spectateBtn.style.width = '100%';
+                    
+                    spectateBtn.onclick = function() {
+                        try {
+                            const spectateRoomInput = self.safeGetElement('spectate-room-id');
+                            const spectatorNameInput = self.safeGetElement('spectator-name');
+                            
+                            if (spectateRoomInput) {
+                                spectateRoomInput.value = gameId;
+                            }
+                            
+                            if (spectatorNameInput && !spectatorNameInput.value.trim()) {
+                                const spectatorName = '観戦者' + Math.floor(Math.random() * 1000);
+                                spectatorNameInput.value = spectatorName;
+                            }
+                            
+                            if (spectatorNameInput) {
+                                spectatorNameInput.focus();
+                            }
+                        } catch (error) {
+                            console.error('観戦ボタンクリックエラー:', error);
+                        }
+                    };
+                    
+                    gameDiv.appendChild(infoDiv);
+                    gameDiv.appendChild(spectateBtn);
+                    container.appendChild(gameDiv);
+                } catch (error) {
+                    console.error('ゲームアイテム作成エラー:', error);
+                }
+            });
+        } catch (error) {
+            console.error('進行中ゲーム一覧更新エラー:', error);
+        }
+    }
+
+    // その他の基本機能（変更なし）
     static showSpectatorMode(isSpectator) {
         try {
             const existingIndicator = document.getElementById('spectator-indicator');
@@ -321,7 +419,6 @@ export class UIManager {
         }
     }
 
-    // 接続状態表示
     static showConnectionStatus(status) {
         try {
             const statusEl = this.safeGetElement('connection-status');
@@ -339,7 +436,6 @@ export class UIManager {
         }
     }
 
-    // エラー表示
     static showError(message, type) {
         try {
             if (type === undefined) type = 'error';
@@ -371,7 +467,6 @@ export class UIManager {
         }
     }
 
-    // プレイヤー名表示
     static showPlayerName(name) {
         try {
             const displayEl = this.safeGetElement('player-name-display');
@@ -386,7 +481,6 @@ export class UIManager {
         }
     }
 
-    // ルーム一覧更新
     static updateRoomList(rooms) {
         try {
             const container = this.safeGetElement('room-list-container');
@@ -458,85 +552,6 @@ export class UIManager {
         }
     }
 
-    // 進行中ゲーム一覧更新
-    static updateOngoingGames(games) {
-        try {
-            const container = this.safeGetElement('ongoing-games-container');
-            if (!container) return;
-            
-            container.innerHTML = '';
-
-            if (!games || !Array.isArray(games) || games.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #32CD32;">現在進行中のゲームはありません</p>';
-                return;
-            }
-
-            const self = this;
-            games.forEach(function(game, index) {
-                try {
-                    if (!game || typeof game !== 'object') return;
-
-                    const gameDiv = document.createElement('div');
-                    gameDiv.className = 'ongoing-game-item';
-                    gameDiv.style.cssText = 'background: rgba(4, 56, 76, 0.3); padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid rgba(135, 206, 235, 0.2); display: flex; flex-direction: column; gap: 10px;';
-                    
-                    const infoDiv = document.createElement('div');
-                    infoDiv.className = 'ongoing-game-info';
-                    
-                    const gameId = game.id || 'GAME' + index;
-                    const currentRound = game.currentRound || 1;
-                    const maxRounds = game.maxRounds || 4;
-                    const cardsPerPlayer = game.cardsPerPlayer || 5;
-                    const playerCount = game.playerCount || 0;
-                    const treasureFound = game.treasureFound || 0;
-                    const treasureGoal = game.treasureGoal || 7;
-                    const trapTriggered = game.trapTriggered || 0;
-                    const trapGoal = game.trapGoal || 2;
-                    
-                    infoDiv.innerHTML = '<strong>ID: ' + gameId + '</strong><br>' +
-                                       'ラウンド: ' + currentRound + '/' + maxRounds + ' | プレイヤー: ' + playerCount + '/10<br>' +
-                                       '手札: ' + cardsPerPlayer + '枚 | 救出: ' + treasureFound + '/' + treasureGoal + ' | 罠: ' + trapTriggered + '/' + trapGoal;
-                    
-                    const spectateBtn = document.createElement('button');
-                    spectateBtn.className = 'btn btn-small';
-                    spectateBtn.textContent = '観戦する';
-                    spectateBtn.style.width = '100%';
-                    
-                    spectateBtn.onclick = function() {
-                        try {
-                            const spectateRoomInput = self.safeGetElement('spectate-room-id');
-                            const spectatorNameInput = self.safeGetElement('spectator-name');
-                            
-                            if (spectateRoomInput) {
-                                spectateRoomInput.value = gameId;
-                            }
-                            
-                            if (spectatorNameInput && !spectatorNameInput.value.trim()) {
-                                const spectatorName = '観戦者' + Math.floor(Math.random() * 1000);
-                                spectatorNameInput.value = spectatorName;
-                            }
-                            
-                            if (spectatorNameInput) {
-                                spectatorNameInput.focus();
-                            }
-                        } catch (error) {
-                            console.error('観戦ボタンクリックエラー:', error);
-                        }
-                    };
-                    
-                    gameDiv.appendChild(infoDiv);
-                    gameDiv.appendChild(spectateBtn);
-                    container.appendChild(gameDiv);
-                } catch (error) {
-                    console.error('ゲームアイテム作成エラー:', error);
-                }
-            });
-        } catch (error) {
-            console.error('進行中ゲーム一覧更新エラー:', error);
-        }
-    }
-
-    // 画面切り替え
     static showScreen(screenName) {
         try {
             const screens = ['lobby', 'room-info', 'game-board', 'victory-screen'];
@@ -560,7 +575,6 @@ export class UIManager {
         }
     }
 
-    // プレイヤー一覧更新
     static updatePlayersList(players, hostId) {
         try {
             const container = this.safeGetElement('players-list');
@@ -609,7 +623,6 @@ export class UIManager {
         }
     }
 
-    // メッセージ更新
     static updateMessages(messages) {
         try {
             const container = this.safeGetElement('chat-container');
