@@ -125,6 +125,12 @@ function setupGameHandlers(io, socket) {
 // 既存のコードの「ラウンド終了チェック」部分を探して、以下に置き換え：
 
         // 🔧 ラウンド終了チェック（正しいカードリサイクル対応）
+// server/handlers/game-handlers.js の selectCard 処理内で
+// ラウンド終了チェック部分を以下のように修正してください
+
+// 既存のコードの「ラウンド終了チェック」部分を探して、以下に置き換え：
+
+        // 🔧 ラウンド終了チェック（正しいカードリサイクル対応）
         const connectedPlayerCount = gameData.players.filter(p => p.connected).length;
         console.log(`ラウンド終了チェック: ${gameData.cardsFlippedThisRound} >= ${connectedPlayerCount} ?`);
         
@@ -155,10 +161,16 @@ function setupGameHandlers(io, socket) {
                 console.log(`✅ ラウンド ${gameData.currentRound} の正しいカードリサイクル完了`);
                 gameData.cardsFlippedThisRound = 0; // リセット
                 
-                // 最初のプレイヤーに鍵を渡す
-                if (connectedPlayers.length > 0) {
+                // 🗝️ 最後にカードを捲られた人（現在の鍵保持者）が次ラウンドも鍵を持つ
+                // data.targetPlayerId が最後にカードを捲られた人
+                gameData.keyHolderId = data.targetPlayerId;
+                const newKeyHolder = gameData.players.find(p => p.id === data.targetPlayerId);
+                console.log(`🗝️ ラウンド ${gameData.currentRound} の鍵保持者: ${newKeyHolder?.name} (最後にカードを捲られた人)`);
+                
+                // フォールバック：該当プレイヤーが見つからない場合は最初のプレイヤーに
+                if (!newKeyHolder && connectedPlayers.length > 0) {
                     gameData.keyHolderId = connectedPlayers[0].id;
-                    console.log(`🗝️ ラウンド ${gameData.currentRound} の最初の鍵保持者: ${connectedPlayers[0].name}`);
+                    console.log(`🗝️ フォールバック: ${connectedPlayers[0].name} に鍵を渡します`);
                 }
                 
                 // 新しいラウンド開始の通知
