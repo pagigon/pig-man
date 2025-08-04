@@ -23,32 +23,21 @@ export class UIManager {
         }
     }
 
+// 既存の public/js/core/ui-manager.js に以下のメソッドを追加してください
+// （既存のコードはそのまま残して、この部分だけ追加）
+
+    // 🔧 正しいカードリサイクルシステム対応メソッドを追加
+
     // ラウンド表示の更新（手札枚数付き）
     static updateRoundDisplayWithCards(gameData) {
         try {
             const currentRound = gameData.currentRound || 1;
-            const maxRounds = gameData.maxRounds || 4;
             const cardsThisRound = gameData.cardsPerPlayer || 5;
             
-            // ラウンド情報を更新
-            const roundElement = this.safeGetElement('current-round');
-            if (roundElement && roundElement.parentElement) {
-                const parentEl = roundElement.parentElement;
-                if (parentEl.classList.contains('info-item')) {
-                    // info-itemの構造を維持して更新
-                    parentEl.innerHTML = 
-                        '<span class="label">R' + currentRound + '</span>' +
-                        '<span class="value">' + currentRound + '/' + maxRounds + '</span>';
-                } else {
-                    // 通常のテキスト更新
-                    roundElement.textContent = currentRound + '/' + maxRounds;
-                }
-            }
-            
-            // 個別の手札枚数表示も更新
+            // 手札枚数表示を更新
             this.safeSetText('cards-per-player', cardsThisRound);
             
-            // 🔧 正しいカードリサイクル情報の更新
+            // リサイクル情報の更新
             const recycleStatus = this.safeGetElement('recycle-status');
             if (recycleStatus) {
                 const remainingTreasures = (gameData.totalTreasures || gameData.treasureGoal || 7) - (gameData.treasureFound || 0);
@@ -65,14 +54,11 @@ export class UIManager {
             
         } catch (error) {
             console.error('ラウンド表示更新エラー:', error);
-            // フォールバック
-            this.safeSetText('current-round', gameData.currentRound || 1);
-            this.safeSetText('cards-per-player', gameData.cardsPerPlayer || 5);
         }
     }
 
-    // 新ラウンド開始時の特別表示（正しいカードリサイクル通知付き）
-    static showRoundStart(roundNumber) {
+    // 新ラウンド開始時の特別表示（リサイクル通知付き）
+    static showRoundStartWithRecycle(roundNumber) {
         try {
             const overlay = this.safeGetElement('round-start-overlay');
             const message = this.safeGetElement('round-start-message');
@@ -93,18 +79,9 @@ export class UIManager {
                 message.innerHTML = roundMessage + '<br>' + subMessage;
                 overlay.style.display = 'flex';
                 
-                // バイブレーション
-                if (navigator.vibrate) {
-                    if (roundNum > 1) {
-                        navigator.vibrate([100, 50, 100, 50, 100, 50, 200]); // リサイクル完了
-                    } else {
-                        navigator.vibrate([100, 50, 100, 50, 200]); // 初期開始
-                    }
-                }
-                
                 setTimeout(function() {
                     overlay.style.display = 'none';
-                }, 3500); // 少し長めに表示
+                }, 3500);
             }
         } catch (error) {
             console.error('ラウンド開始表示エラー:', error);
@@ -116,6 +93,11 @@ export class UIManager {
         const cardsPerRound = { 1: 5, 2: 4, 3: 3, 4: 2 };
         return cardsPerRound[round] || 5;
     }
+
+// 既存の showRoundStart メソッドがある場合は、以下のように修正：
+// static showRoundStart(roundNumber) {
+//     this.showRoundStartWithRecycle(roundNumber);
+// }
 
     // ゲーム概要更新（正しいカードリサイクル説明付き）
     static updateGameOverview(playerCount) {
