@@ -1,4 +1,118 @@
-socket.join(roomId);
+// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - 正しいカードリサイクル対応版
+const { 
+    generateRoomId, 
+    assignRoles, 
+    generateAllCards, 
+    distributeCards, 
+    calculateVictoryGoal,
+    initializeGameData,
+    checkGameEndConditions,
+    getCardsPerPlayerForRound,
+    advanceToNextRound,
+    correctCardRecycleSystem  // 🔧 正しいカードリサイクルシステム
+} = require('./game/game-Logic');
+
+const activeRooms = new Map();
+const socketRequestHistory = new Map();
+
+function setupSocketHandlers(io) {
+    console.log('🚀 Socket.io ハンドラー設定開始（正しいカードリサイクル対応版）');
+    
+    io.on('connection', (socket) => {
+        console.log('✅ 新しい接続確認:', socket.id);
+        
+        // Socket毎の要求履歴を初期化
+        socketRequestHistory.set(socket.id, {
+            lastJoinRequest: 0,
+            lastCreateRequest: 0,
+            requestCooldown: 3000
+        });
+        
+        // 接続直後にルーム一覧を送信
+        setTimeout(() => {
+            sendRoomList(socket);
+        }, 1000);
+        
+        // ルーム一覧要求
+        socket.on('getRoomList', () => {
+            console.log('📋 ルーム一覧要求受信:', socket.id);
+            sendRoomList(socket);
+        });
+        
+        // 進行中ゲーム一覧要求
+        socket.on('getOngoingGames', () => {
+            console.log('📋 進行中ゲーム一覧要求受信:', socket.id);
+            sendOngoingGames(socket);
+        });
+        
+        // ルーム作成
+        socket.on('createRoom', (data) => {
+            const now = Date.now();
+            const history = socketRequestHistory.get(socket.id);
+            
+            if (history && (now - history.lastCreateRequest) < history.requestCooldown) {
+                console.warn(`⚠️ Socket ${socket.id} 作成クールダウン中`);
+                socket.emit('error', { 
+                    message: 'しばらく待ってから再試行してください' 
+                });
+                return;
+            }
+            
+            if (history) {
+                history.lastCreateRequest = now;
+            }
+            
+            console.log('🏠 ===== ルーム作成要求受信 =====');
+            console.log('Socket ID:', socket.id);
+            console.log('データ:', JSON.stringify(data, null, 2));
+            
+            if (isPlayerInAnyRoom(socket.id)) {
+                socket.emit('error', { 
+                    message: '既に他のルームに参加しています' 
+                });
+                return;
+            }
+            
+            try {
+                const roomId = generateRoomId();
+                console.log('生成ルームID:', roomId);
+                
+                const hostPlayer = createPlayer(socket.id, data.playerName || 'プレイヤー');
+                
+                const gameData = {
+                    id: roomId,
+                    players: [hostPlayer],
+                    gameState: 'waiting',
+                    host: socket.id,
+                    password: data.hasPassword ? data.password : null,
+                    messages: [],
+                    currentRound: 1,
+                    treasureFound: 0,
+                    trapTriggered: 0,
+                    treasureGoal: 7,
+                    trapGoal: 2,
+                    totalTreasures: 7,
+                    totalTraps: 2,
+                    keyHolderId: null,
+                    cardsPerPlayer: 5,
+                    cardsFlippedThisRound: 0,
+                    maxRounds: 4,
+                    turnInRound: 0,
+                    allCards: [],
+                    playerHands: {},
+                    remainingCards: []
+                };
+                
+                const roomData = {
+                    id: roomId,
+                    hostName: data.playerName || 'プレイヤー',
+                    gameData: gameData,
+                    createdAt: Date.now()
+                };
+                
+                activeRooms.set(roomId, roomData);
+                
+                socket.join(roomId);
                 socket.roomId = roomId;
                 socket.playerName = data.playerName;
                 console.log('ソケットルーム参加完了:', roomId);
@@ -653,26 +767,6 @@ function handlePlayerTempLeave(socket, io) {
     if (player) {
         player.connected = false;
         player.lastDisconnected = Date.now();
-        console.log(`${player.name} が切断しました`);
-    }
-    
-    if (roomData.gameData.players.every(p => !p.connected)) {
-        activeRooms.delete(socket.roomId);
-        console.log('全員切断のためルームを削除:', socket.roomId);
-    } else {
-        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
-    }
-    
-    broadcastRoomList(io);
-}
-
-// エクスポート
-module.exports = { 
-    setupSocketHandlers
-};
-    if (player) {
-        player.connected = false;
-        player.lastDisconnected = Date.now();
         console.log(`${player.name} が一時退出しました`);
     }
     
@@ -714,120 +808,24 @@ function handlePlayerDisconnect(socket, io) {
     const roomData = activeRooms.get(socket.roomId);
     if (!roomData) return;
     
-    const player = roomData.gameData.players.find(p => p.id === socket.id);// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - 正しいカードリサイクル対応版
-const { 
-    generateRoomId, 
-    assignRoles, 
-    generateAllCards, 
-    distributeCards, 
-    calculateVictoryGoal,
-    initializeGameData,
-    checkGameEndConditions,
-    getCardsPerPlayerForRound,
-    advanceToNextRound,
-    correctCardRecycleSystem  // 🔧 正しいカードリサイクルシステム
-} = require('./game/game-Logic');
-
-const activeRooms = new Map();
-const socketRequestHistory = new Map();
-
-function setupSocketHandlers(io) {
-    console.log('🚀 Socket.io ハンドラー設定開始（正しいカードリサイクル対応版）');
+    const player = roomData.gameData.players.find(p => p.id === socket.id);
+    if (player) {
+        player.connected = false;
+        player.lastDisconnected = Date.now();
+        console.log(`${player.name} が切断しました`);
+    }
     
-    io.on('connection', (socket) => {
-        console.log('✅ 新しい接続確認:', socket.id);
-        
-        // Socket毎の要求履歴を初期化
-        socketRequestHistory.set(socket.id, {
-            lastJoinRequest: 0,
-            lastCreateRequest: 0,
-            requestCooldown: 3000
-        });
-        
-        // 接続直後にルーム一覧を送信
-        setTimeout(() => {
-            sendRoomList(socket);
-        }, 1000);
-        
-        // ルーム一覧要求
-        socket.on('getRoomList', () => {
-            console.log('📋 ルーム一覧要求受信:', socket.id);
-            sendRoomList(socket);
-        });
-        
-        // 進行中ゲーム一覧要求
-        socket.on('getOngoingGames', () => {
-            console.log('📋 進行中ゲーム一覧要求受信:', socket.id);
-            sendOngoingGames(socket);
-        });
-        
-        // ルーム作成
-        socket.on('createRoom', (data) => {
-            const now = Date.now();
-            const history = socketRequestHistory.get(socket.id);
-            
-            if (history && (now - history.lastCreateRequest) < history.requestCooldown) {
-                console.warn(`⚠️ Socket ${socket.id} 作成クールダウン中`);
-                socket.emit('error', { 
-                    message: 'しばらく待ってから再試行してください' 
-                });
-                return;
-            }
-            
-            if (history) {
-                history.lastCreateRequest = now;
-            }
-            
-            console.log('🏠 ===== ルーム作成要求受信 =====');
-            console.log('Socket ID:', socket.id);
-            console.log('データ:', JSON.stringify(data, null, 2));
-            
-            if (isPlayerInAnyRoom(socket.id)) {
-                socket.emit('error', { 
-                    message: '既に他のルームに参加しています' 
-                });
-                return;
-            }
-            
-            try {
-                const roomId = generateRoomId();
-                console.log('生成ルームID:', roomId);
-                
-                const hostPlayer = createPlayer(socket.id, data.playerName || 'プレイヤー');
-                
-                const gameData = {
-                    id: roomId,
-                    players: [hostPlayer],
-                    gameState: 'waiting',
-                    host: socket.id,
-                    password: data.hasPassword ? data.password : null,
-                    messages: [],
-                    currentRound: 1,
-                    treasureFound: 0,
-                    trapTriggered: 0,
-                    treasureGoal: 7,
-                    trapGoal: 2,
-                    totalTreasures: 7,
-                    totalTraps: 2,
-                    keyHolderId: null,
-                    cardsPerPlayer: 5,
-                    cardsFlippedThisRound: 0,
-                    maxRounds: 4,
-                    turnInRound: 0,
-                    allCards: [],
-                    playerHands: {},
-                    remainingCards: []
-                };
-                
-                const roomData = {
-                    id: roomId,
-                    hostName: data.playerName || 'プレイヤー',
-                    gameData: gameData,
-                    createdAt: Date.now()
-                };
-                
-                activeRooms.set(roomId, roomData);
-                
-                socket.join(roomId);
-                socket.roomId = roomId;
-                socket.playerName = data.
+    if (roomData.gameData.players.every(p => !p.connected)) {
+        activeRooms.delete(socket.roomId);
+        console.log('全員切断のためルームを削除:', socket.roomId);
+    } else {
+        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+    }
+    
+    broadcastRoomList(io);
+}
+
+// エクスポート
+module.exports = { 
+    setupSocketHandlers
+};
