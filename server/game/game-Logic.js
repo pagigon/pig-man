@@ -1,4 +1,4 @@
-// 恐怖の古代寺院ルール完全対応版 game-Logic.js - 正しいカードリサイクルシステム
+// 恐怖の古代寺院ルール完全対応版 game-Logic.js - 正しいカードリサイクルシステム完全実装
 
 function generateRoomId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -257,7 +257,7 @@ function distributeCards(allCards, playerCount, cardsPerPlayer) {
     return { playerHands, remainingCards: shuffledCards };
 }
 
-// 🔧 正しいカードリサイクルシステム - 完全版
+// 🔧 正しいカードリサイクルシステム - 完全版実装
 function correctCardRecycleSystem(gameData, connectedPlayers) {
     console.log('♻️ ===== 正しいカードリサイクルシステム開始 =====');
     console.log(`ラウンド ${gameData.currentRound} 終了後の処理`);
