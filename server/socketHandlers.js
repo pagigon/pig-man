@@ -451,7 +451,6 @@ function setupSocketHandlers(io) {
                             console.log('リサイクル統計:', recycleResult);
                             console.log('カード保証検証:', recycleResult.verification);
                             
-                            // 最初のプレイヤーに鍵を渡す
                             // 🗝️ 最後にカードを捲られた人が次ラウンドも鍵を持つ
                             roomData.gameData.keyHolderId = data.targetPlayerId;
                             
