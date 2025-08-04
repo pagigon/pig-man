@@ -100,18 +100,20 @@
             </div>
 
             <div class="info-box">
-                <h3>🎮 ゲームルール</h3>
+                <h3>🎮 ゲームルール（恐怖の古代寺院ルール）</h3>
                 <div class="rule-toggle">
                     <button id="toggle-rules" class="btn btn-small">ルールを表示</button>
                     <ul id="game-rules" class="rules-list" style="display: none;">
                         <li><strong>ストーリー</strong>：豚男という怪物が村の子供たちを誘拐し、豚の姿に変えてしまいました</li>
                         <li><strong>探検家チーム</strong>：豚に変えられた子供をすべて救出することが目標</li>
                         <li><strong>豚男チーム</strong>：罠をすべて発動させるか、4ラウンド終了まで子供たちを守る（隠す）ことが目標</li>
+                        <li><strong style="color: #FFA500;">ラウンド制</strong>：全4ラウンド。手札は1R→5枚、2R→4枚、3R→3枚、4R→2枚と減少</li>
+                        <li><strong style="color: #87CEEB;">カードリサイクル</strong>：ラウンド終了時、公開されたカードは除去され、空き部屋カードで補充</li>
                         <li>各プレイヤーには最初5枚のカードが配られます</li>
                         <li>自分のカードの内訳は分かりますが、位置は分かりません</li>
                         <li>鍵を持った人が、他のプレイヤーのカードを1枚選んで公開します</li>
                         <li>選ばれた人が次に鍵を受け取ります</li>
-                        <li>各ラウンドでプレイヤー数分のカードを公開したら、カードを回収して再配布します</li>
+                        <li>各ラウンドでプレイヤー数分のカードを公開したらラウンド終了</li>
                     </ul>
                 </div>
             </div>
@@ -180,12 +182,16 @@
                 </div>
             </div>
 
-            <!-- コンパクトなゲーム情報 -->
+            <!-- ラウンド別手札枚数対応のゲーム情報 -->
             <div class="game-info mobile-compact">
                 <div class="info-row">
                     <div class="info-item">
-                        <span class="label">R</span>
+                        <span class="label">ラウンド</span>
                         <span class="value"><span id="current-round">1</span>/4</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">手札</span>
+                        <span class="value"><span id="cards-per-player">5</span>枚</span>
                     </div>
                     <div class="info-item">
                         <span class="label">🐷</span>
@@ -196,13 +202,13 @@
                         <span class="value"><span id="trap-triggered">0</span>/<span id="trap-goal">2</span></span>
                     </div>
                     <div class="info-item">
-                        <span class="label">配布</span>
-                        <span class="value" id="cards-per-player">5</span>
-                    </div>
-                    <div class="info-item">
                         <span class="label">公開</span>
                         <span class="value"><span id="cards-flipped">0</span>枚</span>
                     </div>
+                </div>
+                <!-- カードリサイクル情報 -->
+                <div class="recycle-info" style="text-align: center; margin-top: 8px; font-size: 11px; color: #FFA500;">
+                    <span id="recycle-status">ラウンド終了時、公開カードは空き部屋で補充されます</span>
                 </div>
             </div>
 
@@ -261,7 +267,7 @@
             </div>
         </div>
 
-        <!-- ラウンド開始演出 -->
+        <!-- ラウンド開始演出（カードリサイクル情報付き） -->
         <div id="round-start-overlay" class="round-start-overlay">
             <div class="round-start-text">
                 <h1 id="round-start-message">ラウンド 1 スタート！</h1>
