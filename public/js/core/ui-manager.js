@@ -1,4 +1,4 @@
-// 構文修正版 UIManager クラス - カードリサイクルシステム対応
+// 完全版 UIManager クラス - カードリサイクルシステム対応
 export class UIManager {
     // 🆕 ゲーム情報更新（カードリサイクル対応版）
     static updateGameInfo(gameData) {
@@ -24,21 +24,6 @@ export class UIManager {
             console.error('❌ ゲーム情報更新エラー:', error);
         }
     }
-
-    static safeSetText(id, text) {
-        try {
-            const el = this.safeGetElement(id);
-            if (el) {
-                el.textContent = String(text || '');
-                return true;
-            }
-            return false;
-        } catch (error) {
-            console.error('テキスト設定エラー (#' + id + '):', error);
-            return false;
-        }
-    }
-}
 
     // ラウンド表示の更新
     static updateRoundDisplay(gameData) {
@@ -654,3 +639,20 @@ export class UIManager {
         } catch (error) {
             console.error('要素取得エラー (#' + id + '):', error);
             return null;
+        }
+    }
+
+    static safeSetText(id, text) {
+        try {
+            const el = this.safeGetElement(id);
+            if (el) {
+                el.textContent = String(text || '');
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('テキスト設定エラー (#' + id + '):', error);
+            return false;
+        }
+    }
+}
