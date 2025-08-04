@@ -13,6 +13,65 @@ export class SocketClient {
         this.initializeSocket();
     }
 
+    // 🔧 安全なプロパティアクセス関数を追加
+    safeGetProperty(obj, path, defaultValue = null) {
+        try {
+            const keys = path.split('.');
+            let current = obj;
+            
+            for (const key of keys) {
+                if (current && typeof current === 'object' && key in current) {
+                    current = current[key];
+                } else {
+                    return defaultValue;
+                }
+            }
+            
+            return current;
+        } catch (error) {
+            console.warn('プロパティアクセスエラー:', error);
+            return defaultValue;
+        }
+    }
+
+    // Transport名の安全な取得
+    getTransportName() {
+        return this.safeGetProperty(this.socket, 'io.engine.transport.name', 'unknown');
+    }
+
+    // Socket IDの安全な取得
+    getSocketId() {
+        return this.safeGetProperty(this.socket, 'id', 'なし');
+    }
+
+    // 接続状態の確認
+    isConnected() {
+        try {
+            return this.socket && this.socket.connected === true;
+        } catch (error) {
+            console.warn('接続状態確認エラー:', error);
+            return false;
+        }
+    }
+
+    // 修正されたデバッグ情報取得
+    getDebugInfo() {
+        try {
+            return {
+                socketId: this.getSocketId(),
+                connected: this.isConnected(),
+                connecting: this.isConnecting,
+                transport: this.getTransportName(),
+                reconnectAttempts: this.reconnectAttempts
+            };
+        } catch (error) {
+            console.error('デバッグ情報取得エラー:', error);
+            return {
+                error: 'デバッグ情報取得失敗'
+            };
+        }
+    }
+    
 initializeSocket() {
     console.log('Socket.io 初期化開始 (Render.com最適化)');
     
