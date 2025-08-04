@@ -1480,3 +1480,55 @@ body {
         border-left-width: 4px;
     }
 }
+
+/* 既存の public/css/style.css の末尾に以下を追加してください */
+
+/* =============================================== */
+/* 正しいカードリサイクルシステム対応スタイル */
+/* =============================================== */
+
+/* リサイクル情報表示エリア */
+.recycle-info {
+    transition: all 0.3s ease;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(255, 165, 0, 0.1);
+    border: 1px solid rgba(255, 165, 0, 0.3);
+}
+
+.recycle-info small {
+    display: block;
+    margin-top: 2px;
+    font-size: 9px;
+    opacity: 0.8;
+}
+
+/* ラウンド開始演出の改良 */
+.round-start-text small {
+    font-size: 0.6em;
+    display: block;
+    margin-top: 10px;
+    opacity: 0.9;
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+    .recycle-info {
+        font-size: 10px;
+    }
+    
+    .recycle-info small {
+        font-size: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .recycle-info {
+        padding: 2px 4px;
+        font-size: 9px;
+    }
+    
+    .recycle-info small {
+        font-size: 7px;
+    }
+}
