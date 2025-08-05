@@ -1,12 +1,10 @@
 const activeRooms = new Map();
 function setupGameHandlers(io, socket) {
-    const activeRooms = getActiveRooms();
     
     // 🔧 【追加】チャットハンドラーからゲームログ機能を取得
     const { sendGameLog } = require('./chat-handlers');
 
-// ゲーム関連のSocket.ioイベントハンドラー
-const { getActiveRooms, updateRoomList } = require('./room-handlers');
+
 
     
     // ゲーム開始
@@ -54,7 +52,6 @@ const { getActiveRooms, updateRoomList } = require('./room-handlers');
             io.to(socket.roomId).emit('roundStart', 1);
             
             // ルーム一覧から削除（進行中ゲームは非表示）
-            updateRoomList(io);
             
             console.log(`ルーム ${socket.roomId} でゲーム開始`);
             
