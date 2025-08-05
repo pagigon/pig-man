@@ -1,3 +1,4 @@
+const activeRooms = new Map();
 function setupGameHandlers(io, socket) {
     const activeRooms = getActiveRooms();
     
