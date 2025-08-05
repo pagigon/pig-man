@@ -203,6 +203,7 @@ function setupGameHandlers(io, socket) {
             }
         }
             }
+}
             
             // 全員に更新を送信
             io.to(socket.roomId).emit('gameUpdate', room.gameData);
