@@ -1,4 +1,4 @@
-// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - 正しいカードリサイクル対応版
+// 恐怖の古代寺院ルール完全対応版 socketHandlers.js - 修正完了版
 const { 
     generateRoomId, 
     assignRoles, 
@@ -9,7 +9,7 @@ const {
     checkGameEndConditions,
     getCardsPerPlayerForRound,
     advanceToNextRound,
-    correctCardRecycleSystem  // 🔧 正しいカードリサイクルシステム
+    correctCardRecycleSystem
 } = require('./game/game-Logic');
 
 const { setupGameHandlers } = require('./handlers/game-handlers');
@@ -18,17 +18,13 @@ const activeRooms = new Map();
 const socketRequestHistory = new Map();
 
 function setupSocketHandlers(io) {
-    console.log('🚀 Socket.io ハンドラー設定開始（正しいカードリサイクル対応版）');
+    console.log('🚀 Socket.io ハンドラー設定開始（修正完了版）');
 
     io.on('connection', (socket) => {
         console.log('✅ 新しい接続確認:', socket.id);
 
-        // setupGameHandlers(io, socket);//
-         // 🔧 【テスト追加】この部分を追加
-    socket.on('createRoom', (data) => {
-        console.log('🔧 テスト: createRoom受信!', data);
-        socket.emit('roomCreated', { test: 'success' });
-    });
+        // ゲームハンドラーを設定
+        setupGameHandlers(io, socket);
         
         // Socket毎の要求履歴を初期化
         socketRequestHistory.set(socket.id, {
@@ -336,161 +332,6 @@ function setupSocketHandlers(io) {
             }
         });
         
-        // 🔧 カード選択 - 正しいカードリサイクル対応版
-        socket.on('selectCard', (data) => {
-            console.log('🃏 ===== カード選択要求受信（正しいリサイクル対応版） =====');
-            console.log('選択者:', socket.playerName, '(', socket.id, ')');
-            console.log('データ:', data);
-            
-            if (!socket.roomId) {
-                socket.emit('error', { message: 'ルームに参加していません' });
-                return;
-            }
-            
-            const roomData = activeRooms.get(socket.roomId);
-            if (!roomData || roomData.gameData.gameState !== 'playing') {
-                socket.emit('error', { message: 'ゲームが進行していません' });
-                return;
-            }
-            
-            if (socket.isSpectator) {
-                socket.emit('error', { message: '観戦者はカードを選択できません' });
-                return;
-            }
-            
-            if (roomData.gameData.keyHolderId !== socket.id) {
-                socket.emit('error', { message: 'あなたのターンではありません' });
-                return;
-            }
-            
-            try {
-                const targetPlayer = roomData.gameData.players.find(p => p.id === data.targetPlayerId);
-                if (!targetPlayer) {
-                    console.error('対象プレイヤーが見つかりません:', data.targetPlayerId);
-                    socket.emit('error', { message: '対象プレイヤーが見つかりません' });
-                    return;
-                }
-                
-                console.log('対象プレイヤー:', targetPlayer.name);
-                console.log('カードインデックス:', data.cardIndex);
-                
-                if (!targetPlayer.hand || !targetPlayer.hand[data.cardIndex]) {
-                    console.error('カードが存在しません');
-                    socket.emit('error', { message: '無効なカード選択です' });
-                    return;
-                }
-                
-                const selectedCard = targetPlayer.hand[data.cardIndex];
-                console.log('選択されたカード:', selectedCard);
-                
-                if (selectedCard.revealed) {
-                    console.warn('既に公開済みのカード');
-                    socket.emit('error', { message: 'そのカードは既に公開されています' });
-                    return;
-                }
-                
-                console.log('=== カード公開前の状態 ===');
-                console.log('現在のラウンド:', roomData.gameData.currentRound, '/', roomData.gameData.maxRounds);
-                console.log('このラウンドで公開されたカード数:', roomData.gameData.cardsFlippedThisRound);
-                console.log('接続中プレイヤー数:', getConnectedPlayerCount(roomData));
-                console.log('現在の手札枚数設定:', roomData.gameData.cardsPerPlayer);
-                console.log('財宝発見数:', roomData.gameData.treasureFound, '/', roomData.gameData.treasureGoal);
-                console.log('罠発動数:', roomData.gameData.trapTriggered, '/', roomData.gameData.trapGoal);
-                
-                // カードを公開
-                selectedCard.revealed = true;
-                console.log('✅ カードを公開しました:', selectedCard.type);
-                
-                // 進捗更新
-                if (selectedCard.type === 'treasure') {
-                    roomData.gameData.treasureFound++;
-                    console.log(`💎 子豚発見！ 合計: ${roomData.gameData.treasureFound}/${roomData.gameData.treasureGoal}`);
-                } else if (selectedCard.type === 'trap') {
-                    roomData.gameData.trapTriggered++;
-                    console.log(`💀 罠発動！ 合計: ${roomData.gameData.trapTriggered}/${roomData.gameData.trapGoal}`);
-                } else {
-                    console.log('🏠 空き部屋でした');
-                }
-                
-                roomData.gameData.cardsFlippedThisRound++;
-                console.log(`📊 このラウンドでのカード公開数: ${roomData.gameData.cardsFlippedThisRound}`);
-                
-                // 勝利条件チェック
-                const endResult = checkGameEndConditions(roomData.gameData);
-                if (endResult.ended) {
-                    console.log('🏆 ゲーム終了:', endResult);
-                    roomData.gameData.gameState = 'finished';
-                    roomData.gameData.winningTeam = endResult.winner;
-                    roomData.gameData.victoryMessage = endResult.message;
-                    
-                    io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
-                    console.log('✅ 勝利条件達成 - ゲーム終了');
-                    return;
-                }
-                
-                // 鍵を次のプレイヤーに渡す
-                roomData.gameData.keyHolderId = data.targetPlayerId;
-                const newKeyHolder = roomData.gameData.players.find(p => p.id === data.targetPlayerId);
-                console.log('🗝️ 鍵の移動:', socket.playerName, '→', newKeyHolder?.name);
-                
-                // 🔧 ラウンド終了チェック（正しいカードリサイクル対応）
-                const connectedPlayerCount = getConnectedPlayerCount(roomData);
-                console.log(`🔄 ラウンド終了チェック: ${roomData.gameData.cardsFlippedThisRound} >= ${connectedPlayerCount} ?`);
-                
-                if (roomData.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
-                    console.log('📋 ===== ラウンド終了条件達成！正しいカードリサイクル開始 =====');
-                    
-                    const nextRoundResult = advanceToNextRound(roomData.gameData, connectedPlayerCount);
-                    
-                    if (nextRoundResult.gameEnded) {
-                        console.log('🎮 4ラウンド終了によるゲーム終了:', nextRoundResult.reason);
-                        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
-                        return;
-                    }
-                    
-                    if (nextRoundResult.newRound) {
-                        console.log(`🆕 ラウンド ${nextRoundResult.newRound} 開始準備 - 正しいカードリサイクル実行`);
-                        
-                        // 🔧 正しいカードリサイクルシステムを実行
-                        const connectedPlayers = roomData.gameData.players.filter(p => p.connected);
-                        const recycleResult = correctCardRecycleSystem(roomData.gameData, connectedPlayers);
-                        
-                        if (recycleResult.success) {
-                            console.log(`✅ ラウンド ${nextRoundResult.newRound} の正しいカードリサイクル完了`);
-                            console.log('リサイクル統計:', recycleResult);
-                            console.log('カード保証検証:', recycleResult.verification);
-                            
-                            // 🗝️ 最後にカードを捲られた人が次ラウンドも鍵を持つ
-                            roomData.gameData.keyHolderId = data.targetPlayerId;
-                            
-                            // 新しいラウンド開始の通知
-                            io.to(socket.roomId).emit('roundStart', nextRoundResult.newRound);
-                        } else {
-                            console.error('❌ 正しいカードリサイクルに失敗:', recycleResult.error);
-                        }
-                    }
-                } else {
-                    console.log('🔄 次のプレイヤーにターン移行（ラウンド継続）');
-                }
-                
-                console.log('=== カード公開後の状態 ===');
-                console.log('現在のラウンド:', roomData.gameData.currentRound, '/', roomData.gameData.maxRounds);
-                console.log('このラウンドで公開されたカード数:', roomData.gameData.cardsFlippedThisRound);
-                console.log('現在の手札枚数設定:', roomData.gameData.cardsPerPlayer);
-                console.log('現在の鍵保持者:', newKeyHolder?.name);
-                console.log('ゲーム状態:', roomData.gameData.gameState);
-                
-                // 全員に更新を送信
-                io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
-                
-                console.log('✅ カード選択処理完了（正しいカードリサイクル対応）');
-                
-            } catch (error) {
-                console.error('❌ カード選択エラー:', error);
-                socket.emit('error', { message: 'カード選択に失敗しました: ' + error.message });
-            }
-        });
-        
         // その他のハンドラー
         setupOtherHandlers(socket, io);
         
@@ -510,7 +351,7 @@ function setupSocketHandlers(io) {
         console.log('🎯 イベントハンドラー登録完了:', socket.id);
     });
     
-    console.log('🏁 Socket.io ハンドラー設定完了（正しいカードリサイクル対応）');
+    console.log('🏁 Socket.io ハンドラー設定完了（修正完了版）');
 }
 
 // その他のハンドラー設定
