@@ -150,67 +150,13 @@ function setupGameHandlers(io, socket) {
             if (room.gameData.gameState === 'playing') {
                 passKeyToNextPlayer(room.gameData, data.targetPlayerId);
                 
-// server/handlers/game-handlers.js の selectCard 処理内で
-// ラウンド終了チェック部分を以下のように修正してください
-
-// 既存のコードの「ラウンド終了チェック」部分を探して、以下に置き換え：
-
-        // 🔧 ラウンド終了チェック（正しいカードリサイクル対応）
-// server/handlers/game-handlers.js の selectCard 処理内で
-// ラウンド終了チェック部分を以下のように修正してください
-
-// 既存のコードの「ラウンド終了チェック」部分を探して、以下に置き換え：
-
-        // 🔧 ラウンド終了チェック（正しいカードリサイクル対応）
-        const connectedPlayerCount = gameData.players.filter(p => p.connected).length;
-        console.log(`ラウンド終了チェック: ${gameData.cardsFlippedThisRound} >= ${connectedPlayerCount} ?`);
-        
-        if (gameData.cardsFlippedThisRound >= connectedPlayerCount) {
-            console.log('📋 ラウンド終了！正しいカードリサイクル開始');
-            
-            // 次のラウンドへ進行
-            gameData.currentRound++;
-            console.log(`ラウンド進行: ${gameData.currentRound - 1} → ${gameData.currentRound}`);
-            
-            // 4ラウンド終了チェック
-            if (gameData.currentRound > gameData.maxRounds) {
-                console.log('4ラウンド終了！豚男チームの勝利');
-                gameData.gameState = 'finished';
-                gameData.winningTeam = 'guardian';
-                gameData.victoryMessage = `${gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！`;
-                
-                io.to(socket.roomId).emit('gameUpdate', gameData);
-                return;
+// 次のプレイヤーに鍵を渡す
+            if (room.gameData.gameState === 'playing') {
+                passKeyToNextPlayer(room.gameData, data.targetPlayerId);
             }
             
-            // 🔧 正しいカードリサイクルシステムを実行
-            const { correctCardRecycleSystem } = require('../game/game-Logic');
-            const connectedPlayers = gameData.players.filter(p => p.connected);
-            const recycleResult = correctCardRecycleSystem(gameData, connectedPlayers);
-            
-            if (recycleResult.success) {
-                console.log(`✅ ラウンド ${gameData.currentRound} の正しいカードリサイクル完了`);
-                gameData.cardsFlippedThisRound = 0; // リセット
-                
-                // 🗝️ 最後にカードを捲られた人（現在の鍵保持者）が次ラウンドも鍵を持つ
-                // data.targetPlayerId が最後にカードを捲られた人
-                gameData.keyHolderId = data.targetPlayerId;
-                const newKeyHolder = gameData.players.find(p => p.id === data.targetPlayerId);
-                console.log(`🗝️ ラウンド ${gameData.currentRound} の鍵保持者: ${newKeyHolder?.name} (最後にカードを捲られた人)`);
-                
-                // フォールバック：該当プレイヤーが見つからない場合は最初のプレイヤーに
-                if (!newKeyHolder && connectedPlayers.length > 0) {
-                    gameData.keyHolderId = connectedPlayers[0].id;
-                    console.log(`🗝️ フォールバック: ${connectedPlayers[0].name} に鍵を渡します`);
-                }
-                
-                // 新しいラウンド開始の通知
-                io.to(socket.roomId).emit('roundStart', gameData.currentRound);
-            } else {
-                console.error('❌ 正しいカードリサイクルに失敗:', recycleResult.error);
-            }
-        }
-    }
+            // 全員に更新を送信
+            io.to(socket.roomId).emit('gameUpdate', room.gameData);
 
             
             // 全員に更新を送信
