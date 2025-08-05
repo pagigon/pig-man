@@ -138,15 +138,6 @@ function setupGameHandlers(io, socket) {
             
             room.gameData.cardsFlippedThisRound++;
             
-            // 進捗更新
-            if (selectedCard.type === 'treasure') {
-                room.gameData.treasureFound++;
-            } else if (selectedCard.type === 'trap') {
-                room.gameData.trapTriggered++;
-            }
-            
-            room.gameData.cardsFlippedThisRound++;
-            
             // 勝利条件チェック
             checkWinConditions(room.gameData);
             
