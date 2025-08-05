@@ -66,6 +66,7 @@ const { getActiveRooms, updateRoomList } = require('./room-handlers');
     // カード選択
     socket.on('selectCard', (data) => {
         console.log('🃏 カード選択:', data);
+        console.log('🔧 sendGameLog存在チェック:', typeof sendGameLog);
         
         if (!socket.roomId) {
             socket.emit('error', { message: 'ルームに参加していません' });
