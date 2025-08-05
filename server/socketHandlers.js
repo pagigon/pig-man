@@ -12,14 +12,18 @@ const {
     correctCardRecycleSystem  // 🔧 正しいカードリサイクルシステム
 } = require('./game/game-Logic');
 
+const { setupGameHandlers } = require('./handlers/game-handlers');
+
 const activeRooms = new Map();
 const socketRequestHistory = new Map();
 
 function setupSocketHandlers(io) {
     console.log('🚀 Socket.io ハンドラー設定開始（正しいカードリサイクル対応版）');
-    
+
     io.on('connection', (socket) => {
         console.log('✅ 新しい接続確認:', socket.id);
+
+        setupGameHandlers(io, socket);
         
         // Socket毎の要求履歴を初期化
         socketRequestHistory.set(socket.id, {
