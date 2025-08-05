@@ -65,6 +65,14 @@ function setupGameHandlers(io, socket) {
     socket.on('selectCard', (data) => {
         console.log('🃏 カード選択:', data);
         console.log('🔧 sendGameLog存在チェック:', typeof sendGameLog);
+
+        // 🔧 【テスト追加】この行を追加
+    if (typeof sendGameLog === 'function') {
+        console.log('🔧 sendGameLog関数テスト実行');
+        sendGameLog(io, 'TEST', 'テストメッセージ');
+    } else {
+        console.log('🔧 sendGameLog関数が見つかりません');
+    }
         
         if (!socket.roomId) {
             socket.emit('error', { message: 'ルームに参加していません' });
@@ -202,6 +210,8 @@ function setupGameHandlers(io, socket) {
                 console.error('❌ 正しいカードリサイクルに失敗:', recycleResult.error);
             }
         }
+    }
+
             
             // 全員に更新を送信
             io.to(socket.roomId).emit('gameUpdate', room.gameData);
@@ -316,25 +326,3 @@ module.exports = {
     passKeyToNextPlayer,
     nextRound
 };
-
-
-
-// カード選択
-socket.on('selectCard', (data) => {
-    console.log('🃏 カード選択:', data);
-    console.log('🔧 sendGameLog存在チェック:', typeof sendGameLog);
-    
-    // 🔧 【テスト追加】この行を追加
-    if (typeof sendGameLog === 'function') {
-        console.log('🔧 sendGameLog関数テスト実行');
-        sendGameLog(io, 'TEST', 'テストメッセージ');
-    } else {
-        console.log('🔧 sendGameLog関数が見つかりません');
-    }
-    
-    if (!socket.roomId) {
-        socket.emit('error', { message: 'ルームに参加していません' });
-        return;
-    }
-    
-    // 既存のコード...
