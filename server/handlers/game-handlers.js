@@ -202,8 +202,6 @@ function setupGameHandlers(io, socket) {
                 console.error('❌ 正しいカードリサイクルに失敗:', recycleResult.error);
             }
         }
-            }
-}
             
             // 全員に更新を送信
             io.to(socket.roomId).emit('gameUpdate', room.gameData);
