@@ -7,8 +7,6 @@ function setupGameHandlers(io, socket) {
 // ゲーム関連のSocket.ioイベントハンドラー
 const { getActiveRooms, updateRoomList } = require('./room-handlers');
 
-function setupGameHandlers(io, socket) {
-    const activeRooms = getActiveRooms();
     
     // ゲーム開始
     socket.on('startGame', () => {
