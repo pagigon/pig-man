@@ -23,7 +23,7 @@ function setupSocketHandlers(io) {
     io.on('connection', (socket) => {
         console.log('✅ 新しい接続確認:', socket.id);
 
-        setupGameHandlers(io, socket);
+        // setupGameHandlers(io, socket);//
         
         // Socket毎の要求履歴を初期化
         socketRequestHistory.set(socket.id, {
