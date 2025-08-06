@@ -48,6 +48,65 @@ export class PigManGame {
         }
     }
 
+    
+    returnToLobby() {
+        try {
+            if (!this.socketClient.isConnected()) {
+                UIManager.showError('サーバーに接続されていません');
+                return;
+            }
+            
+            console.log('🏠 ロビー復帰要求');
+            this.socketClient.returnToLobby();
+            
+        } catch (error) {
+            console.error('ロビー復帰エラー:', error);
+            UIManager.showError('ロビー復帰でエラーが発生しました');
+        }
+    }
+    
+    // 🔧 【追加】連戦開始
+    restartGame() {
+        try {
+            if (!this.isHost) {
+                UIManager.showError('連戦開始権限がありません');
+                return;
+            }
+            
+            if (!this.socketClient.isConnected()) {
+                UIManager.showError('サーバーに接続されていません');
+                return;
+            }
+            
+            console.log('🔄 連戦開始要求');
+            this.socketClient.restartGame();
+            
+        } catch (error) {
+            console.error('連戦開始エラー:', error);
+            UIManager.showError('連戦開始でエラーが発生しました');
+        }
+    }
+    
+    // 🔧 【追加】勝利画面からの復帰処理
+    onReturnToLobby() {
+        try {
+            this.returnToLobby();
+        } catch (error) {
+            console.error('勝利画面からのロビー復帰エラー:', error);
+            UIManager.showError('ロビー復帰でエラーが発生しました');
+        }
+    }
+    
+    // 🔧 【追加】勝利画面からの連戦開始処理
+    onRestartGame() {
+        try {
+            this.restartGame();
+        } catch (error) {
+            console.error('勝利画面からの連戦開始エラー:', error);
+            UIManager.showError('連戦開始でエラーが発生しました');
+        }
+    }
+    
     initializeErrorMonitoring() {
         const self = this;
         
