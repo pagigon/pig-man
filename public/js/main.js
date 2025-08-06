@@ -33,6 +33,41 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
+    // 🔧 【追加】勝利画面のボタンイベント（フォールバック処理）
+        document.addEventListener('click', function(e) {
+            // 動的に生成されるボタンのクリックイベント処理
+            if (e.target && e.target.textContent && e.target.textContent.includes('ロビーに戻る')) {
+                e.preventDefault();
+                console.log('🏠 フォールバック: ロビー復帰ボタンクリック');
+                if (window.pigGame && typeof window.pigGame.returnToLobby === 'function') {
+                    window.pigGame.returnToLobby();
+                } else {
+                    console.error('❌ pigGame.returnToLobby メソッドが見つかりません');
+                }
+            }
+            
+            if (e.target && e.target.textContent && e.target.textContent.includes('もう一戦')) {
+                e.preventDefault();
+                console.log('🔄 フォールバック: 連戦開始ボタンクリック');
+                if (window.pigGame && typeof window.pigGame.restartGame === 'function') {
+                    window.pigGame.restartGame();
+                } else {
+                    console.error('❌ pigGame.restartGame メソッドが見つかりません');
+                }
+            }
+        });
+        
+        // 🔧 【追加】デバッグ用グローバル関数
+        window.debugVictory = function() {
+            console.log('=== 勝利画面デバッグ ===');
+            console.log('pigGame:', window.pigGame);
+            console.log('isHost:', window.pigGame?.isHost);
+            console.log('returnToLobby:', typeof window.pigGame?.returnToLobby);
+            console.log('restartGame:', typeof window.pigGame?.restartGame);
+            console.log('socketClient:', window.pigGame?.socketClient);
+            console.log('==================');
+        };
+        
     } catch (error) {
         console.error('❌ ゲーム初期化エラー:', error);
         // UIManagerが使えない場合のフォールバック
