@@ -13,6 +13,18 @@ export class SocketClient {
         this.initializeSocket();
     }
 
+    // 🔧 【追加】ロビーに戻る
+    returnToLobby() {
+        console.log('🏠 ロビー復帰要求');
+        return this.emit('returnToLobby');
+    }
+    
+    // 🔧 【追加】連戦開始
+    restartGame() {
+        console.log('🔄 連戦開始要求');
+        return this.emit('restartGame');
+    }
+
     // 安全なプロパティアクセス関数
     safeGetProperty(obj, path, defaultValue) {
         if (defaultValue === undefined) defaultValue = null;
