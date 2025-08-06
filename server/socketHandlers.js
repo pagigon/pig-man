@@ -298,64 +298,6 @@ if (room.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
     io.to(socket.roomId).emit('gameUpdate', room.gameData);
 }
                 
-                // ラウンド進行処理
-                const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
-                
-                if (roundResult.gameEnded) {
-                    // 最大ラウンド達成による豚男チーム勝利
-                    room.gameData.gameState = 'finished';
-                    room.gameData.winningTeam = 'guardian';
-                    room.gameData.victoryMessage = roundResult.reason === 'max_rounds_reached' ? 
-                        `${room.gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！` : 
-                        '豚男チームの勝利です！';
-                    
-                    io.to(socket.roomId).emit('gameUpdate', room.gameData);
-                    return;
-                }
-                
-                // 🔧 正しいカードリサイクルシステム実行
-                if (roundResult.needsCardRecycle) {
-                    const connectedPlayers = room.gameData.players.filter(p => p.connected);
-                    const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
-                    
-                    if (recycleResult.success) {
-                        console.log('♻️ カードリサイクル成功');
-                        
-                        // リサイクル完了のゲームログ
-                        const recycleLogMessage = {
-                            type: 'game-log',
-                            text: `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`,
-                            timestamp: Date.now()
-                        };
-                        
-                        room.gameData.messages.push(recycleLogMessage);
-                        if (room.gameData.messages.length > 20) {
-                            room.gameData.messages = room.gameData.messages.slice(-20);
-                        }
-                        
-                        io.to(socket.roomId).emit('newMessage', room.gameData.messages);
-                    } else {
-                        console.error('❌ カードリサイクル失敗:', recycleResult.error);
-                    }
-                }
-                
-                // ラウンド開始イベントを送信
-                io.to(socket.roomId).emit('roundStart', roundResult.newRound);
-                
-                // 新ラウンドの最初のプレイヤーに鍵を渡す
-                const firstPlayer = room.gameData.players.find(p => p.connected);
-                if (firstPlayer) {
-                    room.gameData.keyHolderId = firstPlayer.id;
-                }
-                
-                console.log(`🆕 ラウンド ${roundResult.newRound} 開始`);
-            } else {
-                // 通常のターン進行：次のプレイヤーに鍵を渡す
-                passKeyToNextPlayer(room.gameData, data.targetPlayerId);
-            }
-            
-            // 全員に更新を送信
-            io.to(socket.roomId).emit('gameUpdate', room.gameData);
             
         } catch (error) {
             console.error('カード選択エラー:', error);
