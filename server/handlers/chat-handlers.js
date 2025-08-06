@@ -1,8 +1,6 @@
-// チャット関連のSocket.ioイベントハンドラー
-const { getActiveRooms } = require('./room-handlers');
+// server/handlers/chat-handlers.js - 循環参照修正版
 
-function setupChatHandlers(io, socket) {
-    const activeRooms = getActiveRooms();
+function setupChatHandlers(io, socket, activeRooms) {  // activeRoomsを引数で受け取る
     
     // チャット送信
     socket.on('sendChat', (message) => {
@@ -65,11 +63,18 @@ function setupChatHandlers(io, socket) {
     });
 }
 
-// ゲームログ送信（他のハンドラーから呼び出し用）
-function sendGameLog(io, roomId, logMessage) {
-    const activeRooms = getActiveRooms();
+// 🔧 【修正】ゲームログ送信関数（循環参照を避けて直接activeRoomsを使用）
+function sendGameLog(io, roomId, logMessage, activeRooms) {
+    if (!activeRooms) {
+        console.error('❌ activeRoomsが提供されていません');
+        return;
+    }
+    
     const room = activeRooms.get(roomId);
-    if (!room) return;
+    if (!room) {
+        console.warn('❌ ゲームログ送信: ルームが見つかりません');
+        return;
+    }
     
     const gameLogMessage = {
         type: 'game-log',
