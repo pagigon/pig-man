@@ -240,8 +240,15 @@ function advanceToNextRound(gameData, connectedPlayerCount) {
 // 既存のmodule.exportsに以下の関数を追加してください：
 
 module.exports = {
-    // ... 既存のエクスポート ...
-    correctCardRecycleSystem,
+    generateRoomId,
+    assignRoles,
+    generateAllCards,
+    shuffleArray,
+    distributeCards,
+    calculateVictoryGoal,
+    initializeGameData,
+    checkGameEndConditions,
+    getCardsPerPlayerForRound,
     advanceToNextRound,
-    getCardsPerPlayerForRound
+    correctCardRecycleSystem
 };
