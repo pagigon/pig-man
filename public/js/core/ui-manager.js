@@ -1,34 +1,106 @@
-// UIManager - 正しいカードリサイクルシステム完全対応版
-export class UIManager {
-    // ゲーム情報更新（正しいカードリサイクル対応）
-    static updateGameInfo(gameData) {
-        try {
-            if (!gameData || typeof gameData !== 'object') {
-                console.warn('無効なゲームデータ:', gameData);
-                return;
-            }
+// UIManager - ゲームログ表示修正版（既存コードを拡張）
 
-            // 基本情報の安全な更新
-            this.safeSetText('treasure-found', gameData.treasureFound || 0);
-            this.safeSetText('trap-triggered', gameData.trapTriggered || 0);
-            this.safeSetText('trap-goal', gameData.trapGoal || 2);
-            this.safeSetText('treasure-goal', gameData.treasureGoal || 7);
-            this.safeSetText('cards-flipped', gameData.cardsFlippedThisRound || 0);
+export class UIManager {
+    // 🔧 【修正】メッセージ更新処理（ゲームログ表示対応）
+    static updateMessages(messages) {
+        try {
+            const container = this.safeGetElement('chat-container');
+            if (!container) return;
             
-            // ラウンド表示の特別処理（手札枚数を表示）
-            this.updateRoundDisplayWithCards(gameData);
+            if (!messages || !Array.isArray(messages)) return;
             
+            const recentMessages = messages.slice(-20);
+            
+            container.innerHTML = '';
+            recentMessages.forEach(function(msg, index) {
+                try {
+                    if (!msg || typeof msg !== 'object') return;
+
+                    const div = document.createElement('div');
+                    
+                    // 🔧 【修正】ゲームログの適切な表示処理
+                    if (msg.type === 'game-log') {
+                        div.className = 'chat-message game-log';
+                        div.textContent = msg.text || '';
+                        
+                        // ゲームログの特別な装飾
+                        if (msg.text && msg.text.includes('♻️')) {
+                            div.style.background = 'rgba(50, 205, 50, 0.2)';
+                            div.style.borderLeft = '4px solid #32CD32';
+                            div.style.fontWeight = 'bold';
+                        } else if (msg.text && msg.text.includes('🐷')) {
+                            div.style.background = 'rgba(255, 215, 0, 0.1)';
+                            div.style.borderLeft = '4px solid #FFD700';
+                        } else if (msg.text && msg.text.includes('💀')) {
+                            div.style.background = 'rgba(220, 20, 60, 0.1)';
+                            div.style.borderLeft = '4px solid #DC143C';
+                        }
+                        
+                    } else if (msg.type === 'player') {
+                        div.className = 'chat-message player';
+                        const playerName = msg.playerName || '名前なし';
+                        const text = msg.text || '';
+                        div.textContent = playerName + ': ' + text;
+                        
+                    } else {
+                        // システムメッセージ
+                        div.className = 'chat-message system';
+                        div.textContent = msg.text || '';
+                    }
+                    
+                    container.appendChild(div);
+                } catch (error) {
+                    console.error('メッセージアイテム作成エラー:', error);
+                }
+            });
+            
+            container.scrollTop = container.scrollHeight;
         } catch (error) {
-            console.error('❌ ゲーム情報更新エラー:', error);
+            console.error('メッセージ更新エラー:', error);
         }
     }
 
-// 既存の public/js/core/ui-manager.js に以下のメソッドを追加してください
-// （既存のコードはそのまま残して、この部分だけ追加）
+    // 🔧 【追加】ラウンド開始表示（リサイクル情報付き）
+    static showRoundStartWithRecycle(roundNumber) {
+        try {
+            const overlay = this.safeGetElement('round-start-overlay');
+            const message = this.safeGetElement('round-start-message');
+            
+            if (overlay && message) {
+                const roundNum = roundNumber || 1;
+                const cardsThisRound = this.getExpectedCardsForRound(roundNum);
+                
+                let roundMessage = 'ラウンド ' + roundNum + ' スタート！';
+                let subMessage = '手札 ' + cardsThisRound + ' 枚';
+                
+                if (roundNum > 1) {
+                    subMessage += '<br><small style="color: #32CD32;">✅ 全カード回収→残存カード保証→再配布完了</small>';
+                } else {
+                    subMessage += '<br><small style="color: #87CEEB;">初期配布完了</small>';
+                }
+                
+                message.innerHTML = roundMessage + '<br>' + subMessage;
+                overlay.style.display = 'flex';
+                
+                // バイブレーション追加
+                if (navigator.vibrate) {
+                    if (roundNum > 1) {
+                        navigator.vibrate([100, 50, 100, 50, 100, 50, 200]); // リサイクル完了
+                    } else {
+                        navigator.vibrate([100, 50, 100, 50, 200]); // 初期開始
+                    }
+                }
+                
+                setTimeout(function() {
+                    overlay.style.display = 'none';
+                }, 3500);
+            }
+        } catch (error) {
+            console.error('ラウンド開始表示エラー:', error);
+        }
+    }
 
-    // 🔧 正しいカードリサイクルシステム対応メソッドを追加
-
-    // ラウンド表示の更新（手札枚数付き）
+    // 🔧 【追加】ラウンド表示の更新（手札枚数付き）
     static updateRoundDisplayWithCards(gameData) {
         try {
             const currentRound = gameData.currentRound || 1;
@@ -57,56 +129,39 @@ export class UIManager {
         }
     }
 
-    // 新ラウンド開始時の特別表示（リサイクル通知付き）
-    static showRoundStartWithRecycle(roundNumber) {
-        try {
-            const overlay = this.safeGetElement('round-start-overlay');
-            const message = this.safeGetElement('round-start-message');
-            
-            if (overlay && message) {
-                const roundNum = roundNumber || 1;
-                const cardsThisRound = this.getExpectedCardsForRound(roundNum);
-                
-                let roundMessage = 'ラウンド ' + roundNum + ' スタート！';
-                let subMessage = '手札 ' + cardsThisRound + ' 枚';
-                
-                if (roundNum > 1) {
-                    subMessage += '<br><small style="color: #32CD32;">✅ 全カード回収→残存カード保証→再配布完了</small>';
-                } else {
-                    subMessage += '<br><small style="color: #87CEEB;">初期配布完了</small>';
-                }
-                
-                message.innerHTML = roundMessage + '<br>' + subMessage;
-                overlay.style.display = 'flex';
-                
-                // 🔧 バイブレーション追加
-                if (navigator.vibrate) {
-                    if (roundNum > 1) {
-                        navigator.vibrate([100, 50, 100, 50, 100, 50, 200]); // リサイクル完了
-                    } else {
-                        navigator.vibrate([100, 50, 100, 50, 200]); // 初期開始
-                    }
-                }
-                
-                setTimeout(function() {
-                    overlay.style.display = 'none';
-                }, 3500);
-            }
-        } catch (error) {
-            console.error('ラウンド開始表示エラー:', error);
-        }
-    }
-
     // ラウンド別手札枚数の期待値
     static getExpectedCardsForRound(round) {
         const cardsPerRound = { 1: 5, 2: 4, 3: 3, 4: 2 };
         return cardsPerRound[round] || 5;
     }
 
-// 既存の showRoundStart メソッドがある場合は、以下のように修正：
-// static showRoundStart(roundNumber) {
-//     this.showRoundStartWithRecycle(roundNumber);
-// }
+    // 既存の showRoundStart メソッドを上書き
+    static showRoundStart(roundNumber) {
+        this.showRoundStartWithRecycle(roundNumber);
+    }
+
+    // ゲーム情報更新（正しいカードリサイクル対応）
+    static updateGameInfo(gameData) {
+        try {
+            if (!gameData || typeof gameData !== 'object') {
+                console.warn('無効なゲームデータ:', gameData);
+                return;
+            }
+
+            // 基本情報の安全な更新
+            this.safeSetText('treasure-found', gameData.treasureFound || 0);
+            this.safeSetText('trap-triggered', gameData.trapTriggered || 0);
+            this.safeSetText('trap-goal', gameData.trapGoal || 2);
+            this.safeSetText('treasure-goal', gameData.treasureGoal || 7);
+            this.safeSetText('cards-flipped', gameData.cardsFlippedThisRound || 0);
+            
+            // ラウンド表示の特別処理（手札枚数を表示）
+            this.updateRoundDisplayWithCards(gameData);
+            
+        } catch (error) {
+            console.error('❌ ゲーム情報更新エラー:', error);
+        }
+    }
 
     // ゲーム概要更新（正しいカードリサイクル説明付き）
     static updateGameOverview(playerCount) {
@@ -387,7 +442,7 @@ export class UIManager {
         }
     }
 
-    // その他の基本機能（変更なし）
+    // その他の基本機能（既存コードから継承）
     static showSpectatorMode(isSpectator) {
         try {
             const existingIndicator = document.getElementById('spectator-indicator');
@@ -611,47 +666,6 @@ export class UIManager {
             });
         } catch (error) {
             console.error('プレイヤー一覧更新エラー:', error);
-        }
-    }
-
-    static updateMessages(messages) {
-        try {
-            const container = this.safeGetElement('chat-container');
-            if (!container) return;
-            
-            if (!messages || !Array.isArray(messages)) return;
-            
-            const recentMessages = messages.slice(-20);
-            
-            container.innerHTML = '';
-            recentMessages.forEach(function(msg, index) {
-                try {
-                    if (!msg || typeof msg !== 'object') return;
-
-                    const div = document.createElement('div');
-                    div.className = 'chat-message ' + (msg.type || 'player');
-                    
-                    if (msg.type === 'player') {
-                        const playerName = msg.playerName || '名前なし';
-                        const text = msg.text || '';
-                        div.textContent = playerName + ': ' + text;
-                     } else if (msg.type === 'game-log') {
-                        // 🔧 【追加】ゲームログの表示
-                        div.textContent = msg.text || '';
-                    } else {
-                        // システムメッセージ
-                        div.textContent = msg.text || '';
-                    }
-                    
-                    container.appendChild(div);
-                } catch (error) {
-                    console.error('メッセージアイテム作成エラー:', error);
-                }
-            });
-            
-            container.scrollTop = container.scrollHeight;
-        } catch (error) {
-            console.error('メッセージ更新エラー:', error);
         }
     }
 
