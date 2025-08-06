@@ -280,14 +280,15 @@
 
         <!-- 勝利画面 -->
         <div id="victory-screen" class="victory-screen">
-            <div class="victory-content">
-                <h2 id="victory-title"></h2>
-                <p id="victory-message"></p>
-                <div id="winners-list" style="margin: 20px 0;"></div>
-                <button id="return-to-lobby" class="btn">ロビーに戻る</button>
-            </div>
+    <div class="victory-content">
+        <h2 id="victory-title"></h2>
+        <p id="victory-message"></p>
+        <div id="winners-list" style="margin: 20px 0;">
+            <!-- 🔧 【削除】既存のreturn-to-lobbyボタンは削除 -->
+            <!-- JavaScriptで動的に生成されるボタンエリアに置き換え -->
         </div>
     </div>
+</div>
 
     <!-- JavaScript統合版 → ES6モジュール版 -->
     <script type="module" src="js/main.js"></script>
