@@ -78,8 +78,7 @@ function setupSocketHandlers(io) {
 
 // 🔧 【追加】ゲームハンドラー（activeRoomsを共有）
 function setupGameHandlers(io, socket, activeRooms) {
-    // 🔧 【ここに追加】ゲーム終了後の処理機能
-function setupGameEndHandlers(io, socket, activeRooms) {
+
 
         // ロビーに戻る
     socket.on('returnToLobby', () => {
@@ -241,7 +240,10 @@ function resetGameData(gameData) {
     
     console.log('🔄 ゲームデータリセット完了');
 }
-    
+
+    // 🔧 【ここに追加】ゲーム終了後の処理機能
+function setupGameEndHandlers(io, socket, activeRooms) {
+
     // カード選択
     socket.on('selectCard', (data) => {
         console.log('🃏 カード選択:', data);
