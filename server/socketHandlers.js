@@ -1,5 +1,7 @@
 // server/socketHandlers.js - インポート修正版（先頭部分のみ置き換え）
 
+// server/socketHandlers.js - 修正版（関数重複解決）
+
 // 🔧 【修正】正しいインポート方法
 const gameLogic = require('./game/game-Logic');
 
@@ -38,8 +40,7 @@ function setupSocketHandlers(io) {
 
         // 🔧 【修正】各種ハンドラーを activeRooms を共有して設定
         setupChatHandlers(io, socket, activeRooms);
-        setupGameHandlers(io, socket, activeRooms);  // この関数内で定義
-        setupGameEndHandlers(io, socket, activeRooms);
+        setupGameHandlers(io, socket, activeRooms);  // 統合版ゲームハンドラー
         
         // Socket毎の要求履歴を初期化
         socketRequestHistory.set(socket.id, {
@@ -76,11 +77,12 @@ function setupSocketHandlers(io) {
     console.log('🏁 Socket.io ハンドラー設定完了（完全修正統合版）');
 }
 
-// 🔧 【追加】ゲームハンドラー（activeRoomsを共有）
+// 🔧 【統合修正】ゲームハンドラー（全ゲーム機能を統合）
 function setupGameHandlers(io, socket, activeRooms) {
-
-
-        // ロビーに戻る
+    
+    // 🔧 【ロビー復帰・連戦機能】
+    
+    // ロビーに戻る
     socket.on('returnToLobby', () => {
         console.log('🏠 ロビー復帰要求:', socket.id);
         
@@ -209,41 +211,9 @@ function setupGameHandlers(io, socket, activeRooms) {
             socket.emit('error', { message: '連戦開始に失敗しました: ' + error.message });
         }
     });
-}
 
-// 🔧 【追加】ゲームデータリセット関数
-function resetGameData(gameData) {
-    // ゲーム進行状態をリセット
-    gameData.gameState = 'waiting';
-    gameData.currentRound = 1;
-    gameData.treasureFound = 0;
-    gameData.trapTriggered = 0;
-    gameData.keyHolderId = null;
-    gameData.cardsPerPlayer = 5;
-    gameData.cardsFlippedThisRound = 0;
-    gameData.turnInRound = 0;
-    gameData.allCards = [];
-    gameData.playerHands = {};
-    gameData.remainingCards = [];
+    // 🔧 【カード選択処理】
     
-    // 勝利関連データをクリア
-    delete gameData.winningTeam;
-    delete gameData.victoryMessage;
-    
-    // プレイヤーの手札と役職をリセット
-    if (gameData.players) {
-        gameData.players.forEach(player => {
-            player.role = null;
-            player.hand = [];
-        });
-    }
-    
-    console.log('🔄 ゲームデータリセット完了');
-}
-
-    // 🔧 【ここに追加】ゲーム終了後の処理機能
-function setupGameEndHandlers(io, socket, activeRooms) {
-
     // カード選択
     socket.on('selectCard', (data) => {
         console.log('🃏 カード選択:', data);
@@ -363,113 +333,140 @@ function setupGameEndHandlers(io, socket, activeRooms) {
             // 🔧 【追加】ラウンド終了チェックと進行処理
             const connectedPlayerCount = room.gameData.players.filter(p => p.connected).length;
             
-// server/socketHandlers.js - ラウンド進行3秒遅延修正版（該当部分のみ置き換え）
-
-// 🔧 【修正】ラウンド終了チェックと進行処理（3秒遅延追加）
-if (room.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
-    console.log('📋 ラウンド終了条件達成');
-    
-    // 🔧 【追加】ラウンド終了告知を送信
-    const currentRoundEndMessage = {
-        type: 'game-log',
-        text: `🎯 ラウンド${room.gameData.currentRound}終了！3秒後に次のラウンドが開始されます...`,
-        timestamp: Date.now()
-    };
-    
-    room.gameData.messages.push(currentRoundEndMessage);
-    if (room.gameData.messages.length > 20) {
-        room.gameData.messages = room.gameData.messages.slice(-20);
-    }
-    
-    // ラウンド終了をクライアントに送信
-    io.to(socket.roomId).emit('newMessage', room.gameData.messages);
-    io.to(socket.roomId).emit('gameUpdate', room.gameData);
-    
-    // 🔧 【追加】3秒の遅延後にラウンド進行処理
-    setTimeout(() => {
-        console.log('⏰ 3秒経過 - ラウンド進行処理開始');
-        
-        try {
-            // ラウンド進行処理
-            const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
-            
-            if (roundResult.gameEnded) {
-                // 最大ラウンド達成による豚男チーム勝利
-                room.gameData.gameState = 'finished';
-                room.gameData.winningTeam = 'guardian';
-                room.gameData.victoryMessage = roundResult.reason === 'max_rounds_reached' ? 
-                    `${room.gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！` : 
-                    '豚男チームの勝利です！';
+            // 🔧 【修正】ラウンド終了チェックと進行処理（3秒遅延追加）
+            if (room.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
+                console.log('📋 ラウンド終了条件達成');
                 
+                // 🔧 【追加】ラウンド終了告知を送信
+                const currentRoundEndMessage = {
+                    type: 'game-log',
+                    text: `🎯 ラウンド${room.gameData.currentRound}終了！3秒後に次のラウンドが開始されます...`,
+                    timestamp: Date.now()
+                };
+                
+                room.gameData.messages.push(currentRoundEndMessage);
+                if (room.gameData.messages.length > 20) {
+                    room.gameData.messages = room.gameData.messages.slice(-20);
+                }
+                
+                // ラウンド終了をクライアントに送信
+                io.to(socket.roomId).emit('newMessage', room.gameData.messages);
                 io.to(socket.roomId).emit('gameUpdate', room.gameData);
-                return;
-            }
-            
-            // 🔧 正しいカードリサイクルシステム実行
-            if (roundResult.needsCardRecycle) {
-                const connectedPlayers = room.gameData.players.filter(p => p.connected);
-                const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
                 
-                if (recycleResult.success) {
-                    console.log('♻️ カードリサイクル成功');
+                // 🔧 【追加】3秒の遅延後にラウンド進行処理
+                setTimeout(() => {
+                    console.log('⏰ 3秒経過 - ラウンド進行処理開始');
                     
-                    // リサイクル完了のゲームログ
-                    const recycleLogMessage = {
-                        type: 'game-log',
-                        text: `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`,
-                        timestamp: Date.now()
-                    };
-                    
-                    room.gameData.messages.push(recycleLogMessage);
-                    if (room.gameData.messages.length > 20) {
-                        room.gameData.messages = room.gameData.messages.slice(-20);
+                    try {
+                        // ラウンド進行処理
+                        const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
+                        
+                        if (roundResult.gameEnded) {
+                            // 最大ラウンド達成による豚男チーム勝利
+                            room.gameData.gameState = 'finished';
+                            room.gameData.winningTeam = 'guardian';
+                            room.gameData.victoryMessage = roundResult.reason === 'max_rounds_reached' ? 
+                                `${room.gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！` : 
+                                '豚男チームの勝利です！';
+                            
+                            io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                            return;
+                        }
+                        
+                        // 🔧 正しいカードリサイクルシステム実行
+                        if (roundResult.needsCardRecycle) {
+                            const connectedPlayers = room.gameData.players.filter(p => p.connected);
+                            const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
+                            
+                            if (recycleResult.success) {
+                                console.log('♻️ カードリサイクル成功');
+                                
+                                // リサイクル完了のゲームログ
+                                const recycleLogMessage = {
+                                    type: 'game-log',
+                                    text: `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`,
+                                    timestamp: Date.now()
+                                };
+                                
+                                room.gameData.messages.push(recycleLogMessage);
+                                if (room.gameData.messages.length > 20) {
+                                    room.gameData.messages = room.gameData.messages.slice(-20);
+                                }
+                                
+                                io.to(socket.roomId).emit('newMessage', room.gameData.messages);
+                            } else {
+                                console.error('❌ カードリサイクル失敗:', recycleResult.error);
+                            }
+                        }
+                        
+                        // ラウンド開始イベントを送信（3秒遅延後）
+                        io.to(socket.roomId).emit('roundStart', roundResult.newRound);
+                        
+                        // 新ラウンドの最初のプレイヤーに鍵を渡す
+                        const firstPlayer = room.gameData.players.find(p => p.connected);
+                        if (firstPlayer) {
+                            room.gameData.keyHolderId = firstPlayer.id;
+                        }
+                        
+                        // 全員に更新を送信
+                        io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                        
+                        console.log(`🆕 ラウンド ${roundResult.newRound} 開始完了（3秒遅延後）`);
+                        
+                    } catch (error) {
+                        console.error('❌ 遅延ラウンド進行エラー:', error);
+                        // エラー時も続行
+                        io.to(socket.roomId).emit('gameUpdate', room.gameData);
                     }
                     
-                    io.to(socket.roomId).emit('newMessage', room.gameData.messages);
-                } else {
-                    console.error('❌ カードリサイクル失敗:', recycleResult.error);
-                }
-            }
-            
-            // ラウンド開始イベントを送信（3秒遅延後）
-            io.to(socket.roomId).emit('roundStart', roundResult.newRound);
-            
-            // 新ラウンドの最初のプレイヤーに鍵を渡す
-            const firstPlayer = room.gameData.players.find(p => p.connected);
-            if (firstPlayer) {
-                room.gameData.keyHolderId = firstPlayer.id;
-            }
-            
-            // 全員に更新を送信
-            io.to(socket.roomId).emit('gameUpdate', room.gameData);
-            
-            console.log(`🆕 ラウンド ${roundResult.newRound} 開始完了（3秒遅延後）`);
-            
-        } catch (error) {
-            console.error('❌ 遅延ラウンド進行エラー:', error);
-            // エラー時も続行
-            io.to(socket.roomId).emit('gameUpdate', room.gameData);
-        }
-        
-    }, 3000); // 🔧 【重要】3秒（3000ミリ秒）の遅延
-    
-    // 🔧 【重要】ここでreturnして、通常のターン進行をスキップ
-    return;
-    
-} else {
-    // 通常のターン進行：次のプレイヤーに鍵を渡す
-    passKeyToNextPlayer(room.gameData, data.targetPlayerId);
-    
-    // 全員に更新を送信
-    io.to(socket.roomId).emit('gameUpdate', room.gameData);
-}
+                }, 3000); // 🔧 【重要】3秒（3000ミリ秒）の遅延
                 
+                // 🔧 【重要】ここでreturnして、通常のターン進行をスキップ
+                return;
+                
+            } else {
+                // 通常のターン進行：次のプレイヤーに鍵を渡す
+                passKeyToNextPlayer(room.gameData, data.targetPlayerId);
+                
+                // 全員に更新を送信
+                io.to(socket.roomId).emit('gameUpdate', room.gameData);
+            }
             
         } catch (error) {
             console.error('カード選択エラー:', error);
             socket.emit('error', { message: 'カード選択に失敗しました: ' + error.message });
         }
     });
+}
+
+// 🔧 【追加】ゲームデータリセット関数
+function resetGameData(gameData) {
+    // ゲーム進行状態をリセット
+    gameData.gameState = 'waiting';
+    gameData.currentRound = 1;
+    gameData.treasureFound = 0;
+    gameData.trapTriggered = 0;
+    gameData.keyHolderId = null;
+    gameData.cardsPerPlayer = 5;
+    gameData.cardsFlippedThisRound = 0;
+    gameData.turnInRound = 0;
+    gameData.allCards = [];
+    gameData.playerHands = {};
+    gameData.remainingCards = [];
+    
+    // 勝利関連データをクリア
+    delete gameData.winningTeam;
+    delete gameData.victoryMessage;
+    
+    // プレイヤーの手札と役職をリセット
+    if (gameData.players) {
+        gameData.players.forEach(player => {
+            player.role = null;
+            player.hand = [];
+        });
+    }
+    
+    console.log('🔄 ゲームデータリセット完了');
 }
 
 // 基本的なルーム操作ハンドラー
@@ -613,7 +610,429 @@ function setupRoomHandlers(io, socket) {
             return;
         }
         
-        if (roomData.gameData.password && roomData.gameData.password !== password) {
+        if (roomData.gameData.host !== socket.id) {
+            socket.emit('error', { message: 'ゲーム開始権限がありません' });
+            return;
+        }
+        
+        const connectedCount = getConnectedPlayerCount(roomData);
+        if (connectedCount < 3) {
+            socket.emit('error', { message: 'ゲーム開始には最低3人必要です' });
+            return;
+        }
+        
+        if (connectedCount > 10) {
+            socket.emit('error', { message: 'プレイヤー数が多すぎます（最大10人）' });
+            return;
+        }
+        
+        try {
+            console.log('🎭 ゲーム開始:', connectedCount, '人');
+            
+            const gameInitData = initializeGameData(connectedCount);
+            console.log('ゲーム初期化データ:', gameInitData);
+            
+            Object.assign(roomData.gameData, gameInitData);
+            
+            const connectedPlayers = roomData.gameData.players.filter(p => p.connected);
+            console.log('接続中プレイヤー:', connectedPlayers.map(p => p.name));
+            
+            connectedPlayers.forEach((player, index) => {
+                player.role = gameInitData.assignedRoles[index];
+                console.log(`${player.name} → ${player.role}`);
+            });
+            
+            const round1CardsPerPlayer = getCardsPerPlayerForRound(1);
+            console.log(`1ラウンド目: ${round1CardsPerPlayer}枚ずつ配布`);
+            
+            const { playerHands } = distributeCards(
+                gameInitData.allCards, 
+                connectedCount, 
+                round1CardsPerPlayer
+            );
+            
+            connectedPlayers.forEach((player, index) => {
+                player.hand = playerHands[index] || [];
+                console.log(`${player.name} に ${player.hand.length} 枚配布`);
+            });
+            
+            if (connectedPlayers.length > 0) {
+                roomData.gameData.keyHolderId = connectedPlayers[0].id;
+                console.log(`🗝️ 初期鍵保持者: ${connectedPlayers[0].name}`);
+            }
+            
+            roomData.gameData.gameState = 'playing';
+            roomData.gameData.cardsPerPlayer = round1CardsPerPlayer;
+            
+            console.log('📊 ゲーム開始時の状態:', {
+                playerCount: connectedCount,
+                treasureGoal: roomData.gameData.treasureGoal,
+                trapGoal: roomData.gameData.trapGoal,
+                cardsPerPlayer: roomData.gameData.cardsPerPlayer,
+                currentRound: roomData.gameData.currentRound,
+                maxRounds: roomData.gameData.maxRounds,
+                keyHolder: connectedPlayers[0]?.name
+            });
+            
+            io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+            io.to(socket.roomId).emit('roundStart', 1);
+            
+            broadcastRoomList(io);
+            
+            console.log(`✅ ルーム ${socket.roomId} でゲーム開始完了`);
+            
+        } catch (error) {
+            console.error('❌ ゲーム開始エラー:', error);
+            socket.emit('error', { message: 'ゲーム開始に失敗しました: ' + error.message });
+        }
+    });
+}
+
+// その他のハンドラー設定
+function setupOtherHandlers(socket, io) {
+    // 再入場
+    socket.on('rejoinRoom', (data) => {
+        console.log('🔄 再入場要求:', data);
+        const { roomId, playerName } = data;
+        
+        const roomData = activeRooms.get(roomId);
+        if (!roomData) {
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        const existingPlayer = findPlayerByName(roomData, playerName);
+        if (!existingPlayer) {
+            socket.emit('error', { message: 'このルームにあなたのデータが見つかりません' });
+            return;
+        }
+        
+        if (existingPlayer.connected) {
+            socket.emit('error', { message: 'このプレイヤーは既に接続中です' });
+            return;
+        }
+        
+        existingPlayer.id = socket.id;
+        existingPlayer.connected = true;
+        existingPlayer.lastConnected = Date.now();
+        
+        socket.join(roomId);
+        socket.roomId = roomId;
+        socket.playerName = playerName;
+        
+        socket.emit('rejoinSuccess', {
+            roomId: roomId,
+            gameData: roomData.gameData,
+            isHost: roomData.gameData.host === socket.id
+        });
+        
+        io.to(roomId).emit('gameUpdate', roomData.gameData);
+        
+        console.log(`✅ ${playerName} がルーム ${roomId} に再入場完了`);
+    });
+    
+    // 観戦
+    socket.on('spectateRoom', (data) => {
+        console.log('👁️ 観戦要求:', data);
+        const { roomId, spectatorName } = data;
+        
+        const roomData = activeRooms.get(roomId);
+        if (!roomData) {
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        if (roomData.gameData.gameState !== 'playing') {
+            socket.emit('error', { message: 'このルームはゲーム中ではありません' });
+            return;
+        }
+        
+        socket.join(roomId);
+        socket.roomId = roomId;
+        socket.playerName = spectatorName;
+        socket.isSpectator = true;
+        
+        socket.emit('spectateSuccess', {
+            roomId: roomId,
+            gameData: roomData.gameData
+        });
+        
+        console.log(`✅ ${spectatorName} がルーム ${roomId} を観戦開始`);
+    });
+    
+    // 一時退出
+    socket.on('tempLeaveRoom', () => {
+        console.log('🚶 一時退出:', socket.id);
+        handlePlayerTempLeave(socket, io);
+    });
+    
+    // ルーム退出
+    socket.on('leaveRoom', () => {
+        console.log('🚪 ルーム退出:', socket.id);
+        handlePlayerLeave(socket, io);
+    });
+    
+    // ルーム再接続
+    socket.on('reconnectToRoom', (data) => {
+        console.log('🔄 ルーム再接続要求:', data);
+        const { roomId, playerName } = data;
+        
+        const roomData = activeRooms.get(roomId);
+        if (!roomData) {
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        const player = findPlayerByName(roomData, playerName);
+        if (!player) {
+            socket.emit('error', { message: 'プレイヤーデータが見つかりません' });
+            return;
+        }
+        
+        if (!player.connected) {
+            player.id = socket.id;
+            player.connected = true;
+            player.lastConnected = Date.now();
+            
+            socket.join(roomId);
+            socket.roomId = roomId;
+            socket.playerName = playerName;
+            
+            socket.emit('reconnectSuccess', {
+                roomId: roomId,
+                gameData: roomData.gameData,
+                isHost: roomData.gameData.host === socket.id
+            });
+            
+            io.to(roomId).emit('gameUpdate', roomData.gameData);
+            
+            console.log(`✅ ${playerName} がルーム ${roomId} に再接続完了`);
+        }
+    });
+}
+
+// 勝利条件チェック関数
+function checkWinConditions(gameData) {
+    // 探検家チームの勝利：すべての財宝を発見
+    if (gameData.treasureFound >= gameData.treasureGoal) {
+        return {
+            ended: true,
+            winner: 'adventurer',
+            reason: 'all_treasures_found',
+            message: `全ての子豚（${gameData.treasureGoal}匹）を救出しました！探検家チームの勝利です！`
+        };
+    }
+    
+    // 豚男チームの勝利：すべての罠を発動
+    if (gameData.trapTriggered >= gameData.trapGoal) {
+        return {
+            ended: true,
+            winner: 'guardian',
+            reason: 'all_traps_triggered',
+            message: `全ての罠（${gameData.trapGoal}個）が発動しました！豚男チームの勝利です！`
+        };
+    }
+    
+    // 豚男チーム勝利：4ラウンド終了
+    if (gameData.currentRound > gameData.maxRounds) {
+        return {
+            ended: true,
+            winner: 'guardian',
+            reason: 'max_rounds_reached',
+            message: `${gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！`
+        };
+    }
+    
+    return {
+        ended: false,
+        winner: null,
+        reason: null,
+        message: null
+    };
+}
+
+// 鍵を次のプレイヤーに渡す
+function passKeyToNextPlayer(gameData, currentTargetId) {
+    gameData.keyHolderId = currentTargetId;
+    console.log(`🗝️ 鍵を次のプレイヤーに渡しました: ${gameData.players.find(p => p.id === currentTargetId)?.name}`);
+}
+
+// ユーティリティ関数群
+function createPlayer(socketId, playerName) {
+    return {
+        id: socketId,
+        name: playerName,
+        connected: true,
+        role: null,
+        hand: [],
+        joinedAt: Date.now(),
+        lastConnected: Date.now()
+    };
+}
+
+function isPlayerInAnyRoom(socketId) {
+    for (const roomData of activeRooms.values()) {
+        if (isPlayerInRoom(roomData, socketId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function isPlayerInRoom(roomData, socketId) {
+    return roomData.gameData.players.some(p => p.id === socketId);
+}
+
+function isPlayerNameActiveInRoom(roomData, playerName) {
+    return roomData.gameData.players.some(p => p.name === playerName && p.connected);
+}
+
+function findPlayerByName(roomData, playerName) {
+    return roomData.gameData.players.find(p => p.name === playerName);
+}
+
+function findDisconnectedPlayerByName(roomData, playerName) {
+    return roomData.gameData.players.find(p => p.name === playerName && !p.connected);
+}
+
+function getConnectedPlayerCount(roomData) {
+    return roomData.gameData.players.filter(p => p.connected).length;
+}
+
+function sendRoomList(socket) {
+    try {
+        const roomList = Array.from(activeRooms.values())
+            .filter(roomData => roomData.gameData.gameState === 'waiting')
+            .map(roomData => ({
+                id: roomData.id,
+                hostName: roomData.hostName,
+                playerCount: getConnectedPlayerCount(roomData),
+                hasPassword: !!roomData.gameData.password
+            }));
+        
+        console.log(`📋 ルーム一覧送信: ${roomList.length}個のルーム`);
+        socket.emit('roomList', roomList);
+    } catch (error) {
+        console.error('ルーム一覧送信エラー:', error);
+        socket.emit('roomList', []);
+    }
+}
+
+function sendOngoingGames(socket) {
+    try {
+        const ongoingGames = Array.from(activeRooms.values())
+            .filter(roomData => roomData.gameData.gameState === 'playing')
+            .map(roomData => ({
+                id: roomData.id,
+                currentRound: roomData.gameData.currentRound,
+                maxRounds: roomData.gameData.maxRounds,
+                cardsPerPlayer: roomData.gameData.cardsPerPlayer,
+                playerCount: getConnectedPlayerCount(roomData),
+                treasureFound: roomData.gameData.treasureFound,
+                treasureGoal: roomData.gameData.treasureGoal,
+                trapTriggered: roomData.gameData.trapTriggered,
+                trapGoal: roomData.gameData.trapGoal
+            }));
+        
+        console.log(`📋 進行中ゲーム送信: ${ongoingGames.length}個のゲーム`);
+        socket.emit('ongoingGames', ongoingGames);
+    } catch (error) {
+        console.error('進行中ゲーム送信エラー:', error);
+        socket.emit('ongoingGames', []);
+    }
+}
+
+function broadcastRoomList(io) {
+    try {
+        const roomList = Array.from(activeRooms.values())
+            .filter(roomData => roomData.gameData.gameState === 'waiting')
+            .map(roomData => ({
+                id: roomData.id,
+                hostName: roomData.hostName,
+                playerCount: getConnectedPlayerCount(roomData),
+                hasPassword: !!roomData.gameData.password
+            }));
+        
+        io.emit('roomList', roomList);
+        console.log(`📋 全体ルーム一覧更新: ${roomList.length}個のルーム`);
+    } catch (error) {
+        console.error('全体ルーム一覧更新エラー:', error);
+    }
+}
+
+// プレイヤー処理関数
+function handlePlayerTempLeave(socket, io) {
+    if (!socket.roomId) return;
+    
+    const roomData = activeRooms.get(socket.roomId);
+    if (!roomData) return;
+    
+    const player = roomData.gameData.players.find(p => p.id === socket.id);
+    if (player) {
+        player.connected = false;
+        player.lastDisconnected = Date.now();
+        console.log(`${player.name} が一時退出しました`);
+    }
+    
+    io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+    broadcastRoomList(io);
+}
+
+function handlePlayerLeave(socket, io) {
+    if (!socket.roomId) return;
+    
+    const roomData = activeRooms.get(socket.roomId);
+    if (!roomData) return;
+    
+    roomData.gameData.players = roomData.gameData.players.filter(p => p.id !== socket.id);
+    
+    console.log(`プレイヤー ${socket.playerName} (${socket.id}) をルーム ${socket.roomId} から完全削除`);
+    
+    if (roomData.gameData.host === socket.id) {
+        const nextHost = roomData.gameData.players.find(p => p.connected);
+        if (nextHost) {
+            roomData.gameData.host = nextHost.id;
+            console.log(`新しいホスト: ${nextHost.name}`);
+        }
+    }
+    
+    if (roomData.gameData.players.length === 0) {
+        activeRooms.delete(socket.roomId);
+        console.log('空のルームを削除:', socket.roomId);
+    } else {
+        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+    }
+    
+    broadcastRoomList(io);
+}
+
+function handlePlayerDisconnect(socket, io) {
+    if (!socket.roomId) return;
+    
+    const roomData = activeRooms.get(socket.roomId);
+    if (!roomData) return;
+    
+    const player = roomData.gameData.players.find(p => p.id === socket.id);
+    if (player) {
+        player.connected = false;
+        player.lastDisconnected = Date.now();
+        console.log(`${player.name} が切断しました`);
+    }
+    
+    if (roomData.gameData.players.every(p => !p.connected)) {
+        activeRooms.delete(socket.roomId);
+        console.log('全員切断のためルームを削除:', socket.roomId);
+    } else {
+        io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
+    }
+    
+    broadcastRoomList(io);
+}
+
+// エクスポート
+module.exports = { 
+    setupSocketHandlers
+};Data.password && roomData.gameData.password !== password) {
             socket.emit('error', { message: 'パスワードが正しくありません' });
             return;
         }
