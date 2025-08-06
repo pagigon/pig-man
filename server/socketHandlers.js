@@ -197,8 +197,106 @@ function setupGameHandlers(io, socket, activeRooms) {
             // 🔧 【追加】ラウンド終了チェックと進行処理
             const connectedPlayerCount = room.gameData.players.filter(p => p.connected).length;
             
-            if (room.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
-                console.log('📋 ラウンド終了条件達成');
+// server/socketHandlers.js - ラウンド進行3秒遅延修正版（該当部分のみ置き換え）
+
+// 🔧 【修正】ラウンド終了チェックと進行処理（3秒遅延追加）
+if (room.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
+    console.log('📋 ラウンド終了条件達成');
+    
+    // 🔧 【追加】ラウンド終了告知を送信
+    const currentRoundEndMessage = {
+        type: 'game-log',
+        text: `🎯 ラウンド${room.gameData.currentRound}終了！3秒後に次のラウンドが開始されます...`,
+        timestamp: Date.now()
+    };
+    
+    room.gameData.messages.push(currentRoundEndMessage);
+    if (room.gameData.messages.length > 20) {
+        room.gameData.messages = room.gameData.messages.slice(-20);
+    }
+    
+    // ラウンド終了をクライアントに送信
+    io.to(socket.roomId).emit('newMessage', room.gameData.messages);
+    io.to(socket.roomId).emit('gameUpdate', room.gameData);
+    
+    // 🔧 【追加】3秒の遅延後にラウンド進行処理
+    setTimeout(() => {
+        console.log('⏰ 3秒経過 - ラウンド進行処理開始');
+        
+        try {
+            // ラウンド進行処理
+            const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
+            
+            if (roundResult.gameEnded) {
+                // 最大ラウンド達成による豚男チーム勝利
+                room.gameData.gameState = 'finished';
+                room.gameData.winningTeam = 'guardian';
+                room.gameData.victoryMessage = roundResult.reason === 'max_rounds_reached' ? 
+                    `${room.gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！` : 
+                    '豚男チームの勝利です！';
+                
+                io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                return;
+            }
+            
+            // 🔧 正しいカードリサイクルシステム実行
+            if (roundResult.needsCardRecycle) {
+                const connectedPlayers = room.gameData.players.filter(p => p.connected);
+                const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
+                
+                if (recycleResult.success) {
+                    console.log('♻️ カードリサイクル成功');
+                    
+                    // リサイクル完了のゲームログ
+                    const recycleLogMessage = {
+                        type: 'game-log',
+                        text: `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`,
+                        timestamp: Date.now()
+                    };
+                    
+                    room.gameData.messages.push(recycleLogMessage);
+                    if (room.gameData.messages.length > 20) {
+                        room.gameData.messages = room.gameData.messages.slice(-20);
+                    }
+                    
+                    io.to(socket.roomId).emit('newMessage', room.gameData.messages);
+                } else {
+                    console.error('❌ カードリサイクル失敗:', recycleResult.error);
+                }
+            }
+            
+            // ラウンド開始イベントを送信（3秒遅延後）
+            io.to(socket.roomId).emit('roundStart', roundResult.newRound);
+            
+            // 新ラウンドの最初のプレイヤーに鍵を渡す
+            const firstPlayer = room.gameData.players.find(p => p.connected);
+            if (firstPlayer) {
+                room.gameData.keyHolderId = firstPlayer.id;
+            }
+            
+            // 全員に更新を送信
+            io.to(socket.roomId).emit('gameUpdate', room.gameData);
+            
+            console.log(`🆕 ラウンド ${roundResult.newRound} 開始完了（3秒遅延後）`);
+            
+        } catch (error) {
+            console.error('❌ 遅延ラウンド進行エラー:', error);
+            // エラー時も続行
+            io.to(socket.roomId).emit('gameUpdate', room.gameData);
+        }
+        
+    }, 3000); // 🔧 【重要】3秒（3000ミリ秒）の遅延
+    
+    // 🔧 【重要】ここでreturnして、通常のターン進行をスキップ
+    return;
+    
+} else {
+    // 通常のターン進行：次のプレイヤーに鍵を渡す
+    passKeyToNextPlayer(room.gameData, data.targetPlayerId);
+    
+    // 全員に更新を送信
+    io.to(socket.roomId).emit('gameUpdate', room.gameData);
+}
                 
                 // ラウンド進行処理
                 const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
