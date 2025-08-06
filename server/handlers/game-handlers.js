@@ -1,13 +1,11 @@
-// server/handlers/game-handlers.js - 最小版（構文エラー修正）
+// server/handlers/game-handlers.js - 修正版（共有activeRooms）
 
-const activeRooms = new Map();
-
-function setupGameHandlers(io, socket) {
+function setupGameHandlers(io, socket, activeRooms) {  // activeRoomsを引数で受け取る
     
     // 🔧 【追加】チャットハンドラーからゲームログ機能を取得
     const { sendGameLog } = require('./chat-handlers');
 
-    // カード選択のみ
+    // カード選択
     socket.on('selectCard', (data) => {
         console.log('🃏 カード選択:', data);
         console.log('🔧 sendGameLog存在チェック:', typeof sendGameLog);
@@ -15,7 +13,7 @@ function setupGameHandlers(io, socket) {
         // 🔧 【テスト追加】ゲームログテスト
         if (typeof sendGameLog === 'function') {
             console.log('🔧 sendGameLog関数テスト実行');
-            sendGameLog(io, 'TEST', 'テストメッセージ');
+            sendGameLog(io, socket.roomId || 'TEST', 'テストメッセージ');
         } else {
             console.log('🔧 sendGameLog関数が見つかりません');
         }
@@ -26,7 +24,17 @@ function setupGameHandlers(io, socket) {
         }
         
         const room = activeRooms.get(socket.roomId);
-        if (!room || room.gameData.gameState !== 'playing') {
+        if (!room) {
+            console.error('ルームが見つかりません:', socket.roomId);
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        console.log('ルーム状態:', room.gameData.gameState);
+        console.log('プレイヤー数:', room.gameData.players.length);
+        
+        if (room.gameData.gameState !== 'playing') {
+            console.error('ゲーム状態が異常:', room.gameData.gameState);
             socket.emit('error', { message: 'ゲームが進行していません' });
             return;
         }
