@@ -24,7 +24,7 @@ function setupSocketHandlers(io) {
         console.log('✅ 新しい接続確認:', socket.id);
 
         // ゲームハンドラーを設定
-        setupGameHandlers(io, socket);
+        setupGameHandlers(io, socket, activeRooms);
         
         // Socket毎の要求履歴を初期化
         socketRequestHistory.set(socket.id, {
