@@ -3,6 +3,8 @@ const app = express();
 const http = require('http').createServer(app);
 // server/server.js のSocket.io設定を以下に置き換え
 
+// server/server.js - Render.com Socket.io設定修正版（既存のSocket.io設定部分を置き換え）
+
 const io = require('socket.io')(http, {
     cors: {
         origin: "*",
@@ -10,26 +12,47 @@ const io = require('socket.io')(http, {
         allowedHeaders: ["*"],
         credentials: false
     },
-    // 🔧 Render.com環境に最適化されたSocket.io設定
-    transports: ['polling'],           // pollingのみ許可（WebSocket無効）
+    // 🔧 【修正】Render.com環境に最適化されたSocket.io設定
+    transports: ['polling'],              // pollingのみ許可（WebSocket無効）
     allowEIO3: true,
     
-    // タイムアウト設定の最適化
-    pingTimeout: 60000,                // pingタイムアウトを60秒に延長
-    pingInterval: 25000,               // pingを25秒間隔で送信
-    connectTimeout: 30000,             // 接続タイムアウトを30秒に延長
+    // 🔧 【重要】Render.comでの400エラー対策
+    pingTimeout: 120000,                  // pingタイムアウトを2分に延長
+    pingInterval: 60000,                  // pingを1分間隔で送信
+    connectTimeout: 45000,                // 接続タイムアウトを45秒に延長
     
-    // Render.com環境での安定性向上設定
-    allowUpgrades: false,              // transport upgradeを無効化
-    maxHttpBufferSize: 1e6,           // HTTPバッファサイズを1MBに制限
+    // 🔧 【追加】Render.com特有の設定
+    allowUpgrades: false,                 // transport upgradeを完全無効化
+    maxHttpBufferSize: 1e5,              // HTTPバッファサイズを100KBに制限（より小さく）
+    httpCompression: false,               // HTTP圧縮を無効化
     
-    // 接続管理の最適化
-    serveClient: false,                // クライアント配信を無効化
-    cookie: false,                     // cookieを無効化
+    // 🔧 【修正】接続管理の最適化
+    serveClient: false,                   // クライアント配信を無効化
+    cookie: {
+        name: 'io',
+        httpOnly: false,
+        sameSite: 'lax',
+        secure: false                     // HTTPSでない場合はfalse
+    },
     
-    // エラー処理の改善
+    // 🔧 【追加】エラー処理の改善
     destroyUpgrade: false,
-    destroyUpgradeTimeout: 1000
+    destroyUpgradeTimeout: 1000,
+    
+    // 🔧 【重要】Render.com用の追加設定
+    allowRequest: (req, callback) => {
+        // すべてのリクエストを許可（Render.comの内部通信用）
+        callback(null, true);
+    },
+    
+    // 🔧 【追加】パス設定の明示
+    path: '/socket.io/',
+    
+    // 🔧 【追加】Render.com環境での安定性向上
+    forceNew: false,
+    rememberUpgrade: false,
+    timeout: 45000,
+    autoConnect: true
 });
 
 // 🔧 サーバー側の接続監視とクリーンアップ
