@@ -39,6 +39,7 @@ function setupSocketHandlers(io) {
         // 🔧 【修正】各種ハンドラーを activeRooms を共有して設定
         setupChatHandlers(io, socket, activeRooms);
         setupGameHandlers(io, socket, activeRooms);  // この関数内で定義
+        setupGameEndHandlers(io, socket, activeRooms);
         
         // Socket毎の要求履歴を初期化
         socketRequestHistory.set(socket.id, {
@@ -77,6 +78,169 @@ function setupSocketHandlers(io) {
 
 // 🔧 【追加】ゲームハンドラー（activeRoomsを共有）
 function setupGameHandlers(io, socket, activeRooms) {
+    // 🔧 【ここに追加】ゲーム終了後の処理機能
+function setupGameEndHandlers(io, socket, activeRooms) {
+
+        // ロビーに戻る
+    socket.on('returnToLobby', () => {
+        console.log('🏠 ロビー復帰要求:', socket.id);
+        
+        if (!socket.roomId) {
+            socket.emit('error', { message: 'ルームに参加していません' });
+            return;
+        }
+        
+        const room = activeRooms.get(socket.roomId);
+        if (!room) {
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        try {
+            // ゲーム状態をwaitingに戻す
+            room.gameData.gameState = 'waiting';
+            
+            // ゲーム関連データをリセット
+            resetGameData(room.gameData);
+            
+            // 全プレイヤーに更新を送信
+            io.to(socket.roomId).emit('gameUpdate', room.gameData);
+            
+            // ルーム一覧を更新（待機中ルームとして表示）
+            broadcastRoomList(io);
+            
+            console.log(`✅ ルーム ${socket.roomId} がロビーに復帰`);
+            
+        } catch (error) {
+            console.error('ロビー復帰エラー:', error);
+            socket.emit('error', { message: 'ロビー復帰に失敗しました' });
+        }
+    });
+    
+    // 連戦開始（ホスト専用）
+    socket.on('restartGame', () => {
+        console.log('🔄 連戦開始要求:', socket.id);
+        
+        if (!socket.roomId) {
+            socket.emit('error', { message: 'ルームに参加していません' });
+            return;
+        }
+        
+        const room = activeRooms.get(socket.roomId);
+        if (!room) {
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        if (room.gameData.host !== socket.id) {
+            socket.emit('error', { message: '連戦開始権限がありません' });
+            return;
+        }
+        
+        const connectedCount = room.gameData.players.filter(p => p.connected).length;
+        if (connectedCount < 3) {
+            socket.emit('error', { message: '連戦開始には最低3人必要です' });
+            return;
+        }
+        
+        try {
+            console.log('🎮 連戦開始:', connectedCount, '人');
+            
+            // ゲーム関連データをリセット
+            resetGameData(room.gameData);
+            
+            // 新しいゲームを初期化
+            const gameInitData = initializeGameData(connectedCount);
+            Object.assign(room.gameData, gameInitData);
+            
+            const connectedPlayers = room.gameData.players.filter(p => p.connected);
+            
+            // 役職を再割り当て
+            connectedPlayers.forEach((player, index) => {
+                player.role = gameInitData.assignedRoles[index];
+                console.log(`${player.name} → ${player.role}`);
+            });
+            
+            // カードを再配布
+            const round1CardsPerPlayer = getCardsPerPlayerForRound(1);
+            const { playerHands } = distributeCards(
+                gameInitData.allCards, 
+                connectedCount, 
+                round1CardsPerPlayer
+            );
+            
+            connectedPlayers.forEach((player, index) => {
+                player.hand = playerHands[index] || [];
+                console.log(`${player.name} に ${player.hand.length} 枚配布`);
+            });
+            
+            // 初期鍵保持者を設定
+            if (connectedPlayers.length > 0) {
+                room.gameData.keyHolderId = connectedPlayers[0].id;
+                console.log(`🗝️ 初期鍵保持者: ${connectedPlayers[0].name}`);
+            }
+            
+            room.gameData.gameState = 'playing';
+            room.gameData.cardsPerPlayer = round1CardsPerPlayer;
+            
+            // 連戦開始のゲームログ
+            const restartLogMessage = {
+                type: 'game-log',
+                text: `🔄 連戦開始！新しいゲームが始まります！`,
+                timestamp: Date.now()
+            };
+            
+            if (!room.gameData.messages) {
+                room.gameData.messages = [];
+            }
+            room.gameData.messages.push(restartLogMessage);
+            
+            // 全員に更新を送信
+            io.to(socket.roomId).emit('gameUpdate', room.gameData);
+            io.to(socket.roomId).emit('newMessage', room.gameData.messages);
+            io.to(socket.roomId).emit('roundStart', 1);
+            
+            // ルーム一覧を更新
+            broadcastRoomList(io);
+            
+            console.log(`✅ ルーム ${socket.roomId} で連戦開始完了`);
+            
+        } catch (error) {
+            console.error('❌ 連戦開始エラー:', error);
+            socket.emit('error', { message: '連戦開始に失敗しました: ' + error.message });
+        }
+    });
+}
+
+// 🔧 【追加】ゲームデータリセット関数
+function resetGameData(gameData) {
+    // ゲーム進行状態をリセット
+    gameData.gameState = 'waiting';
+    gameData.currentRound = 1;
+    gameData.treasureFound = 0;
+    gameData.trapTriggered = 0;
+    gameData.keyHolderId = null;
+    gameData.cardsPerPlayer = 5;
+    gameData.cardsFlippedThisRound = 0;
+    gameData.turnInRound = 0;
+    gameData.allCards = [];
+    gameData.playerHands = {};
+    gameData.remainingCards = [];
+    
+    // 勝利関連データをクリア
+    delete gameData.winningTeam;
+    delete gameData.victoryMessage;
+    
+    // プレイヤーの手札と役職をリセット
+    if (gameData.players) {
+        gameData.players.forEach(player => {
+            player.role = null;
+            player.hand = [];
+        });
+    }
+    
+    console.log('🔄 ゲームデータリセット完了');
+}
     
     // カード選択
     socket.on('selectCard', (data) => {
