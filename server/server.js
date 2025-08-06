@@ -55,16 +55,57 @@ const io = require('socket.io')(http, {
     autoConnect: true
 });
 
-// 🔧 サーバー側の接続監視とクリーンアップ
+// server/server.js - デバッグログ追加版（Socket.io設定の後に追加）
+
+// 🔧 【追加】Render.com環境での詳細なSocket.ioデバッグ
 io.engine.on('connection_error', (err) => {
-    console.log('Socket.io Engine 接続エラー:', {
-        req: err.req?.url || 'unknown',      // リクエストURL
-        code: err.code,                      // エラーコード
-        message: err.message,                // エラーメッセージ
-        context: err.context,                // エラーコンテキスト
-        type: err.type                       // エラータイプ
+    console.log('🔧 Socket.io Engine 接続エラー詳細:', {
+        req: err.req ? {
+            url: err.req.url,
+            method: err.req.method,
+            headers: err.req.headers,
+            query: err.req.query
+        } : 'unknown request',
+        code: err.code,
+        message: err.message,
+        context: err.context,
+        type: err.type,
+        description: err.description
     });
 });
+
+// 🔧 【追加】リクエスト詳細ログ
+io.engine.on('initial_headers', (headers, req) => {
+    console.log('🔧 Socket.io 初期ヘッダー:', {
+        url: req.url,
+        method: req.method,
+        userAgent: req.headers['user-agent'],
+        origin: req.headers.origin
+    });
+});
+
+// 🔧 【追加】接続成功時のログ
+io.on('connection', (socket) => {
+    console.log('🔧 Socket.io 接続成功詳細:', {
+        id: socket.id,
+        transport: socket.conn.transport.name,
+        remoteAddress: socket.conn.remoteAddress,
+        userAgent: socket.conn.request.headers['user-agent']
+    });
+});
+
+// 🔧 【追加】定期的な接続状態監視
+setInterval(() => {
+    const connectedSockets = io.sockets.sockets.size;
+    const engineConnections = io.engine.clientsCount;
+    
+    console.log(`🔧 Socket統計詳細: Socket.IO=${connectedSockets}個, Engine=${engineConnections}個`);
+    
+    if (connectedSockets !== engineConnections) {
+        console.warn('⚠️ Socket数の不整合を検出');
+    }
+}, 30000); // 30秒間隔
+
 
 // 定期的なクリーンアップ（Render.com環境での推奨設定）
 setInterval(() => {
