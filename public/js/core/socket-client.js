@@ -57,8 +57,10 @@ export class SocketClient {
         }
     }
 
+// public/js/core/socket-client.js - initializeSocket関数の設定部分のみ修正
+
     initializeSocket() {
-        console.log('Socket.io 初期化開始 (Render.com最適化)');
+        console.log('Socket.io 初期化開始 (Render.com最適化v2)');
         
         if (typeof io === 'undefined') {
             console.error('❌ Socket.io が読み込まれていません');
@@ -74,26 +76,35 @@ export class SocketClient {
         this.isConnecting = true;
 
         try {
-            // Render.com環境に最適化されたSocket.io設定
+            // 🔧 【修正】Render.com環境に最適化されたSocket.io設定v2
             const socketConfig = {
                 transports: ['polling'],
                 forceNew: true,
-                timeout: 30000,
-                pingTimeout: 60000,
-                pingInterval: 25000,
+                timeout: 45000,                    // 45秒に短縮
+                pingTimeout: 120000,               // 2分に延長
+                pingInterval: 60000,               // 1分に延長
                 reconnection: true,
-                reconnectionAttempts: 5,
-                reconnectionDelay: 3000,
-                reconnectionDelayMax: 10000,
+                reconnectionAttempts: 3,           // 3回に削減
+                reconnectionDelay: 5000,           // 5秒に延長
+                reconnectionDelayMax: 15000,       // 15秒に延長
                 upgrade: false,
                 rememberUpgrade: false,
                 autoConnect: true,
                 withCredentials: false,
-                timestampRequests: true,
-                timestampParam: 't'
+                timestampRequests: false,          // タイムスタンプ無効化
+                
+                // 🔧 【追加】Render.com特有の設定
+                query: {
+                    t: Date.now()                  // キャッシュ回避用タイムスタンプ
+                },
+                
+                // 🔧 【追加】エラー対策
+                jsonp: false,
+                forceJSONP: false,
+                forceBase64: false
             };
 
-            console.log('Socket.io 設定 (Render.com最適化):', socketConfig);
+            console.log('Socket.io 設定 (Render.com v2):', socketConfig);
             
             // 既存のSocketがあれば完全に切断
             if (this.socket) {
@@ -111,7 +122,7 @@ export class SocketClient {
             // 新しいSocket接続を作成
             this.socket = io(socketConfig);
 
-            console.log('Socket.io インスタンス作成成功 (Render.com対応)');
+            console.log('Socket.io インスタンス作成成功 (Render.com対応v2)');
             this.setupEventListeners();
             this.setupConnectionMonitoring();
             
