@@ -45,21 +45,56 @@ function assignRoles(playerCount) {
 }
 
 // 全カード生成関数
+// server/game/game-Logic.js - カード枚数修正版（該当関数のみ置き換え）
+
+// 🔧 【修正】正しいカード配分ルール
 function generateAllCards(playerCount) {
-    let treasureCount = 7; // デフォルト
-    let trapCount = 2;     // デフォルト
+    let treasureCount, trapCount;
     
-    // プレイヤー数に応じた調整
-    if (playerCount >= 6) {
-        treasureCount = Math.min(10, playerCount + 2);
-    }
-    if (playerCount >= 10) {
-        trapCount = 3;
-        treasureCount = 10;
+    // 🔧 【修正】プレイヤー数に応じた正しいカード配分
+    switch (playerCount) {
+        case 3:
+            treasureCount = 5;  // 子豚5匹
+            trapCount = 2;      // 罠2個
+            break;
+        case 4:
+            treasureCount = 6;  // 子豚6匹
+            trapCount = 2;      // 罠2個
+            break;
+        case 5:
+            treasureCount = 7;  // 子豚7匹
+            trapCount = 2;      // 罠2個
+            break;
+        case 6:
+            treasureCount = 8;  // 子豚8匹
+            trapCount = 2;      // 罠2個
+            break;
+        case 7:
+            treasureCount = 7;  // 子豚7匹
+            trapCount = 2;      // 罠2個
+            break;
+        case 8:
+            treasureCount = 8;  // 子豚8匹
+            trapCount = 2;      // 罠2個
+            break;
+        case 9:
+            treasureCount = 9;  // 子豚9匹
+            trapCount = 2;      // 罠2個
+            break;
+        case 10:
+            treasureCount = 10; // 子豚10匹
+            trapCount = 3;      // 罠3個
+            break;
+        default:
+            // 3人未満・10人超の場合のフォールバック
+            treasureCount = Math.max(3, Math.min(10, playerCount + 2));
+            trapCount = playerCount >= 10 ? 3 : 2;
     }
     
-    const totalCards = playerCount * 5; // 初期手札数
+    const totalCards = playerCount * 5; // 初期手札数（1ラウンド目）
     const emptyCount = totalCards - treasureCount - trapCount;
+    
+    console.log(`🎴 カード配分 (${playerCount}人): 子豚${treasureCount}匹, 罠${trapCount}個, 空き部屋${emptyCount}個`);
     
     const cards = [];
     
@@ -98,6 +133,53 @@ function generateAllCards(playerCount) {
     };
 }
 
+// 🔧 【修正】勝利条件計算も同じルールに合わせる
+function calculateVictoryGoal(playerCount) {
+    let treasureGoal, trapGoal;
+    
+    switch (playerCount) {
+        case 3:
+            treasureGoal = 5;   // 子豚5匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 4:
+            treasureGoal = 6;   // 子豚6匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 5:
+            treasureGoal = 7;   // 子豚7匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 6:
+            treasureGoal = 8;   // 子豚8匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 7:
+            treasureGoal = 7;   // 子豚7匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 8:
+            treasureGoal = 8;   // 子豚8匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 9:
+            treasureGoal = 9;   // 子豚9匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 10:
+            treasureGoal = 10;  // 子豚10匹
+            trapGoal = 3;       // 罠3個
+            break;
+        default:
+            treasureGoal = Math.max(3, Math.min(10, playerCount + 2));
+            trapGoal = playerCount >= 10 ? 3 : 2;
+    }
+    
+    console.log(`🎯 勝利条件 (${playerCount}人): 子豚${treasureGoal}匹救出 or 罠${trapGoal}個発動`);
+    
+    return { treasureGoal, trapGoal };
+}
+
 // カード配布関数
 function distributeCards(allCards, playerCount, cardsPerPlayer) {
     const playerHands = [];
@@ -119,16 +201,47 @@ function distributeCards(allCards, playerCount, cardsPerPlayer) {
 
 // 勝利条件計算関数
 function calculateVictoryGoal(playerCount) {
-    let treasureGoal = 7;
-    let trapGoal = 2;
+    let treasureGoal, trapGoal;
     
-    if (playerCount >= 6) {
-        treasureGoal = Math.min(10, playerCount + 2);
+    switch (playerCount) {
+        case 3:
+            treasureGoal = 5;   // 子豚5匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 4:
+            treasureGoal = 6;   // 子豚6匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 5:
+            treasureGoal = 7;   // 子豚7匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 6:
+            treasureGoal = 8;   // 子豚8匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 7:
+            treasureGoal = 7;   // 子豚7匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 8:
+            treasureGoal = 8;   // 子豚8匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 9:
+            treasureGoal = 9;   // 子豚9匹
+            trapGoal = 2;       // 罠2個
+            break;
+        case 10:
+            treasureGoal = 10;  // 子豚10匹
+            trapGoal = 3;       // 罠3個
+            break;
+        default:
+            treasureGoal = Math.max(3, Math.min(10, playerCount + 2));
+            trapGoal = playerCount >= 10 ? 3 : 2;
     }
-    if (playerCount >= 10) {
-        treasureGoal = 10;
-        trapGoal = 3;
-    }
+    
+    console.log(`🎯 勝利条件 (${playerCount}人): 子豚${treasureGoal}匹救出 or 罠${trapGoal}個発動`);
     
     return { treasureGoal, trapGoal };
 }
