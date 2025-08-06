@@ -94,7 +94,9 @@ function setupChatHandlers(io, socket) {
 }
 
 module.exports = {
-    setupChatHandlers
+    setupChatHandlers,
+    sendSystemMessage,
+    sendGameLog
 };
 
 // server/handlers/chat-handlers.js の最後に以下の関数を追加：
