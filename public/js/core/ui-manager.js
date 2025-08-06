@@ -351,12 +351,66 @@ export class UIManager {
                 winnersList.appendChild(winnersDiv);
             }
             
-            screen.style.display = 'flex';
+             // 🔧 【追加】ロビー復帰・連戦ボタンエリア
+        const buttonArea = document.createElement('div');
+        buttonArea.style.cssText = 'margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;';
+        
+        // ロビーに戻るボタン
+        const lobbyBtn = document.createElement('button');
+        lobbyBtn.className = 'btn btn-secondary';
+        lobbyBtn.textContent = '🏠 ロビーに戻る';
+        lobbyBtn.style.minWidth = '140px';
+        
+        lobbyBtn.onclick = function() {
+            console.log('🏠 ロビー復帰ボタンクリック');
+            if (window.pigGame && typeof window.pigGame.onReturnToLobby === 'function') {
+                window.pigGame.onReturnToLobby();
+            } else if (window.pigGame && typeof window.pigGame.returnToLobby === 'function') {
+                window.pigGame.returnToLobby();
+            } else {
+                console.error('❌ pigGame.returnToLobby メソッドが見つかりません');
+                if (window.pigGame && window.pigGame.socketClient) {
+                    window.pigGame.socketClient.returnToLobby();
+                }
+            }
+        };
+        
+        buttonArea.appendChild(lobbyBtn);
+        
+        // 🔧 【追加】連戦ボタン（ホストのみ表示）
+        if (window.pigGame && window.pigGame.isHost) {
+            const restartBtn = document.createElement('button');
+            restartBtn.className = 'btn btn-primary';
+            restartBtn.textContent = '🔄 もう一戦！';
+            restartBtn.style.minWidth = '140px';
             
-        } catch (error) {
-            console.error('勝利画面表示エラー:', error);
+            restartBtn.onclick = function() {
+                console.log('🔄 連戦開始ボタンクリック');
+                if (window.pigGame && typeof window.pigGame.onRestartGame === 'function') {
+                    window.pigGame.onRestartGame();
+                } else if (window.pigGame && typeof window.pigGame.restartGame === 'function') {
+                    window.pigGame.restartGame();
+                } else {
+                    console.error('❌ pigGame.restartGame メソッドが見つかりません');
+                    if (window.pigGame && window.pigGame.socketClient) {
+                        window.pigGame.socketClient.restartGame();
+                    }
+                }
+            };
+            
+            buttonArea.appendChild(restartBtn);
         }
+        
+        winnersList.appendChild(buttonArea);
+        
+        screen.style.display = 'flex';
+        
+        console.log('✅ 勝利画面表示完了（連戦機能付き）');
+        
+    } catch (error) {
+        console.error('勝利画面表示エラー:', error);
     }
+}
 
     // 進行中ゲーム一覧更新（正しいカードリサイクル情報付き）
     static updateOngoingGames(games) {
