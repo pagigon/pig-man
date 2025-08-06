@@ -1,5 +1,9 @@
-// server/socketHandlers.js - 完全修正統合版（ラウンド進行・ゲームログ対応）
+// server/socketHandlers.js - インポート修正版（先頭部分のみ置き換え）
 
+// 🔧 【修正】正しいインポート方法
+const gameLogic = require('./game/game-Logic');
+
+// 個別に関数を取得
 const { 
     generateRoomId, 
     assignRoles, 
@@ -11,7 +15,14 @@ const {
     getCardsPerPlayerForRound,
     advanceToNextRound,
     correctCardRecycleSystem
-} = require('./game/game-Logic');
+} = gameLogic;
+
+// デバッグ用：インポート確認
+console.log('🔧 game-Logic.js インポート確認:', {
+    generateRoomId: typeof generateRoomId,
+    advanceToNextRound: typeof advanceToNextRound,
+    correctCardRecycleSystem: typeof correctCardRecycleSystem
+});
 
 // 🔧 【修正】個別ハンドラーを統合して循環参照を回避
 const { setupChatHandlers } = require('./handlers/chat-handlers');
