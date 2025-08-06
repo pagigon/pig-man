@@ -63,68 +63,36 @@ function setupChatHandlers(io, socket) {
         
         console.log(`💬 チャット: [${socket.roomId}] ${socket.playerName}: ${trimmedMessage}`);
     });
+}
+
+// ゲームログ送信（他のハンドラーから呼び出し用）
+function sendGameLog(io, roomId, logMessage) {
+    const activeRooms = getActiveRooms();
+    const room = activeRooms.get(roomId);
+    if (!room) return;
     
-    // システムメッセージ送信（サーバー内部からの呼び出し用）
-    function sendSystemMessage(roomId, message) {
-        const room = activeRooms.get(roomId);
-        if (!room) return;
-        
-        const systemMessage = {
-            type: 'system',
-            text: message,
-            timestamp: Date.now()
-        };
-        
-        if (!room.gameData.messages) {
-            room.gameData.messages = [];
-        }
-        
-        room.gameData.messages.push(systemMessage);
-        
-        // 最新20件のみ保持
-        if (room.gameData.messages.length > 20) {
-            room.gameData.messages = room.gameData.messages.slice(-20);
-        }
-        
-        io.to(roomId).emit('newMessage', room.gameData.messages);
-        console.log(`🔔 システム: [${roomId}] ${message}`);
+    const gameLogMessage = {
+        type: 'game-log',
+        text: logMessage,
+        timestamp: Date.now()
+    };
+    
+    if (!room.gameData.messages) {
+        room.gameData.messages = [];
     }
     
-    return { sendSystemMessage };
+    room.gameData.messages.push(gameLogMessage);
+    
+    // 最新20件のみ保持
+    if (room.gameData.messages.length > 20) {
+        room.gameData.messages = room.gameData.messages.slice(-20);
+    }
+    
+    io.to(roomId).emit('newMessage', room.gameData.messages);
+    console.log(`🎮 ゲームログ: [${roomId}] ${logMessage}`);
 }
 
 module.exports = {
     setupChatHandlers,
-    sendSystemMessage,
     sendGameLog
 };
-
-// server/handlers/chat-handlers.js の最後に以下の関数を追加：
-
-    // ゲームログ送信（他のハンドラーから呼び出し用）
-    function sendGameLog(io, roomId, logMessage) {
-        const room = activeRooms.get(roomId);
-        if (!room) return;
-        
-        const gameLogMessage = {
-            type: 'game-log',
-            text: logMessage,
-            timestamp: Date.now()
-        };
-        
-        if (!room.gameData.messages) {
-            room.gameData.messages = [];
-        }
-        
-        room.gameData.messages.push(gameLogMessage);
-        
-        // 最新20件のみ保持
-        if (room.gameData.messages.length > 20) {
-            room.gameData.messages = room.gameData.messages.slice(-20);
-        }
-        
-        io.to(roomId).emit('newMessage', room.gameData.messages);
-        console.log(`🎮 ゲームログ: [${roomId}] ${logMessage}`);
-    }
-    
-    return { sendSystemMessage, sendGameLog };
