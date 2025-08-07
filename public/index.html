@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>豚小屋探検隊 - 豚小屋に入らずんば子豚を得ず</title>
     
+    <!-- メタタグ -->
+    <meta name="description" content="豚小屋探検隊 - 探検家チームと豚男チームに分かれて戦う、心理戦マルチプレイヤーWebゲーム">
+    <meta name="keywords" content="豚小屋,探検隊,マルチプレイヤー,ゲーム,WebSocket,リアルタイム">
+    
+    <!-- PWA対応 -->
+    <meta name="theme-color" content="#04384c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- OGP設定 -->
+    <meta property="og:title" content="豚小屋探検隊">
+    <meta property="og:description" content="豚小屋に入らずんば子豚を得ず - オンライン心理戦ゲーム">
+    <meta property="og:image" content="/images/title-banner.webp">
+    <meta property="og:type" content="website">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+    
     <!-- Socket.io CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     
@@ -30,7 +49,7 @@
                     <h3>新しいルームを作成</h3>
                     <div class="input-group">
                         <label for="player-name-create">プレイヤー名:</label>
-                        <input type="text" id="player-name-create" placeholder="名前を入力">
+                        <input type="text" id="player-name-create" placeholder="名前を入力" maxlength="20">
                     </div>
                     <div class="checkbox-group">
                         <input type="checkbox" id="use-password">
@@ -38,7 +57,7 @@
                     </div>
                     <div class="input-group" id="password-group" style="display: none;">
                         <label for="room-password">パスワード:</label>
-                        <input type="password" id="room-password" placeholder="パスワードを入力">
+                        <input type="password" id="room-password" placeholder="パスワードを入力" maxlength="50">
                     </div>
                     <button id="create-room" class="btn">ルームを作成</button>
                 </div>
@@ -47,15 +66,15 @@
                     <h3>ルームに参加</h3>
                     <div class="input-group">
                         <label for="player-name-join">プレイヤー名:</label>
-                        <input type="text" id="player-name-join" placeholder="名前を入力">
+                        <input type="text" id="player-name-join" placeholder="名前を入力" maxlength="20">
                     </div>
                     <div class="input-group">
                         <label for="room-id-input">ルームID:</label>
-                        <input type="text" id="room-id-input" placeholder="ルームIDを入力">
+                        <input type="text" id="room-id-input" placeholder="ルームIDを入力" maxlength="10">
                     </div>
                     <div class="input-group" id="join-password-group" style="display: none;">
                         <label for="join-password">パスワード:</label>
-                        <input type="password" id="join-password" placeholder="パスワードを入力">
+                        <input type="password" id="join-password" placeholder="パスワードを入力" maxlength="50">
                     </div>
                     <button id="join-room" class="btn">ルームに参加</button>
                 </div>
@@ -64,11 +83,11 @@
                     <h3>ゲーム中のルームに再入場</h3>
                     <div class="input-group">
                         <label for="rejoin-player-name">プレイヤー名:</label>
-                        <input type="text" id="rejoin-player-name" placeholder="元の名前を入力">
+                        <input type="text" id="rejoin-player-name" placeholder="元の名前を入力" maxlength="20">
                     </div>
                     <div class="input-group">
                         <label for="rejoin-room-id">ルームID:</label>
-                        <input type="text" id="rejoin-room-id" placeholder="ルームIDを入力">
+                        <input type="text" id="rejoin-room-id" placeholder="ルームIDを入力" maxlength="10">
                     </div>
                     <button id="rejoin-room" class="btn">ゲームに再入場</button>
                 </div>
@@ -77,11 +96,11 @@
                     <h3>観戦モード</h3>
                     <div class="input-group">
                         <label for="spectator-name">観戦者名:</label>
-                        <input type="text" id="spectator-name" placeholder="名前を入力">
+                        <input type="text" id="spectator-name" placeholder="名前を入力" maxlength="20">
                     </div>
                     <div class="input-group">
                         <label for="spectate-room-id">ルームID:</label>
-                        <input type="text" id="spectate-room-id" placeholder="ルームIDを入力">
+                        <input type="text" id="spectate-room-id" placeholder="ルームIDを入力" maxlength="10">
                     </div>
                     <button id="spectate-room" class="btn">観戦する</button>
                 </div>
@@ -99,25 +118,28 @@
                 <div id="ongoing-games-container"></div>
             </div>
 
+            <!-- 🔧 【修正】ゲームルール説明（豚小屋テーマ統一） -->
             <div class="info-box">
-                <h3>🎮 ゲームルール（恐怖の古代寺院ルール）</h3>
+                <h3>🎮 ゲームルール（豚小屋探検ルール）</h3>
                 <div class="rule-toggle">
                     <button id="toggle-rules" class="btn btn-small">ルールを表示</button>
                     <ul id="game-rules" class="rules-list" style="display: none;">
-                        <li><strong>ストーリー</strong>：豚男という怪物が村の子供たちを誘拐し、豚の姿に変えてしまいました</li>
-                        <li><strong>探検家チーム</strong>：豚に変えられた子供をすべて救出することが目標</li>
-                        <li><strong>豚男チーム</strong>：罠をすべて発動させるか、4ラウンド終了まで子供たちを守る（隠す）ことが目標</li>
-                        <li><strong style="color: #FFA500;">ラウンド制</strong>：全4ラウンド。手札は1R→5枚、2R→4枚、3R→3枚、4R→2枚と減少</li>
+                        <li><strong>ストーリー</strong>：豚男という怪物が村の子供たちを誘拐し、豚の姿に変えて豚小屋に隠してしまいました</li>
+                        <li><strong>探検家チーム</strong>：豚に変えられた子供をすべて救出することが目標（⛏️ 農場作業員風の勇敢な探検家）</li>
+                        <li><strong>豚男チーム</strong>：罠をすべて発動させるか、4ラウンド終了まで子供たちを守る（隠す）ことが目標（🐷 威嚇的だが愛嬌のある豚男）</li>
+                        <li><strong style="color: #FFA500;">豚小屋ラウンド制</strong>：全4ラウンド。手札は1R→5枚、2R→4枚、3R→3枚、4R→2枚と減少</li>
                         <li><strong style="color: #32CD32;">正しいカードリサイクル</strong>：ラウンド終了時、全カード回収→残存カード保証→再配布</li>
                         <li><strong style="color: #FFD700;">カード保証システム</strong>：未発見の子豚・未発動の罠は必ず手札に含まれます</li>
-                        <li>各プレイヤーには最初5枚のカードが配られます</li>
+                        <li>各プレイヤーには最初5枚のカードが配られます（豚小屋の部屋カード）</li>
                         <li>自分のカードの内訳は分かりますが、位置は分かりません</li>
-                        <li>鍵を持った人が、他のプレイヤーのカードを1枚選んで公開します</li>
-                        <li>選ばれた人が次に鍵を受け取ります</li>
+                        <li>鍵を持った人が、他のプレイヤーのカードを1枚選んで豚小屋の部屋を調べます</li>
+                        <li>調べられた人が次に鍵を受け取ります</li>
                         <li>各ラウンドでプレイヤー数分のカードを公開したらラウンド終了</li>
-                        <li><strong style="color: #32CD32;">正しいカードリサイクル</strong>：ラウンド終了時、全カード回収→残存カード保証→再配布</li>
-                        <li><strong style="color: #FFD700;">カード保証システム</strong>：未発見の子豚・未発動の罠は必ず手札に含まれます</li>
-
+                        <li><strong style="color: #32CD32;">豚小屋システム</strong>：ラウンド間で全カード回収→残存保証→再配布</li>
+                        <li><strong style="color: #FFD700;">子豚救出保証</strong>：未発見の子豚・未発動の罠は必ず手札に含まれます</li>
+                        <li>子豚カード：🐷 豚に変えられた子供（救出対象）</li>
+                        <li>罠カード：💀 豚男が仕掛けた危険な罠</li>
+                        <li>空き部屋カード：🏠 何もない豚小屋の部屋</li>
                     </ul>
                 </div>
             </div>
@@ -135,15 +157,15 @@
             </div>
             
             <div class="room-buttons">
-                <button id="start-game" class="btn btn-primary" style="display: none;">ゲーム開始 (3人以上必要)</button>
+                <button id="start-game" class="btn btn-primary" style="display: none;">豚小屋探検開始 (3人以上必要)</button>
                 <button id="leave-room" class="btn btn-secondary">ルームを退出</button>
             </div>
 
             <!-- プレイ中退出機能 -->
             <div class="temp-leave-section" id="temp-leave-section" style="display: none;">
                 <div class="temp-leave-info">
-                    <h4>⚠️ ゲーム中の一時退出</h4>
-                    <p>ゲーム中ですが、一時的に退出できます。</p>
+                    <h4>⚠️ 豚小屋探検中の一時退出</h4>
+                    <p>探検中ですが、一時的に退出できます。</p>
                     <p>プレイヤー名とルームIDを覚えておけば、後で再入場可能です。</p>
                 </div>
                 <div class="temp-leave-buttons">
@@ -158,7 +180,7 @@
             <!-- 折りたたみ可能なゲーム概要 -->
             <div class="collapsible-section">
                 <button class="section-toggle" onclick="toggleSection('game-overview')">
-                    <span>ゲーム情報</span> <span class="toggle-icon">▼</span>
+                    <span>豚小屋探検情報</span> <span class="toggle-icon">▼</span>
                 </button>
                 <div id="game-overview" class="game-overview collapsed">
                     <div class="overview-grid">
@@ -167,7 +189,7 @@
                             <p id="role-possibility-text"></p>
                         </div>
                         <div class="card-distribution">
-                            <h4>カード内訳</h4>
+                            <h4>豚小屋の部屋構成</h4>
                             <p id="card-distribution-text"></p>
                         </div>
                     </div>
@@ -177,11 +199,11 @@
             <!-- 進捗バー -->
             <div class="progress-bars">
                 <div class="treasure-progress">
-                    <span>救出</span>
+                    <span>子豚救出</span>
                     <div id="treasure-icons" class="icon-row"></div>
                 </div>
                 <div class="trap-progress">
-                    <span>罠</span>
+                    <span>罠発動</span>
                     <div id="trap-icons" class="icon-row"></div>
                 </div>
             </div>
@@ -206,13 +228,13 @@
                         <span class="value"><span id="trap-triggered">0</span>/<span id="trap-goal">2</span></span>
                     </div>
                     <div class="info-item">
-                        <span class="label">公開</span>
-                        <span class="value"><span id="cards-flipped">0</span>枚</span>
+                        <span class="label">調査済</span>
+                        <span class="value"><span id="cards-flipped">0</span>部屋</span>
                     </div>
                 </div>
                 <!-- 正しいカードリサイクル情報 -->
                 <div class="recycle-info" style="text-align: center; margin-top: 8px; font-size: 11px; color: #FFA500;">
-                    <span id="recycle-status">ラウンド終了時：全カード回収→残存カード保証→再配布</span>
+                    <span id="recycle-status">ラウンド終了時：全部屋調査完了→残存保証→再配布</span>
                 </div>
             </div>
 
@@ -231,7 +253,7 @@
             <div id="key-holder-message" class="key-holder-message compact">
                 <div class="key-info">
                     <span style="font-size: 20px; margin-right: 8px;">🗝️</span>
-                    <span>鍵: <strong id="key-holder-name"></strong></span>
+                    <span>豚小屋の鍵: <strong id="key-holder-name"></strong></span>
                 </div>
                 <p id="turn-message" class="turn-status"></p>
             </div>
@@ -239,32 +261,32 @@
             <!-- 自分のカード -->
             <div class="my-cards-section">
                 <div class="section-header">
-                    <h3>あなたのカード</h3>
-                    <p class="card-info">子豚 <span id="my-treasure">0</span> / 罠 <span id="my-trap">0</span> / 空き <span id="my-empty">0</span></p>
+                    <h3>あなたの豚小屋部屋カード</h3>
+                    <p class="card-info">子豚 <span id="my-treasure">0</span> / 罠 <span id="my-trap">0</span> / 空き部屋 <span id="my-empty">0</span></p>
                 </div>
                 <div id="my-cards-grid" class="my-cards-grid mobile-optimized"></div>
             </div>
 
             <!-- 他のプレイヤー -->
             <div class="other-players-section">
-                <h3>他のプレイヤー</h3>
+                <h3>他の探検隊メンバー</h3>
                 <div id="other-players-container"></div>
             </div>
 
             <!-- ゲーム中の退出ボタン -->
             <div class="game-leave-section">
-                <button id="game-leave-room" class="btn btn-secondary btn-small">一時退出</button>
+                <button id="game-leave-room" class="btn btn-secondary btn-small">豚小屋から一時退出</button>
             </div>
 
             <!-- チャット -->
             <div class="collapsible-section">
                 <button class="section-toggle" onclick="toggleSection('chat-section')">
-                    <span>チャット</span> <span class="toggle-icon">▼</span>
+                    <span>探検隊通信</span> <span class="toggle-icon">▼</span>
                 </button>
                 <div id="chat-section" class="collapsed">
                     <div id="chat-container" class="chat-container mobile"></div>
                     <div class="chat-input-container">
-                        <input type="text" id="chat-input" placeholder="メッセージ..." maxlength="100">
+                        <input type="text" id="chat-input" placeholder="探検隊にメッセージ..." maxlength="100">
                         <button id="send-chat" class="btn btn-small">送信</button>
                     </div>
                 </div>
@@ -274,21 +296,21 @@
         <!-- 正しいカードリサイクル対応のラウンド開始演出 -->
         <div id="round-start-overlay" class="round-start-overlay">
             <div class="round-start-text">
-                <h1 id="round-start-message">ラウンド 1 スタート！</h1>
+                <h1 id="round-start-message">ラウンド 1 スタート！<br><small>豚小屋探検開始</small></h1>
             </div>
         </div>
 
         <!-- 勝利画面 -->
         <div id="victory-screen" class="victory-screen">
-    <div class="victory-content">
-        <h2 id="victory-title"></h2>
-        <p id="victory-message"></p>
-        <div id="winners-list" style="margin: 20px 0;">
-            <!-- 🔧 【削除】既存のreturn-to-lobbyボタンは削除 -->
-            <!-- JavaScriptで動的に生成されるボタンエリアに置き換え -->
+            <div class="victory-content">
+                <h2 id="victory-title"></h2>
+                <p id="victory-message"></p>
+                <div id="winners-list" style="margin: 20px 0;">
+                    <!-- JavaScriptで動的に生成されるボタンエリア -->
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
     <!-- JavaScript統合版 → ES6モジュール版 -->
     <script type="module" src="js/main.js"></script>
