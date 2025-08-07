@@ -822,45 +822,72 @@ roomData.gameData.lastTargetedPlayerId = null;
 // その他のハンドラー設定
 function setupOtherHandlers(socket, io) {
     // 再入場
-    socket.on('rejoinRoom', (data) => {
-        console.log('🔄 再入場要求:', data);
-        const { roomId, playerName } = data;
-        
-        const roomData = activeRooms.get(roomId);
-        if (!roomData) {
-            socket.emit('error', { message: 'ルームが見つかりません' });
-            return;
-        }
-        
-        const existingPlayer = findPlayerByName(roomData, playerName);
-        if (!existingPlayer) {
-            socket.emit('error', { message: 'このルームにあなたのデータが見つかりません' });
-            return;
-        }
-        
-        if (existingPlayer.connected) {
-            socket.emit('error', { message: 'このプレイヤーは既に接続中です' });
-            return;
-        }
-        
+    // 🔧 【修正】再入場処理（ゲーム中でも参加可能に）
+socket.on('rejoinRoom', (data) => {
+    console.log('🔄 再入場要求:', data);
+    const { roomId, playerName } = data;
+    
+    // バリデーション
+    if (!roomId || !playerName) {
+        socket.emit('error', { message: 'ルームIDとプレイヤー名を入力してください' });
+        return;
+    }
+    
+    const roomData = activeRooms.get(roomId.trim().toUpperCase());
+    if (!roomData) {
+        socket.emit('error', { message: 'ルームが見つかりません' });
+        return;
+    }
+    
+    // 🔧 【重要】ゲーム中でも再入場を許可
+    const existingPlayer = findPlayerByName(roomData, playerName.trim());
+    if (!existingPlayer) {
+        socket.emit('error', { message: 'このルームにあなたのデータが見つかりません' });
+        return;
+    }
+    
+    // 🔧 【修正】既に接続中でも強制的に再接続を許可（重複接続対策）
+    if (existingPlayer.connected) {
+        console.log(`⚠️ ${playerName} は既に接続中ですが、強制再接続します`);
+        // 既存の接続を切断状態にする
+        existingPlayer.connected = false;
+    }
+    
+    try {
+        // 再接続処理
         existingPlayer.id = socket.id;
         existingPlayer.connected = true;
         existingPlayer.lastConnected = Date.now();
         
         socket.join(roomId);
         socket.roomId = roomId;
-        socket.playerName = playerName;
+        socket.playerName = playerName.trim();
+        
+        // 🔧 【修正】ホスト判定を正確に
+        const isHost = roomData.gameData.host === socket.id;
         
         socket.emit('rejoinSuccess', {
             roomId: roomId,
             gameData: roomData.gameData,
-            isHost: roomData.gameData.host === socket.id
+            isHost: isHost,
+            playerInfo: {
+                roomId: roomId,
+                playerName: playerName.trim(),
+                isHost: isHost
+            }
         });
         
+        // ルーム内の全員に更新を送信
         io.to(roomId).emit('gameUpdate', roomData.gameData);
         
-        console.log(`✅ ${playerName} がルーム ${roomId} に再入場完了`);
-    });
+        console.log(`✅ ${playerName} がルーム ${roomId} に再入場完了（ゲーム状態: ${roomData.gameData.gameState}）`);
+        
+    } catch (error) {
+        console.error('❌ 再入場処理エラー:', error);
+        socket.emit('error', { message: '再入場に失敗しました: ' + error.message });
+    }
+});
+
     
     // 観戦
     socket.on('spectateRoom', (data) => {
@@ -1147,13 +1174,35 @@ function handlePlayerDisconnect(socket, io) {
     if (player) {
         player.connected = false;
         player.lastDisconnected = Date.now();
-        console.log(`${player.name} が切断しました`);
+        console.log(`${player.name} が切断しました（復帰可能状態で保持）`);
+        
+        // 🔧 【修正】ゲーム中の場合は切断されたプレイヤー情報を送信
+        if (roomData.gameData.gameState === 'playing') {
+            const disconnectedNames = roomData.gameData.players
+                .filter(p => !p.connected)
+                .map(p => p.name);
+            
+            io.to(socket.roomId).emit('waitingForReconnect', {
+                disconnectedPlayers: disconnectedNames,
+                message: `${player.name} が切断されました。復帰をお待ちください。`
+            });
+        }
     }
     
+    // 🔧 【修正】全員が切断した場合のみルーム削除（猶予時間付き）
     if (roomData.gameData.players.every(p => !p.connected)) {
-        activeRooms.delete(socket.roomId);
-        console.log('全員切断のためルームを削除:', socket.roomId);
+        console.log(`⏰ 全員切断 - ルーム ${socket.roomId} を10分後に削除予定`);
+        
+        // 10分の猶予時間を設ける
+        setTimeout(() => {
+            const currentRoom = activeRooms.get(socket.roomId);
+            if (currentRoom && currentRoom.gameData.players.every(p => !p.connected)) {
+                activeRooms.delete(socket.roomId);
+                console.log(`🗑️ ルーム ${socket.roomId} を削除（10分間復帰なし）`);
+            }
+        }, 10 * 60 * 1000); // 10分
     } else {
+        // 他に接続中のプレイヤーがいる場合は更新を送信
         io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
     }
     
