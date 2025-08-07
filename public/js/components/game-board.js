@@ -1,4 +1,4 @@
-// ゲーム画面描画コンポーネント - エラー修正版
+// ゲーム画面描画コンポーネント - 画像対応修正版
 import { UIManager } from '../core/ui-manager.js';
 import { safeGetElement, safeSetText, vibrate } from '../utils/helpers.js';
 
@@ -7,139 +7,72 @@ export class GameBoard {
         this.game = game;
     }
 
-    updateGameUI() {
-        try {
-            console.log('🎨 ゲームUI更新開始');
-            
-            if (!this.game || !this.game.gameData) {
-                console.warn('⚠️ ゲームデータが存在しません');
-                return;
-            }
-
-            UIManager.showScreen('game-board');
-
-            // 安全にUI更新を実行
-            this.safeUpdateGameOverview();
-            this.safeUpdateProgressBars();
-            this.safeUpdateGameInfo();
-            // 🔧 正しいカードリサイクル情報も更新
-           UIManager.updateRoundDisplayWithCards(this.game.gameData);
-            this.safeUpdateKeyHolder();
-            this.safeShowPlayerRole();
-            this.safeRenderMyCards();
-            
-            const isMyTurn = this.game.gameData.keyHolderId === this.game.mySocketId;
-            this.safeRenderOtherPlayers(isMyTurn);
-            this.addCardRevealEffects();
-            
-            console.log('✅ ゲームUI更新完了');
-            
-        } catch (error) {
-            console.error('❌ ゲームUI更新エラー:', error);
-            UIManager.showError('ゲーム画面の更新でエラーが発生しました');
-        }
-    }
-
-    safeUpdateGameOverview() {
-        try {
-            if (!this.game.gameData.players) return;
-            UIManager.updateGameOverview(this.game.gameData.players.length);
-        } catch (error) {
-            console.error('ゲーム概要更新エラー:', error);
-        }
-    }
-
-    safeUpdateProgressBars() {
-        try {
-            UIManager.updateProgressBars(this.game.gameData);
-        } catch (error) {
-            console.error('進捗バー更新エラー:', error);
-        }
-    }
-
-    safeUpdateGameInfo() {
-        try {
-            console.log('📊 ゲーム情報更新:', this.game.gameData);
-            
-            // 個別に安全に更新
-            const gameData = this.game.gameData;
-            
-            // 基本情報の安全な更新
-            this.safeUpdateElement('current-round', gameData.currentRound || 1);
-            this.safeUpdateElement('treasure-found', gameData.treasureFound || 0);
-            this.safeUpdateElement('trap-triggered', gameData.trapTriggered || 0);
-            this.safeUpdateElement('trap-goal', gameData.trapGoal || 2);
-            this.safeUpdateElement('treasure-goal', gameData.treasureGoal || 7);
-            this.safeUpdateElement('cards-per-player', gameData.cardsPerPlayer || 5);
-            this.safeUpdateElement('cards-flipped', gameData.cardsFlippedThisRound || 0);
-            
-            // ラウンド表示の特別処理
-            this.updateRoundDisplay(gameData);
-            
-        } catch (error) {
-            console.error('ゲーム情報更新エラー:', error);
-        }
-    }
-
-    safeUpdateElement(elementId, value) {
-        try {
-            const element = safeGetElement(elementId);
-            if (element) {
-                element.textContent = String(value);
-                console.log(`✅ ${elementId} 更新: ${value}`);
-            } else {
-                console.warn(`⚠️ 要素が見つかりません: ${elementId}`);
-            }
-        } catch (error) {
-            console.error(`要素更新エラー (${elementId}):`, error);
-        }
-    }
-
-    updateRoundDisplay(gameData) {
-        try {
-            // ラウンド表示の更新（エラー対応版）
-            const roundElement = safeGetElement('current-round');
-            if (roundElement && roundElement.parentElement) {
-                const currentRound = gameData.currentRound || 1;
-                const maxRounds = gameData.maxRounds || 4;
-                
-                // 親要素を安全に更新
-                const parentEl = roundElement.parentElement;
-                if (parentEl.classList.contains('info-item')) {
-                    // info-itemの構造を維持して更新
-                    parentEl.innerHTML = 
-                        '<span class="label">R</span>' +
-                        '<span class="value">' + currentRound + '/' + maxRounds + '</span>';
+    // 🔧 【修正】画像読み込みとフォールバック処理
+    loadImageWithFallback(img, basePath, type, size = 'medium') {
+        const formats = ['webp', 'png', 'jpg'];
+        const sizes = ['large', 'medium', 'small'];
+        
+        // 現在のサイズから開始して、小さいサイズへフォールバック
+        const sizeIndex = sizes.indexOf(size);
+        const fallbackSizes = sizes.slice(sizeIndex);
+        
+        const tryLoad = (formatIndex = 0, sizeIndex = 0) => {
+            if (formatIndex >= formats.length) {
+                if (sizeIndex + 1 < fallbackSizes.length) {
+                    tryLoad(0, sizeIndex + 1);
+                    return;
                 } else {
-                    // 通常のテキスト更新
-                    roundElement.textContent = currentRound;
+                    // 全ての画像読み込みに失敗した場合の絵文字フォールバック
+                    this.setEmojiFallback(img, type);
+                    return;
                 }
-                
-                console.log(`✅ ラウンド表示更新: ${currentRound}/${maxRounds}`);
             }
-        } catch (error) {
-            console.error('ラウンド表示更新エラー:', error);
-            // フォールバック: 基本的なテキスト更新
-            safeSetText('current-round', gameData.currentRound || 1);
-        }
+            
+            const currentSize = fallbackSizes[sizeIndex];
+            const currentFormat = formats[formatIndex];
+            const imagePath = `${basePath}${type}-${currentSize}.${currentFormat}`;
+            
+            img.src = imagePath;
+            
+            img.onerror = () => {
+                console.warn(`画像読み込み失敗: ${imagePath}`);
+                tryLoad(formatIndex + 1, sizeIndex);
+            };
+        };
+        
+        tryLoad();
     }
 
-    safeUpdateKeyHolder() {
-        try {
-            const keyHolder = this.game.gameData.players.find(p => p.id === this.game.gameData.keyHolderId);
-            safeSetText('key-holder-name', keyHolder?.name || '不明');
-            
-            const isMyTurn = this.game.gameData.keyHolderId === this.game.mySocketId;
-            const turnMessage = isMyTurn ? 
-                'あなたのターンです！他のプレイヤーのカードを選んでください' : 
-                '待機中...';
-            safeSetText('turn-message', turnMessage);
-            
-        } catch (error) {
-            console.error('鍵保持者情報更新エラー:', error);
+    // 🔧 【追加】絵文字フォールバック処理
+    setEmojiFallback(img, type) {
+        img.style.display = 'none';
+        const emoji = document.createElement('div');
+        emoji.style.cssText = 'font-size: 2.5em; text-align: center; line-height: 1; display: flex; align-items: center; justify-content: center; height: 100%; width: 100%;';
+        
+        switch (type) {
+            case 'treasure':
+                emoji.textContent = '🐷';
+                break;
+            case 'trap':
+                emoji.textContent = '💀';
+                break;
+            case 'empty':
+                emoji.textContent = '🏠';
+                break;
+            case 'adventurer':
+                emoji.textContent = '⛏️';
+                break;
+            case 'pig-man':
+                emoji.textContent = '🐷';
+                break;
+            default:
+                emoji.textContent = '❓';
         }
+        
+        img.parentNode.insertBefore(emoji, img.nextSibling);
     }
 
+    // 🔧 【修正】役職表示（新しい画像パス対応）
     safeShowPlayerRole() {
         try {
             if (!this.game.gameData.players) return;
@@ -160,40 +93,28 @@ export class GameBoard {
 
             if (myRole === 'adventurer') {
                 roleCard.className = 'role-card role-adventurer compact';
-                roleText.textContent = '⛏️ 探検家 (Explorer)';
+                roleText.textContent = '⛏️ 探検家 (Adventurer)';
                 roleDesc.textContent = `子豚に変えられた子供を${this.game.gameData.treasureGoal || 7}匹すべて救出することが目標です！`;
-                roleImage.src = '/images/role-adventurer.png';
+                
+                // 🔧 【修正】新しい画像パスで読み込み
+                this.loadImageWithFallback(roleImage, '/images/roles/', 'adventurer');
                 roleImage.alt = '探検家';
                 
-                roleImage.onerror = () => {
-                    roleImage.style.display = 'none';
-                    const emoji = document.createElement('div');
-                    emoji.textContent = '⛏️';
-                    emoji.style.fontSize = '4em';
-                    emoji.style.textAlign = 'center';
-                    roleImage.parentNode.insertBefore(emoji, roleImage.nextSibling);
-                };
             } else if (myRole === 'guardian') {
                 roleCard.className = 'role-card role-guardian compact';
                 roleText.textContent = '🐷 豚男 (Pig Man)';
                 roleDesc.textContent = `罠を${this.game.gameData.trapGoal || 2}個すべて発動させるか、4ラウンド終了まで子豚たちを隠し続けることが目標です！`;
-                roleImage.src = '/images/role-guardian.png';
-                roleImage.alt = '豚男';
                 
-                roleImage.onerror = () => {
-                    roleImage.style.display = 'none';
-                    const emoji = document.createElement('div');
-                    emoji.textContent = '🐷';
-                    emoji.style.fontSize = '4em';
-                    emoji.style.textAlign = 'center';
-                    roleImage.parentNode.insertBefore(emoji, roleImage.nextSibling);
-                };
+                // 🔧 【修正】新しい画像パスで読み込み
+                this.loadImageWithFallback(roleImage, '/images/roles/', 'pig-man');
+                roleImage.alt = '豚男';
             }
         } catch (error) {
             console.error('役職表示エラー:', error);
         }
     }
 
+    // 🔧 【修正】自分のカード描画（新しい画像パス対応）
     safeRenderMyCards() {
         try {
             const myCardsSection = document.querySelector('.my-cards-section');
@@ -224,34 +145,16 @@ export class GameBoard {
                     div.classList.add('revealed', card.type);
                     const img = document.createElement('img');
                     img.className = 'card-image';
-                    img.src = `/images/card-${card.type}-large.png`;
                     img.alt = card.type;
                     
-                    img.onerror = () => {
-                        img.style.display = 'none';
-                        const emoji = document.createElement('div');
-                        emoji.style.fontSize = '2.5em';
-                        emoji.style.textAlign = 'center';
-                        emoji.style.lineHeight = '1';
-                        switch (card.type) {
-                            case 'treasure':
-                                emoji.textContent = '🐷';
-                                break;
-                            case 'trap':
-                                emoji.textContent = '💀';
-                                break;
-                            case 'empty':
-                                emoji.textContent = '🏠';
-                                break;
-                        }
-                        div.appendChild(emoji);
-                    };
+                    // 🔧 【修正】新しい画像パスで読み込み
+                    this.loadImageWithFallback(img, '/images/cards/', card.type, 'large');
                     
                     div.appendChild(img);
                 } else {
                     const img = document.createElement('img');
                     img.className = 'card-image';
-                    img.src = '/images/card-back-large.png';
+                    img.src = '/images/cards/back-large.webp';
                     img.alt = 'カード裏面';
                     
                     img.onerror = () => {
@@ -292,6 +195,7 @@ export class GameBoard {
         }
     }
 
+    // 🔧 【修正】他プレイヤーカード描画（新しい画像パス対応）
     safeRenderOtherPlayers(isMyTurn) {
         try {
             const container = safeGetElement('other-players-container');
@@ -320,7 +224,7 @@ export class GameBoard {
                 
                 if (player.id === this.game.gameData.keyHolderId) {
                     const keyImg = document.createElement('img');
-                    keyImg.src = '/images/key-icon.png';
+                    keyImg.src = '/images/key-icon.webp';
                     keyImg.className = 'key-icon-small';
                     keyImg.alt = '鍵';
                     
@@ -349,34 +253,16 @@ export class GameBoard {
                             cardDiv.classList.add('revealed', card.type);
                             const img = document.createElement('img');
                             img.className = 'other-card-image';
-                            img.src = `/images/card-${card.type}-medium.png`;
                             img.alt = card.type;
                             
-                            img.onerror = () => {
-                                img.style.display = 'none';
-                                const emoji = document.createElement('div');
-                                emoji.style.fontSize = '1.5em';
-                                emoji.style.textAlign = 'center';
-                                emoji.style.lineHeight = '1';
-                                switch (card.type) {
-                                    case 'treasure':
-                                        emoji.textContent = '🐷';
-                                        break;
-                                    case 'trap':
-                                        emoji.textContent = '💀';
-                                        break;
-                                    case 'empty':
-                                        emoji.textContent = '🏠';
-                                        break;
-                                }
-                                cardDiv.appendChild(emoji);
-                            };
+                            // 🔧 【修正】新しい画像パスで読み込み
+                            this.loadImageWithFallback(img, '/images/cards/', card.type, 'medium');
                             
                             cardDiv.appendChild(img);
                         } else {
                             const img = document.createElement('img');
                             img.className = 'other-card-image';
-                            img.src = '/images/card-back-medium.png';
+                            img.src = '/images/cards/back-medium.webp';
                             img.alt = 'カード裏面';
                             
                             img.onerror = () => {
@@ -410,6 +296,133 @@ export class GameBoard {
             
         } catch (error) {
             console.error('他プレイヤー描画エラー:', error);
+        }
+    }
+
+    // 既存のメソッドはそのまま維持
+    updateGameUI() {
+        try {
+            console.log('🎨 ゲームUI更新開始');
+            
+            if (!this.game || !this.game.gameData) {
+                console.warn('⚠️ ゲームデータが存在しません');
+                return;
+            }
+
+            UIManager.showScreen('game-board');
+
+            // 安全にUI更新を実行
+            this.safeUpdateGameOverview();
+            this.safeUpdateProgressBars();
+            this.safeUpdateGameInfo();
+            // 🔧 正しいカードリサイクル情報も更新
+            UIManager.updateRoundDisplayWithCards(this.game.gameData);
+            this.safeUpdateKeyHolder();
+            this.safeShowPlayerRole();
+            this.safeRenderMyCards();
+            
+            const isMyTurn = this.game.gameData.keyHolderId === this.game.mySocketId;
+            this.safeRenderOtherPlayers(isMyTurn);
+            this.addCardRevealEffects();
+            
+            console.log('✅ ゲームUI更新完了');
+            
+        } catch (error) {
+            console.error('❌ ゲームUI更新エラー:', error);
+            UIManager.showError('ゲーム画面の更新でエラーが発生しました');
+        }
+    }
+
+    // 🔧 【既存メソッドを維持】
+    safeUpdateGameOverview() {
+        try {
+            if (!this.game.gameData.players) return;
+            UIManager.updateGameOverview(this.game.gameData.players.length);
+        } catch (error) {
+            console.error('ゲーム概要更新エラー:', error);
+        }
+    }
+
+    safeUpdateProgressBars() {
+        try {
+            UIManager.updateProgressBars(this.game.gameData);
+        } catch (error) {
+            console.error('進捗バー更新エラー:', error);
+        }
+    }
+
+    safeUpdateGameInfo() {
+        try {
+            console.log('📊 ゲーム情報更新:', this.game.gameData);
+            
+            const gameData = this.game.gameData;
+            
+            this.safeUpdateElement('current-round', gameData.currentRound || 1);
+            this.safeUpdateElement('treasure-found', gameData.treasureFound || 0);
+            this.safeUpdateElement('trap-triggered', gameData.trapTriggered || 0);
+            this.safeUpdateElement('trap-goal', gameData.trapGoal || 2);
+            this.safeUpdateElement('treasure-goal', gameData.treasureGoal || 7);
+            this.safeUpdateElement('cards-per-player', gameData.cardsPerPlayer || 5);
+            this.safeUpdateElement('cards-flipped', gameData.cardsFlippedThisRound || 0);
+            
+            this.updateRoundDisplay(gameData);
+            
+        } catch (error) {
+            console.error('ゲーム情報更新エラー:', error);
+        }
+    }
+
+    safeUpdateElement(elementId, value) {
+        try {
+            const element = safeGetElement(elementId);
+            if (element) {
+                element.textContent = String(value);
+                console.log(`✅ ${elementId} 更新: ${value}`);
+            } else {
+                console.warn(`⚠️ 要素が見つかりません: ${elementId}`);
+            }
+        } catch (error) {
+            console.error(`要素更新エラー (${elementId}):`, error);
+        }
+    }
+
+    updateRoundDisplay(gameData) {
+        try {
+            const roundElement = safeGetElement('current-round');
+            if (roundElement && roundElement.parentElement) {
+                const currentRound = gameData.currentRound || 1;
+                const maxRounds = gameData.maxRounds || 4;
+                
+                const parentEl = roundElement.parentElement;
+                if (parentEl.classList.contains('info-item')) {
+                    parentEl.innerHTML = 
+                        '<span class="label">R</span>' +
+                        '<span class="value">' + currentRound + '/' + maxRounds + '</span>';
+                } else {
+                    roundElement.textContent = currentRound;
+                }
+                
+                console.log(`✅ ラウンド表示更新: ${currentRound}/${maxRounds}`);
+            }
+        } catch (error) {
+            console.error('ラウンド表示更新エラー:', error);
+            safeSetText('current-round', gameData.currentRound || 1);
+        }
+    }
+
+    safeUpdateKeyHolder() {
+        try {
+            const keyHolder = this.game.gameData.players.find(p => p.id === this.game.gameData.keyHolderId);
+            safeSetText('key-holder-name', keyHolder?.name || '不明');
+            
+            const isMyTurn = this.game.gameData.keyHolderId === this.game.mySocketId;
+            const turnMessage = isMyTurn ? 
+                'あなたのターンです！他のプレイヤーのカードを選んでください' : 
+                '待機中...';
+            safeSetText('turn-message', turnMessage);
+            
+        } catch (error) {
+            console.error('鍵保持者情報更新エラー:', error);
         }
     }
 
