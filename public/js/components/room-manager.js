@@ -410,10 +410,12 @@ if (rejoinInfo) {
     console.log('保存された再入場情報:', rejoinInfo);
     
     // 自動復帰を試行
-    if (this.game.socketClient.isConnected()) {
-        console.log('🔍 自動復帰可能性をチェック中...');
-        this.game.socketClient.checkAutoReconnect(rejoinInfo.roomId, rejoinInfo.playerName);
-    }
+    if (this.game.socketClient.isConnected() && rejoinInfo.roomId && rejoinInfo.playerName) {
+    console.log('🔍 自動復帰可能性をチェック中...');
+    this.game.socketClient.checkAutoReconnect(rejoinInfo.roomId, rejoinInfo.playerName);
+} else {
+    console.log('🔍 復帰情報が不完全のため自動復帰チェックをスキップ');
+}
     
     // UIに情報を設定
     this.populateRejoinInfo(rejoinInfo);
