@@ -543,9 +543,9 @@ this.socket.on('waitingForReconnect', function(data) {
     }
     
     if (!roomId || !playerName) {
-        console.error('❌ 復帰チェックに必要な情報が不足');
-        return false;
-    }
+    console.log('🔍 復帰チェック: 情報不足のため無視（正常動作）');
+    return false;
+}
     
     try {
         this.socket.emit('checkAutoReconnect', {
