@@ -732,19 +732,23 @@ body {
     margin: 0;
 }
 
+
+
 /* =====================================
    🔧 スマホ対応カードレイアウト修正
    ===================================== */
 
-/* 基本カードレイアウト（デスクトップ・タブレット） */
-.my-cards-grid.mobile-optimized {
+/* 自分のカードグリッド - 確実に5枚横並び */
+.my-cards-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
+    gap: 8px;
     max-width: 100%;
     margin: 0 auto;
+    padding: 0 5px;
 }
 
+/* 基本カードスタイル */
 .card {
     aspect-ratio: 3/4;
     border: 2px solid #04384c;
@@ -759,11 +763,13 @@ body {
     min-height: 80px;
     position: relative;
     overflow: hidden;
+    transition: all 0.3s ease;
 }
 
+/* 他プレイヤーのカードグリッド */
 .other-player-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
     gap: 6px;
     max-width: 100%;
 }
@@ -778,9 +784,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1em;
+    font-size: 0.8em;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-    min-height: 70px;
+    min-height: 60px;
     overflow: hidden;
 }
 
@@ -794,14 +800,14 @@ body {
 
 /* 🔧 タブレット対応（768px以下） */
 @media (max-width: 768px) {
-    .my-cards-grid.mobile-optimized {
+    .my-cards-grid {
         grid-template-columns: repeat(5, 1fr);
-        gap: 5px;
-        padding: 0 5px;
+        gap: 6px;
+        padding: 0 3px;
     }
     
     .card {
-        min-height: 75px;
+        min-height: 70px;
         font-size: 0.8em;
         border-radius: 6px;
     }
@@ -812,42 +818,45 @@ body {
     }
     
     .other-card {
-        min-height: 65px;
-        font-size: 1em;
+        min-height: 55px;
+        font-size: 0.7em;
         border-radius: 5px;
     }
 }
 
 /* 🔧 スマホ横向き対応（480px-768px） */
 @media (max-width: 768px) and (orientation: landscape) {
-    .my-cards-grid.mobile-optimized {
+    .my-cards-grid {
         grid-template-columns: repeat(5, 1fr);
         gap: 4px;
-        max-width: 90%;
+        max-width: 95%;
+        padding: 0 2px;
     }
     
     .card {
-        min-height: 60px;
+        min-height: 55px;
         border-width: 1px;
+        font-size: 0.7em;
     }
     
     .other-card {
-        min-height: 55px;
+        min-height: 50px;
         border-width: 1px;
+        font-size: 0.6em;
     }
 }
 
-/* 🔧 スマホ縦向き対応（480px以下） */
+/* 🔧 スマホ縦向き対応（480px以下） - 最重要 */
 @media (max-width: 480px) {
-    .my-cards-grid.mobile-optimized {
+    .my-cards-grid {
         grid-template-columns: repeat(5, 1fr);
         gap: 3px;
-        padding: 0 3px;
+        padding: 0 2px;
         max-width: 100%;
     }
     
     .card {
-        min-height: 65px;
+        min-height: 60px;
         font-size: 0.7em;
         border-radius: 4px;
         border-width: 1px;
@@ -859,8 +868,8 @@ body {
     }
     
     .other-card {
-        min-height: 60px;
-        font-size: 0.9em;
+        min-height: 55px;
+        font-size: 0.6em;
         border-radius: 4px;
         border-width: 1px;
     }
@@ -871,40 +880,138 @@ body {
     }
     
     /* 絵文字フォールバック時のサイズ調整 */
-    .card div, .other-card div {
+    .card .emoji-fallback, .other-card .emoji-fallback {
         font-size: 1.8em !important;
     }
 }
 
 /* 🔧 極小画面対応（320px以下、iPhone SE等） */
 @media (max-width: 320px) {
-    .my-cards-grid.mobile-optimized {
+    .my-cards-grid {
+        grid-template-columns: repeat(5, 1fr);
         gap: 2px;
-        padding: 0 2px;
+        padding: 0 1px;
     }
     
     .card {
-        min-height: 60px;
+        min-height: 55px;
         font-size: 0.6em;
         border-radius: 3px;
     }
     
     .other-card {
-        min-height: 55px;
-        font-size: 0.8em;
+        min-height: 50px;
+        font-size: 0.5em;
         border-radius: 3px;
     }
     
     /* タッチエリア確保のため、最小サイズを保持 */
     .other-card:not(.disabled) {
-        min-height: 50px; /* タッチしやすさ重視 */
+        min-height: 48px; /* タッチしやすさ重視 */
     }
     
     /* 絵文字サイズをさらに調整 */
-    .card div, .other-card div {
+    .card .emoji-fallback, .other-card .emoji-fallback {
         font-size: 1.5em !important;
     }
 }
+
+/* 🔧 カード状態の視覚効果（既存の改良） */
+.card.revealed {
+    opacity: 0.8;
+    transform: scale(0.95);
+}
+
+.card.treasure {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #04384c;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+.card.trap {
+    background: linear-gradient(135deg, #8B0000, #DC143C);
+    color: white;
+    box-shadow: 0 0 15px rgba(220, 20, 60, 0.4);
+}
+
+.card.empty {
+    background: linear-gradient(135deg, #4a4a4a, #6a6a6a);
+    color: white;
+    box-shadow: 0 0 10px rgba(74, 74, 74, 0.3);
+}
+
+.other-card:hover:not(.revealed):not(.disabled) {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 15px rgba(135, 206, 235, 0.4);
+    border-color: #87CEEB;
+}
+
+.other-card.disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.other-card.revealed {
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+.other-card.treasure {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #04384c;
+}
+
+.other-card.trap {
+    background: linear-gradient(135deg, #8B0000, #DC143C);
+    color: white;
+}
+
+.other-card.empty {
+    background: linear-gradient(135deg, #4a4a4a, #6a6a6a);
+    color: white;
+}
+
+/* 🔧 タッチ操作最適化 */
+/* タッチデバイスでのホバー効果を無効化 */
+@media (hover: none) {
+    .other-card:hover:not(.revealed):not(.disabled) {
+        transform: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+        border-color: #04384c;
+    }
+}
+
+/* タッチ時のフィードバック */
+.other-card:not(.disabled):not(.revealed):active {
+    transform: scale(0.95);
+    background: linear-gradient(135deg, #0876a0, #065a7a);
+}
+
+/* 🔧 アクセシビリティ改善 */
+/* 高コントラストモード対応 */
+@media (prefers-contrast: high) {
+    .card, .other-card {
+        border-width: 3px;
+        border-color: white;
+    }
+}
+
+/* アニメーション無効化対応 */
+@media (prefers-reduced-motion: reduce) {
+    .card, .other-card {
+        transition: none;
+    }
+    
+    .other-card:hover:not(.revealed):not(.disabled) {
+        transform: none;
+    }
+}
+
+/* 🔧 JSから適用するクラス（既存のHTMLと互換性を保つ） */
+.my-cards-grid.mobile-optimized {
+    /* 既存の .my-cards-grid スタイルを継承 */
+}
+
 
 /* =====================================
    🔧 役職カード画像対応
