@@ -165,6 +165,33 @@ export class SocketClient {
 
     setupEventListeners() {
         console.log('Socket イベントリスナー設定開始 (Render.com対応)');
+
+        // 🔧 【追加】ホスト変更イベント
+this.socket.on('hostChanged', function(data) {
+    console.log('👑 ホスト変更通知:', data);
+    
+    try {
+        if (data && data.newHostId && data.newHostName) {
+            // 自分が新しいホストになった場合
+            if (data.newHostId === self.socket.id) {
+                self.game.isHost = true;
+                UIManager.showError(`あなたが新しいホストになりました！`, 'success');
+                
+                // ゲーム開始ボタンを表示
+                if (self.game.gameData && self.game.gameData.gameState === 'waiting') {
+                    const startButton = document.getElementById('start-game');
+                    if (startButton) {
+                        startButton.style.display = 'block';
+                    }
+                }
+            } else {
+                UIManager.showError(`${data.newHostName} が新しいホストになりました`, 'warning');
+            }
+        }
+    } catch (error) {
+        console.error('ホスト変更処理エラー:', error);
+    }
+});
         
         if (!this.socket) {
             console.error('❌ Socket が存在しません');
