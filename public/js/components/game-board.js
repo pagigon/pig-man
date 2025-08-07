@@ -73,46 +73,76 @@ export class GameBoard {
     }
 
     // 🔧 【修正】役職表示（新しい画像パス対応）
-    safeShowPlayerRole() {
-        try {
-            if (!this.game.gameData.players) return;
-            
-            const myPlayer = this.game.gameData.players.find(p => p.id === this.game.mySocketId);
-            if (!myPlayer || !myPlayer.role) return;
-            
-            const myRole = myPlayer.role;
-            const roleCard = safeGetElement('role-reveal');
-            const roleText = safeGetElement('player-role');
-            const roleDesc = safeGetElement('role-description');
-            const roleImage = safeGetElement('role-image');
+    // 🔧 【最小修正】既存の game-board.js の safeShowPlayerRole メソッドを以下に置き換えてください
 
-            if (!roleCard || !roleText || !roleDesc || !roleImage) {
-                console.warn('役職表示要素が見つかりません');
-                return;
-            }
+safeShowPlayerRole() {
+    try {
+        if (!this.game.gameData.players) return;
+        
+        const myPlayer = this.game.gameData.players.find(p => p.id === this.game.mySocketId);
+        if (!myPlayer || !myPlayer.role) return;
+        
+        const myRole = myPlayer.role;
+        const roleCard = safeGetElement('role-reveal');
+        const roleText = safeGetElement('player-role');
+        const roleDesc = safeGetElement('role-description');
+        const roleImage = safeGetElement('role-image');
 
-            if (myRole === 'adventurer') {
-                roleCard.className = 'role-card role-adventurer compact';
-                roleText.textContent = '⛏️ 探検家 (Adventurer)';
-                roleDesc.textContent = `子豚に変えられた子供を${this.game.gameData.treasureGoal || 7}匹すべて救出することが目標です！`;
-                
-                // 🔧 【修正】新しい画像パスで読み込み
-                this.loadImageWithFallback(roleImage, '/images/roles/', 'adventurer');
-                roleImage.alt = '探検家';
-                
-            } else if (myRole === 'guardian') {
-                roleCard.className = 'role-card role-guardian compact';
-                roleText.textContent = '🐷 豚男 (Pig Man)';
-                roleDesc.textContent = `罠を${this.game.gameData.trapGoal || 2}個すべて発動させるか、4ラウンド終了まで子豚たちを隠し続けることが目標です！`;
-                
-                // 🔧 【修正】新しい画像パスで読み込み
-                this.loadImageWithFallback(roleImage, '/images/roles/', 'pig-man');
-                roleImage.alt = '豚男';
-            }
-        } catch (error) {
-            console.error('役職表示エラー:', error);
+        if (!roleCard || !roleText || !roleDesc || !roleImage) {
+            console.warn('役職表示要素が見つかりません');
+            return;
         }
+
+        if (myRole === 'adventurer') {
+            roleCard.className = 'role-card role-adventurer compact';
+            roleText.textContent = '⛏️ 探検家 (Adventurer)';
+            roleDesc.textContent = `子豚に変えられた子供を${this.game.gameData.treasureGoal || 7}匹すべて救出することが目標です！`;
+            
+            // 🔧 【修正】正しい画像パスを設定
+            roleImage.src = '/images/roles/adventurer.webp';
+            roleImage.alt = '探検家';
+            
+            // 🔧 【追加】画像読み込みエラー時の処理
+            roleImage.onerror = function() {
+                console.warn('探検家画像読み込み失敗、代替表示に切り替え');
+                this.style.display = 'none';
+                // 代替として絵文字を表示
+                if (!this.nextElementSibling || !this.nextElementSibling.classList.contains('emoji-fallback')) {
+                    const emoji = document.createElement('div');
+                    emoji.className = 'emoji-fallback';
+                    emoji.style.cssText = 'font-size: 4em; text-align: center; width: 80px; height: 100px; display: flex; align-items: center; justify-content: center;';
+                    emoji.textContent = '⛏️';
+                    this.parentNode.insertBefore(emoji, this.nextSibling);
+                }
+            };
+            
+        } else if (myRole === 'guardian') {
+            roleCard.className = 'role-card role-guardian compact';
+            roleText.textContent = '🐷 豚男 (Pig Man)';
+            roleDesc.textContent = `罠を${this.game.gameData.trapGoal || 2}個すべて発動させるか、4ラウンド終了まで子豚たちを隠し続けることが目標です！`;
+            
+            // 🔧 【修正】正しい画像パスを設定
+            roleImage.src = '/images/roles/pig-man.webp';
+            roleImage.alt = '豚男';
+            
+            // 🔧 【追加】画像読み込みエラー時の処理
+            roleImage.onerror = function() {
+                console.warn('豚男画像読み込み失敗、代替表示に切り替え');
+                this.style.display = 'none';
+                // 代替として絵文字を表示
+                if (!this.nextElementSibling || !this.nextElementSibling.classList.contains('emoji-fallback')) {
+                    const emoji = document.createElement('div');
+                    emoji.className = 'emoji-fallback';
+                    emoji.style.cssText = 'font-size: 4em; text-align: center; width: 80px; height: 100px; display: flex; align-items: center; justify-content: center;';
+                    emoji.textContent = '🐷';
+                    this.parentNode.insertBefore(emoji, this.nextSibling);
+                }
+            };
+        }
+    } catch (error) {
+        console.error('役職表示エラー:', error);
     }
+}
 
     // 🔧 【修正】自分のカード描画（新しい画像パス対応）
     safeRenderMyCards() {
