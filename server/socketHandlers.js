@@ -172,10 +172,16 @@ function setupGameHandlers(io, socket, activeRooms) {
             });
             
             // 初期鍵保持者を設定
-            if (connectedPlayers.length > 0) {
-                room.gameData.keyHolderId = connectedPlayers[0].id;
-                console.log(`🗝️ 初期鍵保持者: ${connectedPlayers[0].name}`);
-            }
+           // 🔧 【修正】連戦時も初期鍵保持者をランダムに選択
+if (connectedPlayers.length > 0) {
+    const randomIndex = Math.floor(Math.random() * connectedPlayers.length);
+    const randomPlayer = connectedPlayers[randomIndex];
+    room.gameData.keyHolderId = randomPlayer.id;
+    console.log(`🗝️ 連戦初期鍵保持者: ${randomPlayer.name} (ランダム選択)`);
+}
+
+// 🔧 【追加】lastTargetedPlayerIdを初期化
+room.gameData.lastTargetedPlayerId = null;
             
             room.gameData.gameState = 'playing';
             room.gameData.cardsPerPlayer = round1CardsPerPlayer;
@@ -276,6 +282,9 @@ function setupGameHandlers(io, socket, activeRooms) {
             // カードを公開
             selectedCard.revealed = true;
             room.gameData.cardsFlippedThisRound++;
+
+            // 🔧 【重要】最後にカードをめくられたプレイヤーを記録
+            room.gameData.lastTargetedPlayerId = data.targetPlayerId;
             
             // 🔧 【修正】ゲームログを直接チャットに追加（循環参照回避）
             const selectorName = room.gameData.players.find(p => p.id === socket.id)?.name || '不明';
@@ -398,11 +407,32 @@ function setupGameHandlers(io, socket, activeRooms) {
                         // ラウンド開始イベントを送信（3秒遅延後）
                         io.to(socket.roomId).emit('roundStart', roundResult.newRound);
                         
-                        // 新ラウンドの最初のプレイヤーに鍵を渡す
-                        const firstPlayer = room.gameData.players.find(p => p.connected);
-                        if (firstPlayer) {
-                            room.gameData.keyHolderId = firstPlayer.id;
-                        }
+                        // 🔧 【修正】新ラウンドの鍵保持者を正しく設定
+                        // 最後にカードをめくられたプレイヤーに鍵を渡す
+                        if (room.gameData.lastTargetedPlayerId) {
+                        const lastTargetedPlayer = room.gameData.players.find(p => p.id === room.gameData.lastTargetedPlayerId);
+                        if (lastTargetedPlayer && lastTargetedPlayer.connected) {
+                        room.gameData.keyHolderId = room.gameData.lastTargetedPlayerId;
+                        console.log(`🗝️ 新ラウンドの鍵保持者: ${lastTargetedPlayer.name} (最後にめくられたプレイヤー)`);
+                        } else {
+        // フォールバック：最後にめくられたプレイヤーが切断している場合
+        const firstConnectedPlayer = room.gameData.players.find(p => p.connected);
+        if (firstConnectedPlayer) {
+            room.gameData.keyHolderId = firstConnectedPlayer.id;
+            console.log(`🗝️ フォールバック鍵保持者: ${firstConnectedPlayer.name} (最初の接続プレイヤー)`);
+        }
+    }
+} else {
+    // フォールバック：lastTargetedPlayerIdが記録されていない場合
+    const firstConnectedPlayer = room.gameData.players.find(p => p.connected);
+    if (firstConnectedPlayer) {
+        room.gameData.keyHolderId = firstConnectedPlayer.id;
+        console.log(`🗝️ フォールバック鍵保持者: ${firstConnectedPlayer.name} (記録なしのため最初の接続プレイヤー)`);
+    }
+}
+
+// 🔧 【重要】lastTargetedPlayerIdをクリア（次ラウンド用）
+room.gameData.lastTargetedPlayerId = null;
                         
                         // 全員に更新を送信
                         io.to(socket.roomId).emit('gameUpdate', room.gameData);
@@ -748,10 +778,16 @@ function setupRoomHandlers(io, socket) {
                 console.log(`${player.name} に ${player.hand.length} 枚配布`);
             });
             
-            if (connectedPlayers.length > 0) {
-                roomData.gameData.keyHolderId = connectedPlayers[0].id;
-                console.log(`🗝️ 初期鍵保持者: ${connectedPlayers[0].name}`);
-            }
+            // 🔧 【修正】初期鍵保持者をランダムに選択（ホスト固定を避ける）
+if (connectedPlayers.length > 0) {
+    const randomIndex = Math.floor(Math.random() * connectedPlayers.length);
+    const randomPlayer = connectedPlayers[randomIndex];
+    roomData.gameData.keyHolderId = randomPlayer.id;
+    console.log(`🗝️ 初期鍵保持者: ${randomPlayer.name} (ランダム選択)`);
+}
+
+// 🔧 【追加】lastTargetedPlayerIdを初期化
+roomData.gameData.lastTargetedPlayerId = null;
             
             roomData.gameData.gameState = 'playing';
             roomData.gameData.cardsPerPlayer = round1CardsPerPlayer;
