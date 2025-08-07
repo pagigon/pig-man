@@ -480,6 +480,9 @@ function resetGameData(gameData) {
     gameData.playerHands = {};
     gameData.remainingCards = [];
     
+    // 🔧 【追加】最後にターゲットされたプレイヤーIDもリセット
+    gameData.lastTargetedPlayerId = null;
+    
     // 勝利関連データをクリア
     delete gameData.winningTeam;
     delete gameData.victoryMessage;
