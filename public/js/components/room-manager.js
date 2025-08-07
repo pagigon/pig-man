@@ -401,7 +401,6 @@ export class RoomManager {
     }
 
     // 再接続の試行
-    // 再接続の試行
 attemptReconnection() {
     try {
         console.log('🔄 自動復帰処理開始');
