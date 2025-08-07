@@ -802,7 +802,7 @@ roomData.gameData.lastTargetedPlayerId = null;
                 cardsPerPlayer: roomData.gameData.cardsPerPlayer,
                 currentRound: roomData.gameData.currentRound,
                 maxRounds: roomData.gameData.maxRounds,
-                keyHolder: connectedPlayers[0]?.name
+                keyHolder: roomData.gameData.players.find(p => p.id === roomData.gameData.keyHolderId)?.name
             });
             
             io.to(socket.roomId).emit('gameUpdate', roomData.gameData);
