@@ -1147,12 +1147,31 @@ function handlePlayerLeave(socket, io) {
     console.log(`プレイヤー ${socket.playerName} (${socket.id}) をルーム ${socket.roomId} から完全削除`);
     
     if (roomData.gameData.host === socket.id) {
-        const nextHost = roomData.gameData.players.find(p => p.connected);
-        if (nextHost) {
-            roomData.gameData.host = nextHost.id;
-            console.log(`新しいホスト: ${nextHost.name}`);
+    const nextHost = roomData.gameData.players.find(p => p.connected);
+    if (nextHost) {
+        roomData.gameData.host = nextHost.id;
+        console.log(`新しいホスト: ${nextHost.name}`);
+        
+        // 🔧 【追加】ホスト変更をクライアントに通知
+        const hostChangeMessage = {
+            type: 'game-log',
+            text: `👑 ${nextHost.name} が新しいホストになりました`,
+            timestamp: Date.now()
+        };
+        
+        if (!roomData.gameData.messages) {
+            roomData.gameData.messages = [];
         }
+        roomData.gameData.messages.push(hostChangeMessage);
+        
+        // ホスト変更をルーム内全員に送信
+        io.to(socket.roomId).emit('hostChanged', {
+            newHostId: nextHost.id,
+            newHostName: nextHost.name
+        });
+        io.to(socket.roomId).emit('newMessage', roomData.gameData.messages);
     }
+}
     
     if (roomData.gameData.players.length === 0) {
         activeRooms.delete(socket.roomId);
