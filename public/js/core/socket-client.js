@@ -373,6 +373,25 @@ export class SocketClient {
             }
         });
 
+        // 🔧 【追加】切断プレイヤー待機の処理
+this.socket.on('waitingForReconnect', function(data) {
+    console.log('⏸️ プレイヤー切断により待機中:', data);
+    
+    try {
+        if (data && data.disconnectedPlayers && Array.isArray(data.disconnectedPlayers)) {
+            const playerNames = data.disconnectedPlayers.join(', ');
+            const message = data.message || `${playerNames} が切断されました。復帰をお待ちください...`;
+            UIManager.showError(message, 'warning');
+        } else if (data && data.message) {
+            UIManager.showError(data.message, 'warning');
+        } else {
+            UIManager.showError('プレイヤーの復帰をお待ちください...', 'warning');
+        }
+    } catch (error) {
+        console.error('切断待機メッセージ処理エラー:', error);
+    }
+});
+
         // 🔧 【追加】プレイヤー切断時の待機処理
         this.socket.on('waitingForReconnect', function(data) {
             console.log('⏸️ プレイヤー切断により待機中:', data);
@@ -487,6 +506,33 @@ export class SocketClient {
             playerName: playerName.trim() 
         });
     }
+
+    checkAutoReconnect(roomId, playerName) {
+    console.log('🔍 自動復帰チェック要求:', { roomId, playerName });
+    
+    if (!this.socket || !this.socket.connected) {
+        console.error('❌ Socket未接続のため自動復帰チェック不可');
+        return false;
+    }
+    
+    if (!roomId || !playerName) {
+        console.error('❌ 復帰チェックに必要な情報が不足');
+        return false;
+    }
+    
+    try {
+        this.socket.emit('checkAutoReconnect', {
+            roomId: roomId.trim().toUpperCase(),
+            playerName: playerName.trim()
+        });
+        
+        console.log('✅ 自動復帰チェック送信成功');
+        return true;
+    } catch (error) {
+        console.error('❌ 自動復帰チェック送信エラー:', error);
+        return false;
+    }
+}
 
     tempLeaveRoom() {
         console.log('🚶 一時退出要求');
