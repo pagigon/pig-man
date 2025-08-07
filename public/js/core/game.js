@@ -187,10 +187,16 @@ export class PigManGame {
                 this.startGame();
             });
 
-            safeAddEventListener('return-to-lobby', 'click', (e) => {
-                e.preventDefault();
-                this.roomManager.leaveRoom();
-            });
+            // return-to-lobbyボタンは動的生成されるため、条件付きで処理
+const returnToLobbyBtn = safeGetElement('return-to-lobby');
+if (returnToLobbyBtn) {
+    returnToLobbyBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.roomManager.leaveRoom();
+    });
+} else {
+    console.log('return-to-lobbyボタンは動的生成のためスキップ');
+}
 
             // リフレッシュボタン
             safeAddEventListener('refresh-rooms', 'click', (e) => {
