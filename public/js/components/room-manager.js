@@ -405,67 +405,40 @@ export class RoomManager {
 attemptReconnection() {
     try {
         console.log('🔄 自動復帰処理開始');
-        
-        // 🔧 【修正】一時的に再接続を有効化
+
         const rejoinInfo = StorageManager.getRejoinInfo();
-        if (rejoinInfo) {
-            console.log('保存された再入場情報:', rejoinInfo);
-            
-            // 自動復帰を試行
-            if (this.game.socketClient.isConnected()) {
-                console.log('🔍 自動復帰可能性をチェック中...');
-                this.game.socketClient.checkAutoReconnect(rejoinInfo.roomId, rejoinInfo.playerName);
-            }
-            
-            // UIに情報を設定
-            this.populateRejoinInfo(rejoinInfo);
-            UIManager.showError('前回のゲームへの復帰情報が見つかりました。「ゲームに再入場」ボタンから復帰できます。', 'warning');
-            return;
-        }
-
-        // 通常の再接続情報もチェック
-        const savedPlayerInfo = StorageManager.getPlayerInfo();
-        if (savedPlayerInfo && savedPlayerInfo.roomId) {
-            console.log('保存された接続情報で再接続を試行:', savedPlayerInfo);
-            
-            // 少し遅延させて接続を試行
-            setTimeout(() => {
-                if (this.game.socketClient.isConnected()) {
-                    console.log('🔄 自動再接続を試行します');
-                    this.game.socketClient.reconnectToRoom(savedPlayerInfo.roomId, savedPlayerInfo.playerName);
-                }
-            }, 2000);
-        } else {
-            console.log('復帰可能な情報が見つかりませんでした');
-        }
-    } catch (error) {
-        console.error('再接続情報の読み込みエラー:', error);
-        StorageManager.clearAllData();
+if (rejoinInfo) {
+    console.log('保存された再入場情報:', rejoinInfo);
+    
+    // 自動復帰を試行
+    if (this.game.socketClient.isConnected()) {
+        console.log('🔍 自動復帰可能性をチェック中...');
+        this.game.socketClient.checkAutoReconnect(rejoinInfo.roomId, rejoinInfo.playerName);
     }
+    
+    // UIに情報を設定
+    this.populateRejoinInfo(rejoinInfo);
+    UIManager.showError('前回のゲームへの復帰情報が見つかりました。「ゲームに再入場」ボタンから復帰できます。', 'warning');
+    return;
 }
-            
-            const rejoinInfo = StorageManager.getRejoinInfo();
-            if (rejoinInfo) {
-                console.log('保存された再入場情報:', rejoinInfo);
-                this.populateRejoinInfo(rejoinInfo);
-                UIManager.showError('前回のゲームへの再入場情報が見つかりました', 'warning');
-                return;
-            }
 
-            const savedPlayerInfo = StorageManager.getPlayerInfo();
-            if (savedPlayerInfo) {
-                console.log('保存された情報で再接続を試行:', savedPlayerInfo);
-                
-                this.game.myName = savedPlayerInfo.playerName;
-                this.game.isHost = savedPlayerInfo.isHost;
-                UIManager.showPlayerName(this.game.myName);
-                
-                setTimeout(() => {
-                    if (this.game.socketClient.isConnected()) {
-                        this.game.socketClient.reconnectToRoom(savedPlayerInfo.roomId, savedPlayerInfo.playerName);
-                    }
-                }, 2000);
-            }
+// 通常の再接続情報もチェック
+const savedPlayerInfo = StorageManager.getPlayerInfo();
+if (savedPlayerInfo && savedPlayerInfo.roomId) {
+    console.log('保存された接続情報で再接続を試行:', savedPlayerInfo);
+    
+    // 少し遅延させて接続を試行
+    setTimeout(() => {
+        if (this.game.socketClient.isConnected()) {
+            console.log('🔄 自動再接続を試行します');
+            this.game.socketClient.reconnectToRoom(savedPlayerInfo.roomId, savedPlayerInfo.playerName);
+        }
+    }, 2000);
+} else {
+    console.log('復帰可能な情報が見つかりませんでした');
+}
+
+        
         } catch (error) {
             console.error('再接続情報の読み込みエラー:', error);
             StorageManager.clearAllData();
