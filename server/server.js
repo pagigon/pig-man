@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
-// server/server.js のSocket.io設定を以下に置き換え
+
 
 // server/server.js - Render.com Socket.io設定修正版（既存のSocket.io設定部分を置き換え）
 
@@ -12,87 +12,104 @@ const io = require('socket.io')(http, {
         allowedHeaders: ["*"],
         credentials: false
     },
-    // 🔧 【修正】Render.com環境に最適化されたSocket.io設定
-    transports: ['polling'],              // pollingのみ許可（WebSocket無効）
+    
+    // 🔧 【重要】Render.com環境専用設定
+    transports: ['polling', 'websocket'],     // polling優先でwebsocketにアップグレード
     allowEIO3: true,
     
-    // 🔧 【重要】Render.comでの400エラー対策
-    pingTimeout: 120000,                  // pingタイムアウトを2分に延長
-    pingInterval: 60000,                  // pingを1分間隔で送信
-    connectTimeout: 45000,                // 接続タイムアウトを45秒に延長
+    // 🔧 【修正】Render.com安定性向上設定
+    pingTimeout: 180000,                      // 3分に延長（Render.comの遅延対応）
+    pingInterval: 90000,                      // 1.5分間隔
+    connectTimeout: 60000,                    // 接続タイムアウト1分
     
-    // 🔧 【追加】Render.com特有の設定
-    allowUpgrades: false,                 // transport upgradeを完全無効化
-    maxHttpBufferSize: 1e5,              // HTTPバッファサイズを100KBに制限（より小さく）
-    httpCompression: false,               // HTTP圧縮を無効化
+    // 🔧 【重要】Render.com WebSocket対応
+    allowUpgrades: true,                      // アップグレード許可
+    upgradeTimeout: 30000,                    // アップグレードタイムアウト30秒
+    maxHttpBufferSize: 1e5,                   // バッファサイズ制限
+    httpCompression: true,                    // 圧縮有効化
     
-    // 🔧 【修正】接続管理の最適化
-    serveClient: false,                   // クライアント配信を無効化
+    // 🔧 【追加】Render.com安定性設定
+    serveClient: false,
     cookie: {
         name: 'io',
         httpOnly: false,
         sameSite: 'lax',
-        secure: false                     // HTTPSでない場合はfalse
+        secure: process.env.NODE_ENV === 'production'  // 本番環境でのみSSL
     },
     
-    // 🔧 【追加】エラー処理の改善
-    destroyUpgrade: false,
-    destroyUpgradeTimeout: 1000,
-    
-    // 🔧 【重要】Render.com用の追加設定
+    // 🔧 【重要】Render.com特有の設定
     allowRequest: (req, callback) => {
-        // すべてのリクエストを許可（Render.comの内部通信用）
-        callback(null, true);
-    },
-    
-    // 🔧 【追加】パス設定の明示
-    path: '/socket.io/',
-    
-    // 🔧 【追加】Render.com環境での安定性向上
-    forceNew: false,
-    rememberUpgrade: false,
-    timeout: 45000,
-    autoConnect: true
+        // Render.comの内部通信とCORS設定
+        const origin = req.headers.origin;
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'https://*.onrender.com',
+            process.env.CLIENT_URL
+        ].filter(Boolean);
+        
+        // 開発環境では全て許可、本番環境では制限
+        if (process.env.NODE_ENV === 'development') {
+            callback(null, true);
+        } else {
+            const allowed = !origin || allowedOrigins.some(allowed => 
+                origin === allowed || origin.endsWith('.onrender.com')
+            );
+            callback(null, allowed);
+        }
+    }
 });
 
-// server/server.js - デバッグログ追加版（Socket.io設定の後に追加）
-
-// 🔧 【追加】Render.com環境での詳細なSocket.ioデバッグ
+// 🔧 【追加】Render.com環境での詳細ログ
 io.engine.on('connection_error', (err) => {
-    console.log('🔧 Socket.io Engine 接続エラー詳細:', {
-        req: err.req ? {
-            url: err.req.url,
-            method: err.req.method,
-            headers: err.req.headers,
-            query: err.req.query
-        } : 'unknown request',
+    console.log('🔧 Socket.io Engine接続エラー:', {
         code: err.code,
         message: err.message,
         context: err.context,
-        type: err.type,
-        description: err.description
+        req: err.req ? {
+            url: err.req.url,
+            method: err.req.method,
+            headers: {
+                'user-agent': err.req.headers['user-agent'],
+                'origin': err.req.headers.origin,
+                'connection': err.req.headers.connection,
+                'upgrade': err.req.headers.upgrade
+            }
+        } : null
     });
 });
 
-// 🔧 【追加】リクエスト詳細ログ
+// 🔧 【追加】接続監視とヘルスチェック
 io.engine.on('initial_headers', (headers, req) => {
-    console.log('🔧 Socket.io 初期ヘッダー:', {
+    console.log('🔧 Socket.io接続ヘッダー:', {
         url: req.url,
         method: req.method,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers['user-agent']?.substring(0, 50),
         origin: req.headers.origin
     });
 });
 
-// 🔧 【追加】接続成功時のログ
-io.on('connection', (socket) => {
-    console.log('🔧 Socket.io 接続成功詳細:', {
-        id: socket.id,
-        transport: socket.conn.transport.name,
-        remoteAddress: socket.conn.remoteAddress,
-        userAgent: socket.conn.request.headers['user-agent']
+// 🔧 【追加】定期的な接続状態監視
+setInterval(() => {
+    const connectedSockets = io.sockets.sockets.size;
+    const engineConnections = io.engine.clientsCount;
+    
+    console.log(`🔧 Socket統計: Socket.IO=${connectedSockets}, Engine=${engineConnections}`);
+    
+    // 異常検出時の警告
+    if (connectedSockets !== engineConnections) {
+        console.warn('⚠️ Socket数不整合 - 接続状態をチェック中');
+    }
+}, 60000); // 1分間隔
+
+// 🔧 【追加】Render.com環境でのGraceful shutdown
+process.on('SIGTERM', () => {
+    console.log('🔧 SIGTERM受信 - Socket.io正常終了中...');
+    io.close(() => {
+        console.log('🔧 Socket.io正常終了完了');
+        process.exit(0);
     });
 });
+
 
 // 🔧 【追加】定期的な接続状態監視
 setInterval(() => {
