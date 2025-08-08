@@ -2237,3 +2237,130 @@ body {
         font-size: 7px;
     }
 }
+
+
+/* public/css/style.css に以下を追加 */
+
+/* =============================================== */
+/* タイトル画像対応スタイル */
+/* =============================================== */
+
+.title-image-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* タイトルバナー画像の基本スタイル */
+.title-banner-image {
+    /* PC: 元のサイズで表示 */
+    width: 1200px;
+    height: 630px;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+    object-fit: cover;
+}
+
+/* 画像読み込み失敗時のフォールバック */
+.title-fallback {
+    text-align: center;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.title-fallback h1 {
+    font-size: clamp(1.5em, 4vw, 2.2em);
+    color: #FFD700;
+    text-shadow: 2px 2px 4px #04384c;
+    margin-bottom: 8px;
+    line-height: 1.2;
+}
+
+.title-fallback .subtitle {
+    font-size: clamp(1em, 3vw, 1.2em);
+    color: #DC143C;
+    font-style: italic;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* フェードインアニメーション */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* =============================================== */
+/* レスポンシブ対応 */
+/* =============================================== */
+
+/* スマホ: 画面に合わせて表示 */
+@media (max-width: 768px) {
+    .title-banner-image {
+        width: 100%;
+        height: auto;
+        max-width: 100%;
+        border-radius: 12px;
+    }
+    
+    .title-image-container {
+        padding: 0 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .title-banner-image {
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+        border-width: 1px;
+    }
+    
+    .title-image-container {
+        padding: 0 5px;
+    }
+}
+
+/* =============================================== */
+/* アクセシビリティ対応 */
+/* =============================================== */
+
+/* アニメーション無効化対応 */
+@media (prefers-reduced-motion: reduce) {
+    .title-banner-image {
+        transition: none;
+    }
+    
+    .fadeIn {
+        animation: none;
+    }
+}
+
+/* 高コントラストモード対応 */
+@media (prefers-contrast: high) {
+    .title-banner-image {
+        border: 3px solid white;
+    }
+}
+
+/* =============================================== */
+/* 既存のheaderスタイルを維持 */
+/* =============================================== */
+
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.1);
