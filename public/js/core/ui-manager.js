@@ -2,63 +2,89 @@
 
 export class UIManager {
     // 🔧 【修正】メッセージ更新処理（ゲームログ表示対応）
-    static updateMessages(messages) {
-        try {
-            const container = this.safeGetElement('chat-container');
-            if (!container) return;
-            
-            if (!messages || !Array.isArray(messages)) return;
-            
-            const recentMessages = messages.slice(-20);
-            
-            container.innerHTML = '';
-            recentMessages.forEach(function(msg, index) {
-                try {
-                    if (!msg || typeof msg !== 'object') return;
+    // UIManager の updateMessages メソッド - 100件対応版
 
-                    const div = document.createElement('div');
+static updateMessages(messages) {
+    try {
+        const container = this.safeGetElement('chat-container');
+        if (!container) return;
+        
+        if (!messages || !Array.isArray(messages)) return;
+        
+        // 🔧 【修正】最新100件を表示（20件から100件に拡張）
+        const recentMessages = messages.slice(-100);
+        
+        // 🔧 【追加】パフォーマンス最適化: 大量メッセージ用の仮想スクロール検討
+        // 現在のメッセージ数をログ出力
+        if (recentMessages.length > 50) {
+            console.log(`💬 チャット履歴: ${recentMessages.length}件のメッセージを表示中`);
+        }
+        
+        container.innerHTML = '';
+        recentMessages.forEach(function(msg, index) {
+            try {
+                if (!msg || typeof msg !== 'object') return;
+
+                const div = document.createElement('div');
+                
+                // ゲームログの適切な表示処理
+                if (msg.type === 'game-log') {
+                    div.className = 'chat-message game-log';
+                    div.textContent = msg.text || '';
                     
-                    // 🔧 【修正】ゲームログの適切な表示処理
-                    if (msg.type === 'game-log') {
-                        div.className = 'chat-message game-log';
-                        div.textContent = msg.text || '';
-                        
-                        // ゲームログの特別な装飾
-                        if (msg.text && msg.text.includes('♻️')) {
-                            div.style.background = 'rgba(50, 205, 50, 0.2)';
-                            div.style.borderLeft = '4px solid #32CD32';
-                            div.style.fontWeight = 'bold';
-                        } else if (msg.text && msg.text.includes('🐷')) {
-                            div.style.background = 'rgba(255, 215, 0, 0.1)';
-                            div.style.borderLeft = '4px solid #FFD700';
-                        } else if (msg.text && msg.text.includes('💀')) {
-                            div.style.background = 'rgba(220, 20, 60, 0.1)';
-                            div.style.borderLeft = '4px solid #DC143C';
-                        }
-                        
-                    } else if (msg.type === 'player') {
-                        div.className = 'chat-message player';
-                        const playerName = msg.playerName || '名前なし';
-                        const text = msg.text || '';
-                        div.textContent = playerName + ': ' + text;
-                        
-                    } else {
-                        // システムメッセージ
-                        div.className = 'chat-message system';
-                        div.textContent = msg.text || '';
+                    // ゲームログの特別な装飾
+                    if (msg.text && msg.text.includes('♻️')) {
+                        div.style.background = 'rgba(50, 205, 50, 0.2)';
+                        div.style.borderLeft = '4px solid #32CD32';
+                        div.style.fontWeight = 'bold';
+                    } else if (msg.text && msg.text.includes('🐷')) {
+                        div.style.background = 'rgba(255, 215, 0, 0.1)';
+                        div.style.borderLeft = '4px solid #FFD700';
+                    } else if (msg.text && msg.text.includes('💀')) {
+                        div.style.background = 'rgba(220, 20, 60, 0.1)';
+                        div.style.borderLeft = '4px solid #DC143C';
                     }
                     
-                    container.appendChild(div);
-                } catch (error) {
-                    console.error('メッセージアイテム作成エラー:', error);
+                } else if (msg.type === 'player') {
+                    div.className = 'chat-message player';
+                    const playerName = msg.playerName || '名前なし';
+                    const text = msg.text || '';
+                    div.textContent = playerName + ': ' + text;
+                    
+                } else {
+                    // システムメッセージ
+                    div.className = 'chat-message system';
+                    div.textContent = msg.text || '';
                 }
-            });
-            
-            container.scrollTop = container.scrollHeight;
-        } catch (error) {
-            console.error('メッセージ更新エラー:', error);
+                
+                // 🔧 【追加】タイムスタンプ表示（任意）
+                if (msg.timestamp && recentMessages.length > 20) {
+                    const timestamp = new Date(msg.timestamp);
+                    const timeStr = timestamp.toLocaleTimeString('ja-JP', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                    div.title = timeStr; // ホバー時に時刻表示
+                }
+                
+                container.appendChild(div);
+            } catch (error) {
+                console.error('メッセージアイテム作成エラー:', error);
+            }
+        });
+        
+        // スクロール位置を最下部に移動
+        container.scrollTop = container.scrollHeight;
+        
+        // 🔧 【追加】大量メッセージ時のパフォーマンス警告
+        if (recentMessages.length > 80) {
+            console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
         }
+        
+    } catch (error) {
+        console.error('メッセージ更新エラー:', error);
     }
+}
 
     // 🔧 【追加】ラウンド開始表示（リサイクル情報付き）
     static showRoundStartWithRecycle(roundNumber) {
