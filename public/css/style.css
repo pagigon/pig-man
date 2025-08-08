@@ -1359,46 +1359,182 @@ body {
     }
 }
 
-/* チャット */
+/* 🔧 【追加】チャット100件対応のスタイル改善 */
+
+/* チャットコンテナの高さ増加とスクロール最適化 */
 .chat-container.mobile {
     background: rgba(0, 0, 0, 0.7);
     padding: 12px;
     border-radius: 8px;
-    max-height: 150px;
+    max-height: 200px; /* 150px から 200px に増加 */
     overflow-y: auto;
     border: 1px solid rgba(135, 206, 235, 0.2);
     margin-bottom: 10px;
+    
+    /* 🔧 【追加】スムーズスクロール */
+    scroll-behavior: smooth;
+    
+    /* 🔧 【追加】Webkit スクロールバーのカスタマイズ */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(135, 206, 235, 0.3) rgba(0, 0, 0, 0.1);
 }
 
+.chat-container.mobile::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-container.mobile::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.chat-container.mobile::-webkit-scrollbar-thumb {
+    background: rgba(135, 206, 235, 0.3);
+    border-radius: 3px;
+}
+
+.chat-container.mobile::-webkit-scrollbar-thumb:hover {
+    background: rgba(135, 206, 235, 0.5);
+}
+
+/* チャットメッセージの改良 */
 .chat-message {
-    padding: 4px 8px;
+    padding: 6px 8px; /* 4px から 6px に増加 */
     margin: 4px 0;
     border-radius: 4px;
     font-size: 12px;
-    line-height: 1.3;
+    line-height: 1.4; /* 1.3 から 1.4 に改良 */
+    word-wrap: break-word;
+    
+    /* 🔧 【追加】長いメッセージの折り返し */
+    overflow-wrap: break-word;
+    hyphens: auto;
 }
 
+/* システムメッセージの改良 */
 .chat-message.system {
     color: #87CEEB;
     font-style: italic;
+    background: rgba(135, 206, 235, 0.05);
+    border-left: 2px solid #87CEEB;
+    padding-left: 10px;
 }
 
+/* ゲームログの視認性向上 */
 .chat-message.game-log {
     color: #32CD32;
     background: rgba(50, 205, 50, 0.1);
     border-left: 3px solid #32CD32;
     font-weight: bold;
     padding-left: 12px;
+    margin: 6px 0; /* マージン増加 */
+    
+    /* 🔧 【追加】重要ログの強調 */
+    box-shadow: 0 1px 3px rgba(50, 205, 50, 0.2);
 }
 
+/* プレイヤーメッセージの改良 */
 .chat-message.player {
     color: #FFD700;
     background: rgba(4, 56, 76, 0.3);
+    border-radius: 6px;
+    padding: 6px 10px;
 }
 
+/* 🔧 【追加】観戦者メッセージの区別 */
+.chat-message.player[title*="👁️"] {
+    color: #DDA0DD;
+    background: rgba(128, 0, 128, 0.2);
+    border-left: 2px solid #DDA0DD;
+}
+
+/* 🔧 【追加】タイムスタンプホバー効果 */
+.chat-message[title]:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    cursor: help;
+    transition: background-color 0.2s ease;
+}
+
+/* 🔧 【追加】チャット履歴の区切り線（50件ごと） */
+.chat-message:nth-child(50n) {
+    border-bottom: 1px solid rgba(135, 206, 235, 0.1);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+}
+
+/* 🔧 【追加】長いメッセージの省略表示（任意） */
+.chat-message.long-message {
+    max-height: 60px;
+    overflow: hidden;
+    position: relative;
+}
+
+.chat-message.long-message::after {
+    content: "...もっと見る";
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.8);
+    color: #87CEEB;
+    padding: 2px 6px;
+    font-size: 10px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.chat-message.long-message.expanded {
+    max-height: none;
+}
+
+.chat-message.long-message.expanded::after {
+    display: none;
+}
+
+/* モバイル対応の改良 */
+@media (max-width: 768px) {
+    .chat-container.mobile {
+        max-height: 180px; /* タブレットサイズ */
+        padding: 10px;
+    }
+    
+    .chat-message {
+        font-size: 11px;
+        padding: 5px 7px;
+    }
+    
+    .chat-message.game-log {
+        margin: 5px 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-container.mobile {
+        max-height: 160px; /* スマホサイズ */
+        padding: 8px;
+    }
+    
+    .chat-message {
+        font-size: 10px;
+        padding: 4px 6px;
+        margin: 3px 0;
+    }
+    
+    .chat-message.game-log {
+        margin: 4px 0;
+        padding-left: 10px;
+    }
+    
+    /* スマホでのスクロールバー調整 */
+    .chat-container.mobile::-webkit-scrollbar {
+        width: 4px;
+    }
+}
+
+/* 🔧 【追加】チャット入力エリアの改良 */
 .chat-input-container {
     display: flex;
     gap: 8px;
+    margin-top: 8px; /* マージン追加 */
 }
 
 .chat-input-container input {
@@ -1410,6 +1546,78 @@ body {
     color: #e8f4f8;
     font-size: 14px;
     min-height: 40px;
+    
+    /* 🔧 【追加】フォーカス時の改良 */
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.chat-input-container input:focus {
+    outline: none;
+    border-color: #87CEEB;
+    box-shadow: 0 0 8px rgba(135, 206, 235, 0.3);
+}
+
+/* 🔧 【追加】チャット送信ボタンの改良 */
+.chat-input-container .btn {
+    min-width: 60px;
+    padding: 10px 15px;
+    background: linear-gradient(45deg, #32CD32, #228B22);
+    transition: all 0.3s ease;
+}
+
+.chat-input-container .btn:hover {
+    background: linear-gradient(45deg, #228B22, #32CD32);
+    transform: translateY(-1px);
+}
+
+.chat-input-container .btn:active {
+    transform: translateY(0);
+}
+
+/* 高コントラストモード対応 */
+@media (prefers-contrast: high) {
+    .chat-message {
+        border: 1px solid white;
+    }
+    
+    .chat-message.game-log {
+        border-left-width: 4px;
+    }
+    
+    .chat-container.mobile {
+        border: 2px solid white;
+    }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+    .chat-message.system {
+        background: rgba(135, 206, 235, 0.1);
+    }
+    
+    .chat-message.game-log {
+        background: rgba(50, 205, 50, 0.15);
+    }
+    
+    .chat-message.player {
+        background: rgba(4, 56, 76, 0.4);
+    }
+}
+
+/* アニメーション無効化対応 */
+@media (prefers-reduced-motion: reduce) {
+    .chat-container.mobile {
+        scroll-behavior: auto;
+    }
+    
+    .chat-message[title]:hover {
+        transition: none;
+    }
+    
+    .chat-input-container input,
+    .chat-input-container .btn {
+        transition: none;
+    }
 }
 
 /* エラーメッセージ */
