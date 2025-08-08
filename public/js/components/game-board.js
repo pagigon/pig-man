@@ -146,84 +146,94 @@ safeShowPlayerRole() {
 
     // 🔧 【修正】自分のカード描画（新しい画像パス対応）
     safeRenderMyCards() {
-        try {
-            const myCardsSection = document.querySelector('.my-cards-section');
-            if (this.game.isSpectator) {
-                if (myCardsSection) myCardsSection.style.display = 'none';
-                return;
-            } else {
-                if (myCardsSection) myCardsSection.style.display = 'block';
-            }
-
-            if (!this.game.gameData.players) return;
-            
-            const myPlayer = this.game.gameData.players.find(p => p.id === this.game.mySocketId);
-            if (!myPlayer || !myPlayer.hand) return;
-
-            const container = safeGetElement('my-cards-grid');
-            if (!container) return;
-            
-            container.innerHTML = '';
-
-            let treasureCount = 0, trapCount = 0, emptyCount = 0;
-            
-            myPlayer.hand.forEach((card, index) => {
-                const div = document.createElement('div');
-                div.className = 'card';
-                
-                if (card.revealed) {
-                    div.classList.add('revealed', card.type);
-                    const img = document.createElement('img');
-                    img.className = 'card-image';
-                    img.alt = card.type;
-                    
-                    // 🔧 【修正】新しい画像パスで読み込み
-                    this.loadImageWithFallback(img, '/images/cards/', card.type, 'large');
-                    
-                    div.appendChild(img);
-                } else {
-                    const img = document.createElement('img');
-                    img.className = 'card-image';
-                    img.src = '/images/cards/back-large.webp';
-                    img.alt = 'カード裏面';
-                    
-                    img.onerror = () => {
-                        img.style.display = 'none';
-                        const emoji = document.createElement('div');
-                        emoji.textContent = '❓';
-                        emoji.style.fontSize = '2.5em';
-                        emoji.style.textAlign = 'center';
-                        emoji.style.lineHeight = '1';
-                        div.appendChild(emoji);
-                    };
-                    
-                    div.appendChild(img);
-                    
-                    switch (card.type) {
-                        case 'treasure':
-                            treasureCount++;
-                            break;
-                        case 'trap':
-                            trapCount++;
-                            break;
-                        case 'empty':
-                            emptyCount++;
-                            break;
-                    }
-                }
-                
-                container.appendChild(div);
-            });
-
-            // 安全にカウント表示を更新
-            this.safeUpdateElement('my-treasure', treasureCount);
-            this.safeUpdateElement('my-trap', trapCount);
-            this.safeUpdateElement('my-empty', emptyCount);
-            
-        } catch (error) {
-            console.error('自分のカード描画エラー:', error);
+    try {
+        const myCardsSection = document.querySelector('.my-cards-section');
+        if (this.game.isSpectator) {
+            if (myCardsSection) myCardsSection.style.display = 'none';
+            return;
+        } else {
+            if (myCardsSection) myCardsSection.style.display = 'block';
         }
+
+        if (!this.game.gameData.players) return;
+        
+        const myPlayer = this.game.gameData.players.find(p => p.id === this.game.mySocketId);
+        if (!myPlayer || !myPlayer.hand) return;
+
+        const container = safeGetElement('my-cards-grid');
+        if (!container) return;
+        
+        container.innerHTML = '';
+
+        let treasureCount = 0, trapCount = 0, emptyCount = 0;
+        
+        myPlayer.hand.forEach((card, index) => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            
+            if (card.revealed) {
+                div.classList.add('revealed', card.type);
+                const img = document.createElement('img');
+                img.className = 'card-image';
+                img.alt = card.type;
+                
+                // 🔧 【修正】PC用高解像度画像を使用
+                const isPC = window.innerWidth >= 769;
+                const imageSize = isPC ? 'large' : 'medium';
+                img.src = `/images/cards/${card.type}-${imageSize}.webp`;
+                
+                img.onerror = () => {
+                    // フォールバック: PNG → 絵文字
+                    img.src = `/images/cards/${card.type}-${imageSize}.png`;
+                    img.onerror = () => {
+                        this.setCardEmojiFallback(img, card.type);
+                    };
+                };
+                
+                div.appendChild(img);
+            } else {
+                // 🔧 【修正】カード裏面は絵文字のみ使用
+                const emojiDiv = document.createElement('div');
+                emojiDiv.className = 'card-back-emoji';
+                emojiDiv.style.cssText = `
+                    font-size: 2.5em;
+                    text-align: center;
+                    line-height: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100%;
+                    width: 100%;
+                `;
+                emojiDiv.textContent = '❓';
+                
+                div.appendChild(emojiDiv);
+                
+                switch (card.type) {
+                    case 'treasure':
+                        treasureCount++;
+                        break;
+                    case 'trap':
+                        trapCount++;
+                        break;
+                    case 'empty':
+                        emptyCount++;
+                        break;
+                }
+            }
+            
+            container.appendChild(div);
+        });
+
+        // 安全にカウント表示を更新
+        this.safeUpdateElement('my-treasure', treasureCount);
+        this.safeUpdateElement('my-trap', trapCount);
+        this.safeUpdateElement('my-empty', emptyCount);
+        
+    } catch (error) {
+        console.error('自分のカード描画エラー:', error);
     }
+}
 
     // 🔧 【修正】他プレイヤーカード描画（新しい画像パス対応）
     safeRenderOtherPlayers(isMyTurn) {
@@ -280,54 +290,91 @@ safeShowPlayerRole() {
                         cardDiv.className = 'other-card';
                         
                         if (card.revealed) {
-                            cardDiv.classList.add('revealed', card.type);
-                            const img = document.createElement('img');
-                            img.className = 'other-card-image';
-                            img.alt = card.type;
-                            
-                            // 🔧 【修正】新しい画像パスで読み込み
-                            this.loadImageWithFallback(img, '/images/cards/', card.type, 'medium');
-                            
-                            cardDiv.appendChild(img);
-                        } else {
-                            const img = document.createElement('img');
-                            img.className = 'other-card-image';
-                            img.src = '/images/cards/back-medium.webp';
-                            img.alt = 'カード裏面';
-                            
-                            img.onerror = () => {
-                                img.style.display = 'none';
-                                const emoji = document.createElement('div');
-                                emoji.textContent = '❓';
-                                emoji.style.fontSize = '1.5em';
-                                emoji.style.textAlign = 'center';
-                                emoji.style.lineHeight = '1';
-                                cardDiv.appendChild(emoji);
-                            };
-                            
-                            cardDiv.appendChild(img);
-                            
-                            if (isMyTurn && !card.revealed && player.connected && !this.game.isSpectator) {
-                                cardDiv.addEventListener('click', () => {
-                                    this.selectCard(player.id, index);
-                                });
-                            } else {
-                                cardDiv.classList.add('disabled');
-                            }
-                        }
-                        
-                        cardsGrid.appendChild(cardDiv);
-                    });
-                }
+    cardDiv.classList.add('revealed', card.type);
+    const img = document.createElement('img');
+    img.className = 'other-card-image';
+    img.alt = card.type;
+    
+    // 🔧 【修正】PC用高解像度画像
+    const isPC = window.innerWidth >= 769;
+    const imageSize = isPC ? 'large' : 'medium';
+    img.src = `/images/cards/${card.type}-${imageSize}.webp`;
+    
+    img.onerror = () => {
+        img.src = `/images/cards/${card.type}-${imageSize}.png`;
+        img.onerror = () => {
+            this.setCardEmojiFallback(img, card.type);
+        };
+    };
+    
+    cardDiv.appendChild(img);
+} else {
+    // 🔧 【修正】カード裏面は絵文字のみ使用
+    const emojiDiv = document.createElement('div');
+    emojiDiv.className = 'other-card-back-emoji';
+    emojiDiv.style.cssText = `
+        font-size: 1.8em;
+        text-align: center;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        width: 100%;
+    `;
+    emojiDiv.textContent = '❓';
+    
+    cardDiv.appendChild(emojiDiv);
+    
+    // クリック処理など...
+}
 
-                playerBox.appendChild(cardsGrid);
-                container.appendChild(playerBox);
-            });
-            
-        } catch (error) {
-            console.error('他プレイヤー描画エラー:', error);
+// 🔧 【追加】カード絵文字フォールバック処理
+setCardEmojiFallback(img, cardType) {
+    try {
+        img.style.display = 'none';
+        
+        let emojiElement = img.nextElementSibling;
+        if (!emojiElement || !emojiElement.classList.contains('card-emoji-fallback')) {
+            emojiElement = document.createElement('div');
+            emojiElement.className = 'card-emoji-fallback';
+            emojiElement.style.cssText = `
+                font-size: 2.5em;
+                text-align: center;
+                line-height: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+            `;
+            img.parentNode.style.position = 'relative';
+            img.parentNode.appendChild(emojiElement);
         }
+        
+        switch (cardType) {
+            case 'treasure':
+                emojiElement.textContent = '🐷';
+                break;
+            case 'trap':
+                emojiElement.textContent = '💀';
+                break;
+            case 'empty':
+                emojiElement.textContent = '🏠';
+                break;
+            default:
+                emojiElement.textContent = '❓';
+        }
+        
+        console.log(`🎯 カード絵文字フォールバック: ${cardType} → ${emojiElement.textContent}`);
+        
+    } catch (error) {
+        console.error('カード絵文字フォールバック処理エラー:', error);
     }
+}
 
     // 既存のメソッドはそのまま維持
     updateGameUI() {
