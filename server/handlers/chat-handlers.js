@@ -1,4 +1,4 @@
-// server/handlers/chat-handlers.js - 循環参照修正版
+// server/handlers/chat-handlers.js - チャットログ100件対応版
 
 function setupChatHandlers(io, socket, activeRooms) {  // activeRoomsを引数で受け取る
     
@@ -51,9 +51,9 @@ function setupChatHandlers(io, socket, activeRooms) {  // activeRoomsを引数�
         
         room.gameData.messages.push(chatMessage);
         
-        // 最新20件のみ保持
-        if (room.gameData.messages.length > 20) {
-            room.gameData.messages = room.gameData.messages.slice(-20);
+        // 🔧 【修正】最新100件を保持（20件から100件に拡張）
+        if (room.gameData.messages.length > 100) {
+            room.gameData.messages = room.gameData.messages.slice(-100);
         }
         
         // ルーム内の全員にメッセージを送信
@@ -63,7 +63,7 @@ function setupChatHandlers(io, socket, activeRooms) {  // activeRoomsを引数�
     });
 }
 
-// 🔧 【修正】ゲームログ送信関数（循環参照を避けて直接activeRoomsを使用）
+// 🔧 【修正】ゲームログ送信関数（100件対応）
 function sendGameLog(io, roomId, logMessage, activeRooms) {
     if (!activeRooms) {
         console.error('❌ activeRoomsが提供されていません');
@@ -88,9 +88,9 @@ function sendGameLog(io, roomId, logMessage, activeRooms) {
     
     room.gameData.messages.push(gameLogMessage);
     
-    // 最新20件のみ保持
-    if (room.gameData.messages.length > 20) {
-        room.gameData.messages = room.gameData.messages.slice(-20);
+    // 🔧 【修正】最新100件を保持（20件から100件に拡張）
+    if (room.gameData.messages.length > 100) {
+        room.gameData.messages = room.gameData.messages.slice(-100);
     }
     
     io.to(roomId).emit('newMessage', room.gameData.messages);
