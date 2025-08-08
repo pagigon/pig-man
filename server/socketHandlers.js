@@ -279,62 +279,63 @@ room.gameData.lastTargetedPlayerId = null;
         }
         
         try {
-            // カード選択処理
-            const targetPlayer = room.gameData.players.find(p => p.id === data.targetPlayerId);
-            if (!targetPlayer || !targetPlayer.hand[data.cardIndex]) {
-                socket.emit('error', { message: '無効なカード選択です' });
-                return;
-            }
-            
-            const selectedCard = targetPlayer.hand[data.cardIndex];
-            if (selectedCard.revealed) {
-                socket.emit('error', { message: 'そのカードは既に公開されています' });
-                return;
-            }
-            
-            // カードを公開
-            selectedCard.revealed = true;
-            room.gameData.cardsFlippedThisRound++;
 
-            // 🔧 【重要】最後にカードをめくられたプレイヤーを記録
-            room.gameData.lastTargetedPlayerId = data.targetPlayerId;
-            
-            // 🔧 【修正】ゲームログを直接チャットに追加（循環参照回避）
-            const selectorName = room.gameData.players.find(p => p.id === socket.id)?.name || '不明';
-            const targetName = targetPlayer.name;
-            let logMessage = '';
-            
-            if (selectedCard.type === 'treasure') {
-                room.gameData.treasureFound++;
-                logMessage = `🐷 ${selectorName} が ${targetName} のカードを選択 → 子豚発見！ (${room.gameData.treasureFound}/${room.gameData.treasureGoal})`;
-            } else if (selectedCard.type === 'trap') {
-                room.gameData.trapTriggered++;
-                logMessage = `💀 ${selectorName} が ${targetName} のカードを選択 → 罠発動！ (${room.gameData.trapTriggered}/${room.gameData.trapGoal})`;
-            } else {
-                logMessage = `🏠 ${selectorName} が ${targetName} のカードを選択 → 空き部屋でした`;
-            }
-            
-            // ゲームログをメッセージ配列に直接追加
-            if (!room.gameData.messages) {
-                room.gameData.messages = [];
-            }
-            
-            const gameLogMessage = {
-                type: 'game-log',
-                text: logMessage,
-                timestamp: Date.now()
-            };
-            
-            room.gameData.messages.push(gameLogMessage);
-            
-            // 最新20件のみ保持
-            if (room.gameData.messages.length > 100) {
+             // カード選択処理
+        const targetPlayer = room.gameData.players.find(p => p.id === data.targetPlayerId);
+        if (!targetPlayer || !targetPlayer.hand[data.cardIndex]) {
+            socket.emit('error', { message: '無効なカード選択です' });
+            return;
+        }
+        
+        const selectedCard = targetPlayer.hand[data.cardIndex];
+        if (selectedCard.revealed) {
+            socket.emit('error', { message: 'そのカードは既に公開されています' });
+            return;
+        }
+        
+        // カードを公開
+        selectedCard.revealed = true;
+        room.gameData.cardsFlippedThisRound++;
+        
+        // 最後にカードをめくられたプレイヤーを記録
+        room.gameData.lastTargetedPlayerId = data.targetPlayerId;
+        
+        // ゲームログメッセージ作成
+        const selectorName = room.gameData.players.find(p => p.id === socket.id)?.name || '不明';
+        const targetName = targetPlayer.name;
+        let logMessage = '';
+        
+        if (selectedCard.type === 'treasure') {
+            room.gameData.treasureFound++;
+            logMessage = `🐷 ${selectorName} が ${targetName} のカードを選択 → 子豚発見！ (${room.gameData.treasureFound}/${room.gameData.treasureGoal})`;
+        } else if (selectedCard.type === 'trap') {
+            room.gameData.trapTriggered++;
+            logMessage = `💀 ${selectorName} が ${targetName} のカードを選択 → 罠発動！ (${room.gameData.trapTriggered}/${room.gameData.trapGoal})`;
+        } else {
+            logMessage = `🏠 ${selectorName} が ${targetName} のカードを選択 → 空き部屋でした`;
+        }
+        
+        // 🔧 【修正】ゲームログをメッセージ配列に追加
+        if (!room.gameData.messages) {
+            room.gameData.messages = [];
+        }
+        
+        const gameLogMessage = {
+            type: 'game-log',
+            text: logMessage,
+            timestamp: Date.now()
+        };
+        
+        room.gameData.messages.push(gameLogMessage);
+        
+        // 🔧 【修正】最新100件のみ保持（現在20件のまま）
+        if (room.gameData.messages.length > 100) {
             room.gameData.messages = room.gameData.messages.slice(-100);
-}
-            
-            // メッセージ更新を送信
-            io.to(socket.roomId).emit('newMessage', room.gameData.messages);
-            console.log(`🎮 ゲームログ: [${socket.roomId}] ${logMessage}`);
+        }
+        
+        // メッセージ更新を送信
+        io.to(socket.roomId).emit('newMessage', room.gameData.messages);
+        console.log(`🎮 ゲームログ: [${socket.roomId}] ${logMessage}`);
             
             // 勝利条件チェック
             const winResult = checkWinConditions(room.gameData);
@@ -363,7 +364,9 @@ room.gameData.lastTargetedPlayerId = null;
                 };
                 
                 room.gameData.messages.push(currentRoundEndMessage);
-                if (room.gameData.messages.length > 100) {
+
+                // 🔧 【修正】最新100件のみ保持（現在20件のまま）
+    if (room.gameData.messages.length > 100) {
         room.gameData.messages = room.gameData.messages.slice(-100);
     }
 
