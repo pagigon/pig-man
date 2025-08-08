@@ -766,12 +766,13 @@ body {
     transition: all 0.3s ease;
 }
 
-/* 他プレイヤーのカードグリッド */
+/* 他プレイヤーのカードグリッド - 5枚一列固定 */
 .other-player-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+    grid-template-columns: repeat(5, 1fr);
     gap: 6px;
     max-width: 100%;
+    padding: 0 3px;
 }
 
 .other-card {
