@@ -236,6 +236,9 @@ safeShowPlayerRole() {
 }
 
     // 🔧 【修正】他プレイヤーカード描画（新しい画像パス対応）
+    // 🔧 【修正】safeRenderOtherPlayers メソッドと setCardEmojiFallback メソッドを以下で置き換えてください
+
+    // 🔧 【修正】他プレイヤーカード描画（完全版）
     safeRenderOtherPlayers(isMyTurn) {
         try {
             const container = safeGetElement('other-players-container');
@@ -290,91 +293,111 @@ safeShowPlayerRole() {
                         cardDiv.className = 'other-card';
                         
                         if (card.revealed) {
-    cardDiv.classList.add('revealed', card.type);
-    const img = document.createElement('img');
-    img.className = 'other-card-image';
-    img.alt = card.type;
-    
-    // 🔧 【修正】PC用高解像度画像
-    const isPC = window.innerWidth >= 769;
-    const imageSize = isPC ? 'large' : 'medium';
-    img.src = `/images/cards/${card.type}-${imageSize}.webp`;
-    
-    img.onerror = () => {
-        img.src = `/images/cards/${card.type}-${imageSize}.png`;
-        img.onerror = () => {
-            this.setCardEmojiFallback(img, card.type);
-        };
-    };
-    
-    cardDiv.appendChild(img);
-} else {
-    // 🔧 【修正】カード裏面は絵文字のみ使用
-    const emojiDiv = document.createElement('div');
-    emojiDiv.className = 'other-card-back-emoji';
-    emojiDiv.style.cssText = `
-        font-size: 1.8em;
-        text-align: center;
-        line-height: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        width: 100%;
-    `;
-    emojiDiv.textContent = '❓';
-    
-    cardDiv.appendChild(emojiDiv);
-    
-    // クリック処理など...
-}
+                            cardDiv.classList.add('revealed', card.type);
+                            const img = document.createElement('img');
+                            img.className = 'other-card-image';
+                            img.alt = card.type;
+                            
+                            // 🔧 【修正】PC用高解像度画像
+                            const isPC = window.innerWidth >= 769;
+                            const imageSize = isPC ? 'large' : 'medium';
+                            img.src = `/images/cards/${card.type}-${imageSize}.webp`;
+                            
+                            img.onerror = () => {
+                                img.src = `/images/cards/${card.type}-${imageSize}.png`;
+                                img.onerror = () => {
+                                    this.setCardEmojiFallback(img, card.type);
+                                };
+                            };
+                            
+                            cardDiv.appendChild(img);
+                        } else {
+                            // 🔧 【修正】カード裏面は絵文字のみ使用
+                            const emojiDiv = document.createElement('div');
+                            emojiDiv.className = 'other-card-back-emoji';
+                            emojiDiv.style.cssText = `
+                                font-size: 1.8em;
+                                text-align: center;
+                                line-height: 1;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                height: 100%;
+                                width: 100%;
+                            `;
+                            emojiDiv.textContent = '❓';
+                            
+                            cardDiv.appendChild(emojiDiv);
+                            
+                            // 🔧 【修正】クリック処理
+                            if (isMyTurn && !card.revealed && player.connected && !this.game.isSpectator) {
+                                cardDiv.addEventListener('click', () => {
+                                    this.selectCard(player.id, index);
+                                });
+                            } else {
+                                cardDiv.classList.add('disabled');
+                            }
+                        }
+                        
+                        cardsGrid.appendChild(cardDiv);
+                    });
+                }
 
-// 🔧 【追加】カード絵文字フォールバック処理
-setCardEmojiFallback(img, cardType) {
-    try {
-        img.style.display = 'none';
-        
-        let emojiElement = img.nextElementSibling;
-        if (!emojiElement || !emojiElement.classList.contains('card-emoji-fallback')) {
-            emojiElement = document.createElement('div');
-            emojiElement.className = 'card-emoji-fallback';
-            emojiElement.style.cssText = `
-                font-size: 2.5em;
-                text-align: center;
-                line-height: 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 100%;
-                width: 100%;
-                position: absolute;
-                top: 0;
-                left: 0;
-            `;
-            img.parentNode.style.position = 'relative';
-            img.parentNode.appendChild(emojiElement);
+                playerBox.appendChild(cardsGrid);
+                container.appendChild(playerBox);
+            });
+            
+        } catch (error) {
+            console.error('他プレイヤー描画エラー:', error);
         }
-        
-        switch (cardType) {
-            case 'treasure':
-                emojiElement.textContent = '🐷';
-                break;
-            case 'trap':
-                emojiElement.textContent = '💀';
-                break;
-            case 'empty':
-                emojiElement.textContent = '🏠';
-                break;
-            default:
-                emojiElement.textContent = '❓';
-        }
-        
-        console.log(`🎯 カード絵文字フォールバック: ${cardType} → ${emojiElement.textContent}`);
-        
-    } catch (error) {
-        console.error('カード絵文字フォールバック処理エラー:', error);
     }
-}
+
+    // 🔧 【追加】カード絵文字フォールバック処理（独立メソッド）
+    setCardEmojiFallback(img, cardType) {
+        try {
+            img.style.display = 'none';
+            
+            let emojiElement = img.nextElementSibling;
+            if (!emojiElement || !emojiElement.classList.contains('card-emoji-fallback')) {
+                emojiElement = document.createElement('div');
+                emojiElement.className = 'card-emoji-fallback';
+                emojiElement.style.cssText = `
+                    font-size: 2.5em;
+                    text-align: center;
+                    line-height: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100%;
+                    width: 100%;
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                `;
+                img.parentNode.style.position = 'relative';
+                img.parentNode.appendChild(emojiElement);
+            }
+            
+            switch (cardType) {
+                case 'treasure':
+                    emojiElement.textContent = '🐷';
+                    break;
+                case 'trap':
+                    emojiElement.textContent = '💀';
+                    break;
+                case 'empty':
+                    emojiElement.textContent = '🏠';
+                    break;
+                default:
+                    emojiElement.textContent = '❓';
+            }
+            
+            console.log(`🎯 カード絵文字フォールバック: ${cardType} → ${emojiElement.textContent}`);
+            
+        } catch (error) {
+            console.error('カード絵文字フォールバック処理エラー:', error);
+        }
+    }
 
     // 既存のメソッドはそのまま維持
     updateGameUI() {
