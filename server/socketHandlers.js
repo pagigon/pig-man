@@ -237,6 +237,19 @@ room.gameData.lastTargetedPlayerId = null;
             socket.emit('error', { message: 'ゲームが進行していません' });
             return;
         }
+
+        // ゲームログをメッセージ配列に直接追加
+    if (!room.gameData.messages) {
+        room.gameData.messages = [];
+    }
+    
+    const gameLogMessage = {
+        type: 'game-log',
+        text: logMessage,
+        timestamp: Date.now()
+    };
+    
+    room.gameData.messages.push(gameLogMessage);
         
         // 観戦者チェック
         if (socket.isSpectator) {
@@ -315,9 +328,9 @@ room.gameData.lastTargetedPlayerId = null;
             room.gameData.messages.push(gameLogMessage);
             
             // 最新20件のみ保持
-            if (room.gameData.messages.length > 20) {
-                room.gameData.messages = room.gameData.messages.slice(-20);
-            }
+            if (room.gameData.messages.length > 100) {
+            room.gameData.messages = room.gameData.messages.slice(-100);
+}
             
             // メッセージ更新を送信
             io.to(socket.roomId).emit('newMessage', room.gameData.messages);
@@ -350,9 +363,10 @@ room.gameData.lastTargetedPlayerId = null;
                 };
                 
                 room.gameData.messages.push(currentRoundEndMessage);
-                if (room.gameData.messages.length > 20) {
-                    room.gameData.messages = room.gameData.messages.slice(-20);
-                }
+                if (room.gameData.messages.length > 100) {
+        room.gameData.messages = room.gameData.messages.slice(-100);
+    }
+
                 
                 // ラウンド終了をクライアントに送信
                 io.to(socket.roomId).emit('newMessage', room.gameData.messages);
@@ -394,9 +408,10 @@ room.gameData.lastTargetedPlayerId = null;
                                 };
                                 
                                 room.gameData.messages.push(recycleLogMessage);
-                                if (room.gameData.messages.length > 20) {
-                                    room.gameData.messages = room.gameData.messages.slice(-20);
-                                }
+                                if (room.gameData.messages.length > 100) {
+        room.gameData.messages = room.gameData.messages.slice(-100);
+    }
+
                                 
                                 io.to(socket.roomId).emit('newMessage', room.gameData.messages);
                             } else {
