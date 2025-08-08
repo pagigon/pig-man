@@ -171,17 +171,16 @@ function setupGameHandlers(io, socket, activeRooms) {
                 console.log(`${player.name} に ${player.hand.length} 枚配布`);
             });
             
-            // 初期鍵保持者を設定
-           // 🔧 【修正】連戦時も初期鍵保持者をランダムに選択
-if (connectedPlayers.length > 0) {
-    const randomIndex = Math.floor(Math.random() * connectedPlayers.length);
-    const randomPlayer = connectedPlayers[randomIndex];
-    room.gameData.keyHolderId = randomPlayer.id;
-    console.log(`🗝️ 連戦初期鍵保持者: ${randomPlayer.name} (ランダム選択)`);
-}
+            // 🔧 【修正】連戦時も初期鍵保持者をランダムに選択
+            if (connectedPlayers.length > 0) {
+                const randomIndex = Math.floor(Math.random() * connectedPlayers.length);
+                const randomPlayer = connectedPlayers[randomIndex];
+                room.gameData.keyHolderId = randomPlayer.id;
+                console.log(`🗝️ 連戦初期鍵保持者: ${randomPlayer.name} (ランダム選択)`);
+            }
 
-// 🔧 【追加】lastTargetedPlayerIdを初期化
-room.gameData.lastTargetedPlayerId = null;
+            // 🔧 【追加】lastTargetedPlayerIdを初期化
+            room.gameData.lastTargetedPlayerId = null;
             
             room.gameData.gameState = 'playing';
             room.gameData.cardsPerPlayer = round1CardsPerPlayer;
@@ -197,6 +196,11 @@ room.gameData.lastTargetedPlayerId = null;
                 room.gameData.messages = [];
             }
             room.gameData.messages.push(restartLogMessage);
+            
+            // 🔧 【修正】最新100件のみ保持
+            if (room.gameData.messages.length > 100) {
+                room.gameData.messages = room.gameData.messages.slice(-100);
+            }
             
             // 全員に更新を送信
             io.to(socket.roomId).emit('gameUpdate', room.gameData);
@@ -237,19 +241,6 @@ room.gameData.lastTargetedPlayerId = null;
             socket.emit('error', { message: 'ゲームが進行していません' });
             return;
         }
-
-        // ゲームログをメッセージ配列に直接追加
-    if (!room.gameData.messages) {
-        room.gameData.messages = [];
-    }
-    
-    const gameLogMessage = {
-        type: 'game-log',
-        text: logMessage,
-        timestamp: Date.now()
-    };
-    
-    room.gameData.messages.push(gameLogMessage);
         
         // 観戦者チェック
         if (socket.isSpectator) {
@@ -279,63 +270,62 @@ room.gameData.lastTargetedPlayerId = null;
         }
         
         try {
+            // カード選択処理
+            const targetPlayer = room.gameData.players.find(p => p.id === data.targetPlayerId);
+            if (!targetPlayer || !targetPlayer.hand[data.cardIndex]) {
+                socket.emit('error', { message: '無効なカード選択です' });
+                return;
+            }
+            
+            const selectedCard = targetPlayer.hand[data.cardIndex];
+            if (selectedCard.revealed) {
+                socket.emit('error', { message: 'そのカードは既に公開されています' });
+                return;
+            }
+            
+            // カードを公開
+            selectedCard.revealed = true;
+            room.gameData.cardsFlippedThisRound++;
 
-             // カード選択処理
-        const targetPlayer = room.gameData.players.find(p => p.id === data.targetPlayerId);
-        if (!targetPlayer || !targetPlayer.hand[data.cardIndex]) {
-            socket.emit('error', { message: '無効なカード選択です' });
-            return;
-        }
-        
-        const selectedCard = targetPlayer.hand[data.cardIndex];
-        if (selectedCard.revealed) {
-            socket.emit('error', { message: 'そのカードは既に公開されています' });
-            return;
-        }
-        
-        // カードを公開
-        selectedCard.revealed = true;
-        room.gameData.cardsFlippedThisRound++;
-        
-        // 最後にカードをめくられたプレイヤーを記録
-        room.gameData.lastTargetedPlayerId = data.targetPlayerId;
-        
-        // ゲームログメッセージ作成
-        const selectorName = room.gameData.players.find(p => p.id === socket.id)?.name || '不明';
-        const targetName = targetPlayer.name;
-        let logMessage = '';
-        
-        if (selectedCard.type === 'treasure') {
-            room.gameData.treasureFound++;
-            logMessage = `🐷 ${selectorName} が ${targetName} のカードを選択 → 子豚発見！ (${room.gameData.treasureFound}/${room.gameData.treasureGoal})`;
-        } else if (selectedCard.type === 'trap') {
-            room.gameData.trapTriggered++;
-            logMessage = `💀 ${selectorName} が ${targetName} のカードを選択 → 罠発動！ (${room.gameData.trapTriggered}/${room.gameData.trapGoal})`;
-        } else {
-            logMessage = `🏠 ${selectorName} が ${targetName} のカードを選択 → 空き部屋でした`;
-        }
-        
-        // 🔧 【修正】ゲームログをメッセージ配列に追加
-        if (!room.gameData.messages) {
-            room.gameData.messages = [];
-        }
-        
-        const gameLogMessage = {
-            type: 'game-log',
-            text: logMessage,
-            timestamp: Date.now()
-        };
-        
-        room.gameData.messages.push(gameLogMessage);
-        
-        // 🔧 【修正】最新100件のみ保持（現在20件のまま）
-        if (room.gameData.messages.length > 100) {
-            room.gameData.messages = room.gameData.messages.slice(-100);
-        }
-        
-        // メッセージ更新を送信
-        io.to(socket.roomId).emit('newMessage', room.gameData.messages);
-        console.log(`🎮 ゲームログ: [${socket.roomId}] ${logMessage}`);
+            // 🔧 【重要】最後にカードをめくられたプレイヤーを記録
+            room.gameData.lastTargetedPlayerId = data.targetPlayerId;
+            
+            // ゲームログメッセージ作成
+            const selectorName = room.gameData.players.find(p => p.id === socket.id)?.name || '不明';
+            const targetName = targetPlayer.name;
+            let logMessage = '';
+            
+            if (selectedCard.type === 'treasure') {
+                room.gameData.treasureFound++;
+                logMessage = `🐷 ${selectorName} が ${targetName} のカードを選択 → 子豚発見！ (${room.gameData.treasureFound}/${room.gameData.treasureGoal})`;
+            } else if (selectedCard.type === 'trap') {
+                room.gameData.trapTriggered++;
+                logMessage = `💀 ${selectorName} が ${targetName} のカードを選択 → 罠発動！ (${room.gameData.trapTriggered}/${room.gameData.trapGoal})`;
+            } else {
+                logMessage = `🏠 ${selectorName} が ${targetName} のカードを選択 → 空き部屋でした`;
+            }
+            
+            // ゲームログをメッセージ配列に直接追加
+            if (!room.gameData.messages) {
+                room.gameData.messages = [];
+            }
+            
+            const gameLogMessage = {
+                type: 'game-log',
+                text: logMessage,
+                timestamp: Date.now()
+            };
+            
+            room.gameData.messages.push(gameLogMessage);
+            
+            // 🔧 【修正】最新100件のみ保持
+            if (room.gameData.messages.length > 100) {
+                room.gameData.messages = room.gameData.messages.slice(-100);
+            }
+            
+            // メッセージ更新を送信
+            io.to(socket.roomId).emit('newMessage', room.gameData.messages);
+            console.log(`🎮 ゲームログ: [${socket.roomId}] ${logMessage}`);
             
             // 勝利条件チェック
             const winResult = checkWinConditions(room.gameData);
@@ -349,14 +339,13 @@ room.gameData.lastTargetedPlayerId = null;
                 return;
             }
             
-            // 🔧 【追加】ラウンド終了チェックと進行処理
+            // ラウンド終了チェックと進行処理
             const connectedPlayerCount = room.gameData.players.filter(p => p.connected).length;
             
-            // 🔧 【修正】ラウンド終了チェックと進行処理（3秒遅延追加）
             if (room.gameData.cardsFlippedThisRound >= connectedPlayerCount) {
                 console.log('📋 ラウンド終了条件達成');
                 
-                // 🔧 【追加】ラウンド終了告知を送信
+                // ラウンド終了告知を送信
                 const currentRoundEndMessage = {
                     type: 'game-log',
                     text: `🎯 ラウンド${room.gameData.currentRound}終了！3秒後に次のラウンドが開始されます...`,
@@ -365,17 +354,17 @@ room.gameData.lastTargetedPlayerId = null;
                 
                 room.gameData.messages.push(currentRoundEndMessage);
 
-                // 🔧 【修正】最新100件のみ保持（現在20件のまま）
-    if (room.gameData.messages.length > 100) {
-        room.gameData.messages = room.gameData.messages.slice(-100);
-    }
+                // 🔧 【修正】最新100件のみ保持
+                if (room.gameData.messages.length > 100) {
+                    room.gameData.messages = room.gameData.messages.slice(-100);
+                }
 
                 
                 // ラウンド終了をクライアントに送信
                 io.to(socket.roomId).emit('newMessage', room.gameData.messages);
                 io.to(socket.roomId).emit('gameUpdate', room.gameData);
                 
-                // 🔧 【追加】3秒の遅延後にラウンド進行処理
+                // 3秒の遅延後にラウンド進行処理
                 setTimeout(() => {
                     console.log('⏰ 3秒経過 - ラウンド進行処理開始');
                     
@@ -395,7 +384,7 @@ room.gameData.lastTargetedPlayerId = null;
                             return;
                         }
                         
-                        // 🔧 正しいカードリサイクルシステム実行
+                        // 正しいカードリサイクルシステム実行
                         if (roundResult.needsCardRecycle) {
                             const connectedPlayers = room.gameData.players.filter(p => p.connected);
                             const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
@@ -411,9 +400,11 @@ room.gameData.lastTargetedPlayerId = null;
                                 };
                                 
                                 room.gameData.messages.push(recycleLogMessage);
+                                
+                                // 🔧 【修正】最新100件のみ保持
                                 if (room.gameData.messages.length > 100) {
-        room.gameData.messages = room.gameData.messages.slice(-100);
-    }
+                                    room.gameData.messages = room.gameData.messages.slice(-100);
+                                }
 
                                 
                                 io.to(socket.roomId).emit('newMessage', room.gameData.messages);
@@ -425,32 +416,32 @@ room.gameData.lastTargetedPlayerId = null;
                         // ラウンド開始イベントを送信（3秒遅延後）
                         io.to(socket.roomId).emit('roundStart', roundResult.newRound);
                         
-                        // 🔧 【修正】新ラウンドの鍵保持者を正しく設定
+                        // 新ラウンドの鍵保持者を正しく設定
                         // 最後にカードをめくられたプレイヤーに鍵を渡す
                         if (room.gameData.lastTargetedPlayerId) {
-                        const lastTargetedPlayer = room.gameData.players.find(p => p.id === room.gameData.lastTargetedPlayerId);
-                        if (lastTargetedPlayer && lastTargetedPlayer.connected) {
-                        room.gameData.keyHolderId = room.gameData.lastTargetedPlayerId;
-                        console.log(`🗝️ 新ラウンドの鍵保持者: ${lastTargetedPlayer.name} (最後にめくられたプレイヤー)`);
+                            const lastTargetedPlayer = room.gameData.players.find(p => p.id === room.gameData.lastTargetedPlayerId);
+                            if (lastTargetedPlayer && lastTargetedPlayer.connected) {
+                                room.gameData.keyHolderId = room.gameData.lastTargetedPlayerId;
+                                console.log(`🗝️ 新ラウンドの鍵保持者: ${lastTargetedPlayer.name} (最後にめくられたプレイヤー)`);
+                            } else {
+                                // フォールバック：最後にめくられたプレイヤーが切断している場合
+                                const firstConnectedPlayer = room.gameData.players.find(p => p.connected);
+                                if (firstConnectedPlayer) {
+                                    room.gameData.keyHolderId = firstConnectedPlayer.id;
+                                    console.log(`🗝️ フォールバック鍵保持者: ${firstConnectedPlayer.name} (最初の接続プレイヤー)`);
+                                }
+                            }
                         } else {
-        // フォールバック：最後にめくられたプレイヤーが切断している場合
-        const firstConnectedPlayer = room.gameData.players.find(p => p.connected);
-        if (firstConnectedPlayer) {
-            room.gameData.keyHolderId = firstConnectedPlayer.id;
-            console.log(`🗝️ フォールバック鍵保持者: ${firstConnectedPlayer.name} (最初の接続プレイヤー)`);
-        }
-    }
-} else {
-    // フォールバック：lastTargetedPlayerIdが記録されていない場合
-    const firstConnectedPlayer = room.gameData.players.find(p => p.connected);
-    if (firstConnectedPlayer) {
-        room.gameData.keyHolderId = firstConnectedPlayer.id;
-        console.log(`🗝️ フォールバック鍵保持者: ${firstConnectedPlayer.name} (記録なしのため最初の接続プレイヤー)`);
-    }
-}
+                            // フォールバック：lastTargetedPlayerIdが記録されていない場合
+                            const firstConnectedPlayer = room.gameData.players.find(p => p.connected);
+                            if (firstConnectedPlayer) {
+                                room.gameData.keyHolderId = firstConnectedPlayer.id;
+                                console.log(`🗝️ フォールバック鍵保持者: ${firstConnectedPlayer.name} (記録なしのため最初の接続プレイヤー)`);
+                            }
+                        }
 
-// 🔧 【重要】lastTargetedPlayerIdをクリア（次ラウンド用）
-room.gameData.lastTargetedPlayerId = null;
+                        // lastTargetedPlayerIdをクリア（次ラウンド用）
+                        room.gameData.lastTargetedPlayerId = null;
                         
                         // 全員に更新を送信
                         io.to(socket.roomId).emit('gameUpdate', room.gameData);
@@ -463,9 +454,9 @@ room.gameData.lastTargetedPlayerId = null;
                         io.to(socket.roomId).emit('gameUpdate', room.gameData);
                     }
                     
-                }, 3000); // 🔧 【重要】3秒（3000ミリ秒）の遅延
+                }, 3000); // 3秒（3000ミリ秒）の遅延
                 
-                // 🔧 【重要】ここでreturnして、通常のターン進行をスキップ
+                // ここでreturnして、通常のターン進行をスキップ
                 return;
                 
             } else {
@@ -498,7 +489,7 @@ function resetGameData(gameData) {
     gameData.playerHands = {};
     gameData.remainingCards = [];
     
-    // 🔧 【追加】最後にターゲットされたプレイヤーIDもリセット
+    // 最後にターゲットされたプレイヤーIDもリセット
     gameData.lastTargetedPlayerId = null;
     
     // 勝利関連データをクリア
@@ -628,7 +619,7 @@ function setupRoomHandlers(io, socket) {
         }
     });
     
-    // 🔧 【修正】ルーム参加処理（正しい実装）
+    // ルーム参加処理
     socket.on('joinRoom', (data) => {
         const now = Date.now();
         const history = socketRequestHistory.get(socket.id);
@@ -657,26 +648,26 @@ function setupRoomHandlers(io, socket) {
             return;
         }
         
-        // 🔧 【修正】パスワードチェック
+        // パスワードチェック
         if (roomData.gameData.password && roomData.gameData.password !== password) {
             socket.emit('error', { message: 'パスワードが正しくありません' });
             return;
         }
         
-        // 🔧 【修正】ゲーム状態チェック
+        // ゲーム状態チェック
         if (roomData.gameData.gameState !== 'waiting') {
             socket.emit('error', { message: 'このルームはゲーム中です。観戦モードで参加してください。' });
             return;
         }
         
-        // 🔧 【修正】重複参加チェック
+        // 重複参加チェック
         if (isPlayerInRoom(roomData, socket.id)) {
             console.warn(`⚠️ Socket ${socket.id} は既にルームに参加済み`);
             socket.emit('error', { message: '既にこのルームに参加しています' });
             return;
         }
         
-        // 🔧 【修正】名前重複チェック
+        // 名前重複チェック
         if (isPlayerNameActiveInRoom(roomData, playerName)) {
             console.warn(`⚠️ プレイヤー名 "${playerName}" は既に使用中`);
             socket.emit('error', { 
@@ -685,7 +676,7 @@ function setupRoomHandlers(io, socket) {
             return;
         }
         
-        // 🔧 【修正】満員チェック
+        // 満員チェック
         const connectedCount = getConnectedPlayerCount(roomData);
         if (connectedCount >= 10) {
             socket.emit('error', { message: 'ルームが満員です' });
@@ -736,7 +727,7 @@ function setupRoomHandlers(io, socket) {
         }
     });
     
-    // 🔧 【修正】ゲーム開始処理（正しい実装）
+    // ゲーム開始処理
     socket.on('startGame', () => {
         console.log('🎮 ===== ゲーム開始要求 =====');
         console.log('Socket ID:', socket.id);
@@ -752,7 +743,7 @@ function setupRoomHandlers(io, socket) {
             return;
         }
         
-        // 🔧 【修正】ホスト権限チェック
+        // ホスト権限チェック
         if (roomData.gameData.host !== socket.id) {
             socket.emit('error', { message: 'ゲーム開始権限がありません' });
             return;
@@ -799,16 +790,16 @@ function setupRoomHandlers(io, socket) {
                 console.log(`${player.name} に ${player.hand.length} 枚配布`);
             });
             
-            // 🔧 【修正】初期鍵保持者をランダムに選択（ホスト固定を避ける）
-if (connectedPlayers.length > 0) {
-    const randomIndex = Math.floor(Math.random() * connectedPlayers.length);
-    const randomPlayer = connectedPlayers[randomIndex];
-    roomData.gameData.keyHolderId = randomPlayer.id;
-    console.log(`🗝️ 初期鍵保持者: ${randomPlayer.name} (ランダム選択)`);
-}
+            // 初期鍵保持者をランダムに選択（ホスト固定を避ける）
+            if (connectedPlayers.length > 0) {
+                const randomIndex = Math.floor(Math.random() * connectedPlayers.length);
+                const randomPlayer = connectedPlayers[randomIndex];
+                roomData.gameData.keyHolderId = randomPlayer.id;
+                console.log(`🗝️ 初期鍵保持者: ${randomPlayer.name} (ランダム選択)`);
+            }
 
-// 🔧 【追加】lastTargetedPlayerIdを初期化
-roomData.gameData.lastTargetedPlayerId = null;
+            // lastTargetedPlayerIdを初期化
+            roomData.gameData.lastTargetedPlayerId = null;
             
             roomData.gameData.gameState = 'playing';
             roomData.gameData.cardsPerPlayer = round1CardsPerPlayer;
@@ -840,71 +831,70 @@ roomData.gameData.lastTargetedPlayerId = null;
 // その他のハンドラー設定
 function setupOtherHandlers(socket, io) {
     // 再入場
-    // 🔧 【修正】再入場処理（ゲーム中でも参加可能に）
-socket.on('rejoinRoom', (data) => {
-    console.log('🔄 再入場要求:', data);
-    const { roomId, playerName } = data;
-    
-    // バリデーション
-    if (!roomId || !playerName) {
-        socket.emit('error', { message: 'ルームIDとプレイヤー名を入力してください' });
-        return;
-    }
-    
-    const roomData = activeRooms.get(roomId.trim().toUpperCase());
-    if (!roomData) {
-        socket.emit('error', { message: 'ルームが見つかりません' });
-        return;
-    }
-    
-    // 🔧 【重要】ゲーム中でも再入場を許可
-    const existingPlayer = findPlayerByName(roomData, playerName.trim());
-    if (!existingPlayer) {
-        socket.emit('error', { message: 'このルームにあなたのデータが見つかりません' });
-        return;
-    }
-    
-    // 🔧 【修正】既に接続中でも強制的に再接続を許可（重複接続対策）
-    if (existingPlayer.connected) {
-        console.log(`⚠️ ${playerName} は既に接続中ですが、強制再接続します`);
-        // 既存の接続を切断状態にする
-        existingPlayer.connected = false;
-    }
-    
-    try {
-        // 再接続処理
-        existingPlayer.id = socket.id;
-        existingPlayer.connected = true;
-        existingPlayer.lastConnected = Date.now();
+    socket.on('rejoinRoom', (data) => {
+        console.log('🔄 再入場要求:', data);
+        const { roomId, playerName } = data;
         
-        socket.join(roomId);
-        socket.roomId = roomId;
-        socket.playerName = playerName.trim();
+        // バリデーション
+        if (!roomId || !playerName) {
+            socket.emit('error', { message: 'ルームIDとプレイヤー名を入力してください' });
+            return;
+        }
         
-        // 🔧 【修正】ホスト判定を正確に
-        const isHost = roomData.gameData.host === socket.id;
+        const roomData = activeRooms.get(roomId.trim().toUpperCase());
+        if (!roomData) {
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
         
-        socket.emit('rejoinSuccess', {
-            roomId: roomId,
-            gameData: roomData.gameData,
-            isHost: isHost,
-            playerInfo: {
+        // ゲーム中でも再入場を許可
+        const existingPlayer = findPlayerByName(roomData, playerName.trim());
+        if (!existingPlayer) {
+            socket.emit('error', { message: 'このルームにあなたのデータが見つかりません' });
+            return;
+        }
+        
+        // 既に接続中でも強制的に再接続を許可（重複接続対策）
+        if (existingPlayer.connected) {
+            console.log(`⚠️ ${playerName} は既に接続中ですが、強制再接続します`);
+            // 既存の接続を切断状態にする
+            existingPlayer.connected = false;
+        }
+        
+        try {
+            // 再接続処理
+            existingPlayer.id = socket.id;
+            existingPlayer.connected = true;
+            existingPlayer.lastConnected = Date.now();
+            
+            socket.join(roomId);
+            socket.roomId = roomId;
+            socket.playerName = playerName.trim();
+            
+            // ホスト判定を正確に
+            const isHost = roomData.gameData.host === socket.id;
+            
+            socket.emit('rejoinSuccess', {
                 roomId: roomId,
-                playerName: playerName.trim(),
-                isHost: isHost
-            }
-        });
-        
-        // ルーム内の全員に更新を送信
-        io.to(roomId).emit('gameUpdate', roomData.gameData);
-        
-        console.log(`✅ ${playerName} がルーム ${roomId} に再入場完了（ゲーム状態: ${roomData.gameData.gameState}）`);
-        
-    } catch (error) {
-        console.error('❌ 再入場処理エラー:', error);
-        socket.emit('error', { message: '再入場に失敗しました: ' + error.message });
-    }
-});
+                gameData: roomData.gameData,
+                isHost: isHost,
+                playerInfo: {
+                    roomId: roomId,
+                    playerName: playerName.trim(),
+                    isHost: isHost
+                }
+            });
+            
+            // ルーム内の全員に更新を送信
+            io.to(roomId).emit('gameUpdate', roomData.gameData);
+            
+            console.log(`✅ ${playerName} がルーム ${roomId} に再入場完了（ゲーム状態: ${roomData.gameData.gameState}）`);
+            
+        } catch (error) {
+            console.error('❌ 再入場処理エラー:', error);
+            socket.emit('error', { message: '再入場に失敗しました: ' + error.message });
+        }
+    });
 
     
     // 観戦
@@ -1165,31 +1155,36 @@ function handlePlayerLeave(socket, io) {
     console.log(`プレイヤー ${socket.playerName} (${socket.id}) をルーム ${socket.roomId} から完全削除`);
     
     if (roomData.gameData.host === socket.id) {
-    const nextHost = roomData.gameData.players.find(p => p.connected);
-    if (nextHost) {
-        roomData.gameData.host = nextHost.id;
-        console.log(`新しいホスト: ${nextHost.name}`);
-        
-        // 🔧 【追加】ホスト変更をクライアントに通知
-        const hostChangeMessage = {
-            type: 'game-log',
-            text: `👑 ${nextHost.name} が新しいホストになりました`,
-            timestamp: Date.now()
-        };
-        
-        if (!roomData.gameData.messages) {
-            roomData.gameData.messages = [];
+        const nextHost = roomData.gameData.players.find(p => p.connected);
+        if (nextHost) {
+            roomData.gameData.host = nextHost.id;
+            console.log(`新しいホスト: ${nextHost.name}`);
+            
+            // ホスト変更をクライアントに通知
+            const hostChangeMessage = {
+                type: 'game-log',
+                text: `👑 ${nextHost.name} が新しいホストになりました`,
+                timestamp: Date.now()
+            };
+            
+            if (!roomData.gameData.messages) {
+                roomData.gameData.messages = [];
+            }
+            roomData.gameData.messages.push(hostChangeMessage);
+            
+            // 🔧 【修正】最新100件のみ保持
+            if (roomData.gameData.messages.length > 100) {
+                roomData.gameData.messages = roomData.gameData.messages.slice(-100);
+            }
+            
+            // ホスト変更をルーム内全員に送信
+            io.to(socket.roomId).emit('hostChanged', {
+                newHostId: nextHost.id,
+                newHostName: nextHost.name
+            });
+            io.to(socket.roomId).emit('newMessage', roomData.gameData.messages);
         }
-        roomData.gameData.messages.push(hostChangeMessage);
-        
-        // ホスト変更をルーム内全員に送信
-        io.to(socket.roomId).emit('hostChanged', {
-            newHostId: nextHost.id,
-            newHostName: nextHost.name
-        });
-        io.to(socket.roomId).emit('newMessage', roomData.gameData.messages);
     }
-}
     
     if (roomData.gameData.players.length === 0) {
         activeRooms.delete(socket.roomId);
@@ -1213,7 +1208,7 @@ function handlePlayerDisconnect(socket, io) {
         player.lastDisconnected = Date.now();
         console.log(`${player.name} が切断しました（復帰可能状態で保持）`);
         
-        // 🔧 【修正】ゲーム中の場合は切断されたプレイヤー情報を送信
+        // ゲーム中の場合は切断されたプレイヤー情報を送信
         if (roomData.gameData.gameState === 'playing') {
             const disconnectedNames = roomData.gameData.players
                 .filter(p => !p.connected)
@@ -1226,7 +1221,7 @@ function handlePlayerDisconnect(socket, io) {
         }
     }
     
-    // 🔧 【修正】全員が切断した場合のみルーム削除（猶予時間付き）
+    // 全員が切断した場合のみルーム削除（猶予時間付き）
     if (roomData.gameData.players.every(p => !p.connected)) {
         console.log(`⏰ 全員切断 - ルーム ${socket.roomId} を10分後に削除予定`);
         
