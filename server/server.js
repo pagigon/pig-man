@@ -1,10 +1,10 @@
+// server/server.js - 重複削除版（既存ファイルと置き換え）
+
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 
-
-// server/server.js - Render.com Socket.io設定修正版（既存のSocket.io設定部分を置き換え）
-
+// 🔧 【最適化】Render.com環境専用Socket.io設定
 const io = require('socket.io')(http, {
     cors: {
         origin: "*",
@@ -13,33 +13,32 @@ const io = require('socket.io')(http, {
         credentials: false
     },
     
-    // 🔧 【重要】Render.com環境専用設定
-    transports: ['polling', 'websocket'],     // polling優先でwebsocketにアップグレード
+    // Render.com環境専用設定
+    transports: ['polling', 'websocket'],     // polling → websocket アップグレード
     allowEIO3: true,
     
-    // 🔧 【修正】Render.com安定性向上設定
-    pingTimeout: 180000,                      // 3分に延長（Render.comの遅延対応）
-    pingInterval: 90000,                      // 1.5分間隔
-    connectTimeout: 60000,                    // 接続タイムアウト1分
+    // 接続タイムアウト設定
+    pingTimeout: 180000,                      // 3分
+    pingInterval: 90000,                      // 1.5分
+    connectTimeout: 60000,                    // 1分
     
-    // 🔧 【重要】Render.com WebSocket対応
-    allowUpgrades: true,                      // アップグレード許可
-    upgradeTimeout: 30000,                    // アップグレードタイムアウト30秒
-    maxHttpBufferSize: 1e5,                   // バッファサイズ制限
-    httpCompression: true,                    // 圧縮有効化
+    // アップグレード設定
+    allowUpgrades: true,
+    upgradeTimeout: 30000,
+    maxHttpBufferSize: 1e5,
+    httpCompression: true,
     
-    // 🔧 【追加】Render.com安定性設定
+    // セキュリティ設定
     serveClient: false,
     cookie: {
         name: 'io',
         httpOnly: false,
         sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production'  // 本番環境でのみSSL
+        secure: process.env.NODE_ENV === 'production'
     },
     
-    // 🔧 【重要】Render.com特有の設定
+    // CORS詳細設定
     allowRequest: (req, callback) => {
-        // Render.comの内部通信とCORS設定
         const origin = req.headers.origin;
         const allowedOrigins = [
             'http://localhost:3000',
@@ -47,7 +46,6 @@ const io = require('socket.io')(http, {
             process.env.CLIENT_URL
         ].filter(Boolean);
         
-        // 開発環境では全て許可、本番環境では制限
         if (process.env.NODE_ENV === 'development') {
             callback(null, true);
         } else {
@@ -59,84 +57,44 @@ const io = require('socket.io')(http, {
     }
 });
 
-// 🔧 【追加】Render.com環境での詳細ログ
+// 🔧 Render.com環境でのログ設定
 io.engine.on('connection_error', (err) => {
-    console.log('🔧 Socket.io Engine接続エラー:', {
+    console.log('🔧 Socket.io接続エラー:', {
         code: err.code,
         message: err.message,
-        context: err.context,
-        req: err.req ? {
-            url: err.req.url,
-            method: err.req.method,
-            headers: {
-                'user-agent': err.req.headers['user-agent'],
-                'origin': err.req.headers.origin,
-                'connection': err.req.headers.connection,
-                'upgrade': err.req.headers.upgrade
-            }
-        } : null
+        url: err.req?.url,
+        origin: err.req?.headers?.origin
     });
 });
 
-// 🔧 【追加】接続監視とヘルスチェック
 io.engine.on('initial_headers', (headers, req) => {
-    console.log('🔧 Socket.io接続ヘッダー:', {
+    console.log('🔧 新規接続:', {
         url: req.url,
-        method: req.method,
         userAgent: req.headers['user-agent']?.substring(0, 50),
         origin: req.headers.origin
     });
 });
 
-// 🔧 【追加】定期的な接続状態監視
+// 🔧 【統合】接続監視（重複削除）
 setInterval(() => {
     const connectedSockets = io.sockets.sockets.size;
     const engineConnections = io.engine.clientsCount;
     
-    console.log(`🔧 Socket統計: Socket.IO=${connectedSockets}, Engine=${engineConnections}`);
-    
-    // 異常検出時の警告
-    if (connectedSockets !== engineConnections) {
-        console.warn('⚠️ Socket数不整合 - 接続状態をチェック中');
-    }
-}, 60000); // 1分間隔
-
-// 🔧 【追加】Render.com環境でのGraceful shutdown
-process.on('SIGTERM', () => {
-    console.log('🔧 SIGTERM受信 - Socket.io正常終了中...');
-    io.close(() => {
-        console.log('🔧 Socket.io正常終了完了');
-        process.exit(0);
-    });
-});
-
-
-// 🔧 【追加】定期的な接続状態監視
-setInterval(() => {
-    const connectedSockets = io.sockets.sockets.size;
-    const engineConnections = io.engine.clientsCount;
-    
-    console.log(`🔧 Socket統計詳細: Socket.IO=${connectedSockets}個, Engine=${engineConnections}個`);
+    console.log(`📊 Socket統計: ${connectedSockets}個接続中`);
     
     if (connectedSockets !== engineConnections) {
-        console.warn('⚠️ Socket数の不整合を検出');
+        console.warn('⚠️ Socket数不整合検出');
     }
-}, 30000); // 30秒間隔
-
-
-// 定期的なクリーンアップ（Render.com環境での推奨設定）
-setInterval(() => {
-    const connectedSockets = io.sockets.sockets.size;
-    console.log(`📊 Socket統計: ${connectedSockets}個の接続中`);
     
-    // 非アクティブな接続のクリーンアップ
+    // 非アクティブ接続のクリーンアップ
     io.sockets.sockets.forEach((socket) => {
         if (!socket.connected) {
             console.log(`🧹 非アクティブSocket切断: ${socket.id}`);
             socket.disconnect(true);
         }
     });
-}, 5 * 60 * 1000); // 5分間隔
+}, 60000); // 1分間隔に統合
+
 const path = require('path');
 const fs = require('fs');
 
@@ -149,7 +107,7 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// 静的ファイルの配信
+// 静的ファイル配信
 const publicPath = path.join(__dirname, '../public');
 console.log('Static files path:', publicPath);
 
@@ -160,17 +118,18 @@ if (!fs.existsSync(publicPath)) {
 
 app.use(express.static(publicPath));
 
-// ヘルスチェック用のエンドポイント
+// ヘルスチェック
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        memory: process.memoryUsage()
+        memory: process.memoryUsage(),
+        sockets: io.sockets.sockets.size
     });
 });
 
-// デバッグ用ルート
+// デバッグ情報
 app.get('/debug', (req, res) => {
     try {
         const publicFiles = fs.readdirSync(publicPath);
@@ -178,20 +137,17 @@ app.get('/debug', (req, res) => {
         const jsPath = path.join(publicPath, 'js');
         const imagesPath = path.join(publicPath, 'images');
         
-        const cssFiles = fs.existsSync(cssPath) ? fs.readdirSync(cssPath) : ['CSS folder not found'];
-        const jsFiles = fs.existsSync(jsPath) ? fs.readdirSync(jsPath) : ['JS folder not found'];
-        const imageFiles = fs.existsSync(imagesPath) ? fs.readdirSync(imagesPath) : ['Images folder not found'];
-        
         res.json({
             publicPath,
-            publicFiles,
-            cssFiles,
-            jsFiles,
-            imageFiles,
+            publicFiles: publicFiles.slice(0, 10), // 最初の10個のみ
+            cssFiles: fs.existsSync(cssPath) ? fs.readdirSync(cssPath) : ['CSS folder not found'],
+            jsFiles: fs.existsSync(jsPath) ? fs.readdirSync(jsPath).slice(0, 10) : ['JS folder not found'],
+            imageFiles: fs.existsSync(imagesPath) ? fs.readdirSync(imagesPath).slice(0, 10) : ['Images folder not found'],
             workingDirectory: process.cwd(),
             nodeVersion: process.version,
             platform: process.platform,
-            environment: process.env.NODE_ENV || 'development'
+            environment: process.env.NODE_ENV || 'development',
+            socketConnections: io.sockets.sockets.size
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -212,15 +168,13 @@ app.get('/', (req, res) => {
     }
 });
 
-// Socket.ioハンドラーの設定（統合版を使用）
+// Socket.ioハンドラー設定
 try {
-    // 完全版のsocketHandlersを使用
     const { setupSocketHandlers } = require('./socketHandlers');
     setupSocketHandlers(io);
-    console.log('Socket handlers initialized (統合版)');
+    console.log('✅ Socket handlers initialized');
 } catch (error) {
-    console.error('Error initializing socket handlers:', error);
-    console.log('Socket.ioなしでサーバーを起動します');
+    console.error('❌ Socket handlers initialization error:', error);
 }
 
 // 404ハンドラー
@@ -246,10 +200,10 @@ const PORT = process.env.PORT || 3000;
 
 // サーバー起動
 const server = http.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ サーバーがポート ${PORT} で起動しました`);
-    console.log(`📁 Public files served from: ${publicPath}`);
+    console.log(`✅ サーバー起動: ポート ${PORT}`);
+    console.log(`📁 Static files: ${publicPath}`);
     console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`💾 Memory usage:`, process.memoryUsage());
+    console.log(`🔧 Render.com最適化: 有効`);
 });
 
 // サーバーエラーハンドリング
@@ -263,18 +217,22 @@ server.on('error', (error) => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-    console.log('Received SIGTERM, shutting down gracefully');
-    server.close(() => {
-        console.log('Process terminated');
-        process.exit(0);
+    console.log('🔧 SIGTERM受信 - 正常終了開始');
+    io.close(() => {
+        server.close(() => {
+            console.log('✅ 正常終了完了');
+            process.exit(0);
+        });
     });
 });
 
 process.on('SIGINT', () => {
-    console.log('Received SIGINT, shutting down gracefully');
-    server.close(() => {
-        console.log('Process terminated');
-        process.exit(0);
+    console.log('🔧 SIGINT受信 - 正常終了開始');
+    io.close(() => {
+        server.close(() => {
+            console.log('✅ 正常終了完了');
+            process.exit(0);
+        });
     });
 });
 
