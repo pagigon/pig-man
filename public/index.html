@@ -35,11 +35,50 @@
     <div class="player-name-display" id="player-name-display" style="display: none;">👤 <span id="my-name"></span></div>
     
     <div class="container">
+
         <div class="header">
+    <!-- 🔧 【修正】タイトル画像に変更 -->
+    <div class="title-image-container">
+        <img id="title-banner" 
+             class="title-banner-image" 
+             src="/images/title-banner.webp" 
+             alt="豚小屋探検隊 - 豚小屋に入らずんば子豚を得ず"
+             loading="eager">
+        
+        <!-- 🔧 【追加】画像読み込み失敗時のフォールバック -->
+        <div id="title-fallback" class="title-fallback" style="display: none;">
             <h1>🐷 豚小屋探検隊 🐷</h1>
             <p class="subtitle">豚小屋に入らずんば子豚を得ず</p>
         </div>
-
+    </div>
+</div>
+<!-- 🔧 【追加】画像読み込みエラー処理用JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const titleImage = document.getElementById('title-banner');
+    const titleFallback = document.getElementById('title-fallback');
+    
+    // 画像読み込みエラー時のフォールバック処理
+    titleImage.addEventListener('error', function() {
+        console.warn('⚠️ タイトル画像の読み込みに失敗 - テキストフォールバックを表示');
+        titleImage.style.display = 'none';
+        titleFallback.style.display = 'block';
+    });
+    
+    // 画像読み込み成功時の処理
+    titleImage.addEventListener('load', function() {
+        console.log('✅ タイトル画像読み込み成功');
+        titleFallback.style.display = 'none';
+    });
+    
+    // 画像が既に読み込まれている場合（キャッシュから）
+    if (titleImage.complete && titleImage.naturalHeight !== 0) {
+        console.log('✅ タイトル画像キャッシュから読み込み済み');
+        titleFallback.style.display = 'none';
+    }
+});
+</script>
+        
         <div id="error-message" class="error-message"></div>
 
         <!-- ロビー画面 -->
