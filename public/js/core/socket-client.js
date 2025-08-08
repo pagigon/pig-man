@@ -451,17 +451,6 @@ this.socket.on('waitingForReconnect', function(data) {
     }
 });
 
-        // 🔧 【追加】プレイヤー切断時の待機処理
-        this.socket.on('waitingForReconnect', function(data) {
-            console.log('⏸️ プレイヤー切断により待機中:', data);
-            
-            if (data && data.disconnectedPlayers) {
-                const playerNames = data.disconnectedPlayers.join(', ');
-                UIManager.showError(`${playerNames} が切断されました。復帰をお待ちください...`, 'warning');
-            } else {
-                UIManager.showError('プレイヤーの復帰をお待ちください...', 'warning');
-            }
-        });
 
         console.log('✅ Socket イベントリスナー設定完了');
     }
