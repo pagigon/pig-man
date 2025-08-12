@@ -12,7 +12,8 @@ socket.on('selectCard', (data) => {
             socket.emit('error', { message: 'ルームに参加していません' });
             return;
         }
-        
+
+        const activeRooms = getActiveRooms();
         const room = activeRooms.get(socket.roomId);
         if (!room) {
             console.error('ルームが見つかりません:', socket.roomId);
