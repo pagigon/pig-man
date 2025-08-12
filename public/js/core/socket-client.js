@@ -423,7 +423,10 @@ this.socket.on('hostChanged', function(data) {
         });
 
             this.socket.on('error', function(error) {
-            console.error('❌ サーバーエラー:', error);
+    console.error('❌ サーバーエラー:', error);
+    console.error('❌ エラー詳細:', JSON.stringify(error, null, 2));
+    console.error('❌ エラーメッセージ:', error?.message);
+    console.error('❌ エラータイプ:', typeof error);
             try {
                 self.game.onError(error);
             } catch (e) {
