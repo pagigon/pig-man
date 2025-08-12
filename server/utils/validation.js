@@ -1,4 +1,4 @@
-// バリデーション関数群
+// バリデーション関数群 - 緩い判定版
 
 function validatePlayerName(name) {
     if (!name || typeof name !== 'string') {
@@ -12,9 +12,9 @@ function validatePlayerName(name) {
         return false;
     }
     
-    // 文字種チェック（日本語、英数字、一部記号を許可）
-    const validPattern = /^[a-zA-Z0-9ひらがなカタカナ漢字_\-\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+$/;
-    if (!validPattern.test(trimmed)) {
+    // 🔧 【修正】制御文字のみ除外（その他は許可）- より緩い判定
+    const invalidPattern = /[\x00-\x1F\x7F]/;
+    if (invalidPattern.test(trimmed)) {
         return false;
     }
     
