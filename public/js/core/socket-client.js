@@ -345,6 +345,7 @@ this.socket.on('hostChanged', function(data) {
         });
 
         this.socket.on('joinSuccess', function(data) {
+            console.log('🎯 joinSuccess イベント受信確認!', data); // <- この行だけ追加
             console.log('✅ ルーム参加成功:', data);
             try {
                 self.game.onJoinSuccess(data);
