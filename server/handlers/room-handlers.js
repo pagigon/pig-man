@@ -149,6 +149,7 @@ function setupRoomHandlers(io, socket, socketRequestHistory) {
         console.log('🔍 activeRooms数:', activeRooms.size);
         console.log('🔍 対象ルーム存在確認:', activeRooms.has(data.roomId));
         if (!checkRateLimit(socket.id, 'join', socketRequestHistory)) {
+        console.log('❌ joinRoomエラー送信:', { message: 'エラーメッセージ' });
             socket.emit('error', { message: 'しばらく待ってから再試行してください' });
             return;
         }
@@ -233,6 +234,7 @@ function setupRoomHandlers(io, socket, socketRequestHistory) {
         socket.playerName = playerName;
         
         // 成功応答
+        console.log('✅ joinSuccess送信準備完了');
         socket.emit('joinSuccess', {
             roomId: roomId,
             gameData: room.gameData,
