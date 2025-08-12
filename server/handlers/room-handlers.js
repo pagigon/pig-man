@@ -145,6 +145,9 @@ function setupRoomHandlers(io, socket, socketRequestHistory) {
     
     // ルーム参加
     socket.on('joinRoom', (data) => {
+        console.log('🔍 joinRoom処理開始:', data);
+        console.log('🔍 activeRooms数:', activeRooms.size);
+        console.log('🔍 対象ルーム存在確認:', activeRooms.has(data.roomId));
         if (!checkRateLimit(socket.id, 'join', socketRequestHistory)) {
             socket.emit('error', { message: 'しばらく待ってから再試行してください' });
             return;
