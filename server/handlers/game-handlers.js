@@ -1,6 +1,6 @@
 // server/handlers/game-handlers.js - 鍵渡しロジック修正版（該当部分のみ）
 
-function setupGameHandlers(io, socket, activeRooms) {
+function setupGameHandlers(io, socket, socketRequestHistory) {
     
     // カード選択処理（鍵渡しロジック修正版）
 socket.on('selectCard', (data) => {
