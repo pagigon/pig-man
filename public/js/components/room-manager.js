@@ -108,11 +108,34 @@ export class RoomManager {
         
         const now = Date.now();
         
+        // 🔧 【強制修正】重複防止を強化
+        if (this.isJoining) {
+            console.warn('⚠️ 既に参加処理中のため無視');
+            return;
+        }
+        
+        if (this.game.roomId) {
+            console.warn('⚠️ 既にルームに参加中 - 強制リセット');
+            this.resetGameState();
+        }
+        
         // クールダウンチェック
         if (now - this.lastJoinAttempt < this.joinCooldown) {
             const remaining = Math.ceil((this.joinCooldown - (now - this.lastJoinAttempt)) / 1000);
             console.warn(`⚠️ クールダウン中: あと${remaining}秒`);
             UIManager.showError(`${remaining}秒後に再試行してください`, 'warning');
+            return;
+        }
+        
+        // 🔧 【追加】ボタンを即座に無効化
+        this.isJoining = true;
+        this.updateButtonStates();
+        
+        if (!this.game.socketClient.isConnected()) {
+            console.error('❌ ルーム参加失敗: Socket未接続');
+            UIManager.showError('サーバーに接続されていません');
+            this.isJoining = false;
+            this.updateButtonStates();
             return;
         }
         
