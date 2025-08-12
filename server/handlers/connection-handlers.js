@@ -23,9 +23,13 @@ function setupConnectionHandlers(io) {
         }, 1000);
         
         // 各種ハンドラーを設定
+        // 各種ハンドラーを設定
         setupRoomHandlers(io, socket, socketRequestHistory);
-        setupGameHandlers(io, socket);
-        setupChatHandlers(io, socket);
+        setupGameHandlers(io, socket, socketRequestHistory);
+        setupChatHandlers(io, socket, socketRequestHistory);
+        
+        // 🔧 【追加】ロビー復帰・連戦機能のハンドラー
+        setupLobbyHandlers(io, socket);
         
         // クライアントエラー受信
         socket.on('clientError', (errorInfo) => {
