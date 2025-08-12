@@ -3,7 +3,7 @@
 function setupGameHandlers(io, socket, activeRooms) {
     
     // カード選択処理（鍵渡しロジック修正版）
-    socket.on('selectCard', (data) => {
+socket.on('selectCard', (data) => {
         console.log('🃏 カード選択:', data);
         
         if (!socket.roomId) {
@@ -72,7 +72,7 @@ function setupGameHandlers(io, socket, activeRooms) {
             // 🔧 【重要】最後にカードをめくられたプレイヤーを記録
             room.gameData.lastTargetedPlayerId = data.targetPlayerId;
             
-            // ゲームログを直接チャットに追加（循環参照回避）
+            // ゲームログを直接チャットに追加
             const selectorName = room.gameData.players.find(p => p.id === socket.id)?.name || '不明';
             const targetName = targetPlayer.name;
             let logMessage = '';
@@ -100,9 +100,9 @@ function setupGameHandlers(io, socket, activeRooms) {
             
             room.gameData.messages.push(gameLogMessage);
             
-            // 最新20件のみ保持
-            if (room.gameData.messages.length > 20) {
-                room.gameData.messages = room.gameData.messages.slice(-20);
+            // 最新100件のみ保持
+            if (room.gameData.messages.length > 100) {
+                room.gameData.messages = room.gameData.messages.slice(-100);
             }
             
             // メッセージ更新を送信
@@ -135,8 +135,8 @@ function setupGameHandlers(io, socket, activeRooms) {
                 };
                 
                 room.gameData.messages.push(currentRoundEndMessage);
-                if (room.gameData.messages.length > 20) {
-                    room.gameData.messages = room.gameData.messages.slice(-20);
+                if (room.gameData.messages.length > 100) {
+                    room.gameData.messages = room.gameData.messages.slice(-100);
                 }
                 
                 // ラウンド終了をクライアントに送信
@@ -149,6 +149,7 @@ function setupGameHandlers(io, socket, activeRooms) {
                     
                     try {
                         // ラウンド進行処理
+                        const { advanceToNextRound, correctCardRecycleSystem } = require('../game/game-Logic');
                         const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
                         
                         if (roundResult.gameEnded) {
@@ -179,8 +180,8 @@ function setupGameHandlers(io, socket, activeRooms) {
                                 };
                                 
                                 room.gameData.messages.push(recycleLogMessage);
-                                if (room.gameData.messages.length > 20) {
-                                    room.gameData.messages = room.gameData.messages.slice(-20);
+                                if (room.gameData.messages.length > 100) {
+                                    room.gameData.messages = room.gameData.messages.slice(-100);
                                 }
                                 
                                 io.to(socket.roomId).emit('newMessage', room.gameData.messages);
