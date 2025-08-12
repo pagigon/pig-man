@@ -146,10 +146,21 @@ function setupRoomHandlers(io, socket, socketRequestHistory) {
     // ルーム参加
     socket.on('joinRoom', (data) => {
         console.log('🔍 joinRoom処理開始:', data);
-        console.log('🔍 activeRooms数:', activeRooms.size);
-        console.log('🔍 対象ルーム存在確認:', activeRooms.has(data.roomId));
+        console.log('🔍 現在のSocket状態:', {
+            socketId: socket.id,
+            currentRoomId: socket.roomId,
+            playerName: socket.playerName
+        });
+        
+        // 🔧 【追加】既にルームに参加している場合は拒否
+        if (socket.roomId) {
+            console.warn(`⚠️ Socket ${socket.id} は既にルーム ${socket.roomId} に参加中`);
+            socket.emit('error', { message: '既に他のルームに参加しています。一度退出してから参加してください。' });
+            return;
+        }
+        
         if (!checkRateLimit(socket.id, 'join', socketRequestHistory)) {
-        console.log('❌ joinRoomエラー送信:', { message: 'エラーメッセージ' });
+            console.log('❌ joinRoomエラー送信: レート制限');
             socket.emit('error', { message: 'しばらく待ってから再試行してください' });
             return;
         }
@@ -159,37 +170,41 @@ function setupRoomHandlers(io, socket, socketRequestHistory) {
         
         // バリデーション
         if (!validatePlayerName(playerName) || !validateRoomId(roomId)) {
+            console.log('❌ joinRoomエラー送信: バリデーション失敗');
             socket.emit('error', { message: '入力データが無効です' });
             return;
         }
         
         const room = activeRooms.get(roomId);
         if (!room) {
+            console.log('❌ joinRoomエラー送信: ルーム不存在');
             socket.emit('error', { message: 'ルームが見つかりません' });
             return;
         }
         
         // パスワードチェック
         if (room.gameData.password && room.gameData.password !== password) {
+            console.log('❌ joinRoomエラー送信: パスワード不一致');
             socket.emit('error', { message: 'パスワードが正しくありません' });
             return;
         }
         
         // ゲーム状態チェック
         if (room.gameData.gameState !== 'waiting') {
+            console.log('❌ joinRoomエラー送信: ゲーム進行中');
             socket.emit('error', { message: 'このルームはゲーム中です。観戦モードで参加してください。' });
             return;
         }
         
-        // このSocketが既にルームに参加していないかチェック
+        // 🔧 【修正】このSocketが既にルームに参加していないかチェック（二重チェック）
         const socketAlreadyInRoom = room.players.find(p => p.id === socket.id);
         if (socketAlreadyInRoom) {
-            console.warn(`⚠️ Socket ${socket.id} は既にルームに参加済み`);
+            console.warn(`⚠️ Socket ${socket.id} は既にルーム ${roomId} に参加済み`);
             socket.emit('error', { message: '既にこのルームに参加しています' });
             return;
         }
         
-        // 同じ名前のアクティブプレイヤーがいないかチェック
+        // 🔧 【修正】同じ名前のアクティブプレイヤーがいないかチェック
         const nameConflict = room.players.find(p => p.name === playerName && p.connected);
         if (nameConflict) {
             console.warn(`⚠️ プレイヤー名 "${playerName}" は既に使用中`);
@@ -202,20 +217,23 @@ function setupRoomHandlers(io, socket, socketRequestHistory) {
         // 最大プレイヤー数チェック
         const connectedCount = room.players.filter(p => p.connected).length;
         if (connectedCount >= 10) {
+            console.log('❌ joinRoomエラー送信: 満員');
             socket.emit('error', { message: 'ルームが満員です' });
             return;
         }
         
-        // 切断済みの同名プレイヤーを探す
+        // 🔧 【修正】切断済みの同名プレイヤーを探す（再接続処理）
         const disconnectedPlayer = room.players.find(p => p.name === playerName && !p.connected);
         
         if (disconnectedPlayer) {
             // 再接続処理
+            console.log(`🔄 ${playerName} の再接続処理開始`);
             disconnectedPlayer.id = socket.id;
             disconnectedPlayer.connected = true;
             console.log(`${playerName} が再接続しました`);
         } else {
             // 新規プレイヤー追加
+            console.log(`👤 ${playerName} の新規参加処理開始`);
             const newPlayer = {
                 id: socket.id,
                 name: playerName,
@@ -232,6 +250,8 @@ function setupRoomHandlers(io, socket, socketRequestHistory) {
         socket.join(roomId);
         socket.roomId = roomId;
         socket.playerName = playerName;
+        
+        console.log(`🔧 Socket設定完了: ${socket.id} -> ${roomId} (${playerName})`);
         
         // 成功応答
         console.log('✅ joinSuccess送信準備完了');
