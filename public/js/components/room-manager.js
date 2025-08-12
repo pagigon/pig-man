@@ -1,4 +1,4 @@
-// ルーム管理コンポーネント（修正版）
+// ルーム管理コンポーネント（完全修正版）
 import { UIManager } from '../core/ui-manager.js';
 import { StorageManager } from '../utils/storage.js';
 import { safeGetElement } from '../utils/helpers.js';
@@ -12,6 +12,9 @@ export class RoomManager {
         this.lastCreateAttempt = 0;
         this.joinCooldown = 3000; // 3秒のクールダウン
         this.createCooldown = 5000; // 5秒のクールダウン
+        
+        // 🔧 【追加】フラグ強制リセット用タイマー
+        this.flagResetTimer = null;
     }
 
     // 重複防止付きルーム作成
@@ -102,21 +105,16 @@ export class RoomManager {
         }
     }
 
-    // 重複防止付きルーム参加
+    // 🔧 【修正】重複防止付きルーム参加
     joinRoom() {
         console.log('👥 ルーム参加処理開始');
         
         const now = Date.now();
         
-        // 🔧 【強制修正】重複防止を強化
-        if (this.isJoining) {
-            console.warn('⚠️ 既に参加処理中のため無視');
-            return;
-        }
-        
-        if (this.game.roomId) {
-            console.warn('⚠️ 既にルームに参加中 - 強制リセット');
-            this.resetGameState();
+        // 🔧 【追加】古いフラグの強制リセット（30秒以上経過時）
+        if (this.isJoining && (now - this.lastJoinAttempt) > 30000) {
+            console.warn('⚠️ 古い参加フラグを強制リセット');
+            this.forceResetJoinState();
         }
         
         // クールダウンチェック
@@ -127,21 +125,23 @@ export class RoomManager {
             return;
         }
         
-        // 🔧 【追加】ボタンを即座に無効化
-        this.isJoining = true;
-        this.updateButtonStates();
-        
-        if (!this.game.socketClient.isConnected()) {
-            console.error('❌ ルーム参加失敗: Socket未接続');
-            UIManager.showError('サーバーに接続されていません');
-            this.isJoining = false;
-            this.updateButtonStates();
-            return;
-        }
-        
         // 重複参加防止
         if (this.isJoining) {
             console.warn('⚠️ ルーム参加中のため処理をスキップ');
+            
+            // 🔧 【修正】ユーザーに選択肢を提供
+            const timeSinceLastAttempt = now - this.lastJoinAttempt;
+            if (timeSinceLastAttempt > 10000) { // 10秒以上経過
+                console.log('🔧 10秒以上経過のため強制リセットを提案');
+                const shouldReset = confirm('参加処理が10秒以上続いています。リセットして再試行しますか？');
+                if (shouldReset) {
+                    this.forceResetJoinState();
+                    // リセット後に再帰的に実行
+                    setTimeout(() => this.joinRoom(), 500);
+                    return;
+                }
+            }
+            
             UIManager.showError('ルーム参加中です。しばらくお待ちください。', 'warning');
             return;
         }
@@ -189,30 +189,42 @@ export class RoomManager {
             this.lastJoinAttempt = now;
             this.updateButtonStates();
             
+            // 🔧 【追加】自動リセットタイマー（20秒後）
+            this.flagResetTimer = setTimeout(() => {
+                if (this.isJoining) {
+                    console.warn('⏰ 参加処理タイムアウト - フラグをリセット');
+                    this.forceResetJoinState();
+                    UIManager.showError('参加処理がタイムアウトしました。再度お試しください。', 'warning');
+                }
+            }, 20000);
+            
             const success = this.game.socketClient.joinRoom(roomId, playerName, password);
             
             if (success) {
                 UIManager.showError('ルームに参加中...', 'warning');
-                
-                // タイムアウト処理
-                setTimeout(() => {
-                    if (this.isJoining && (!this.game.gameData || this.game.gameData.id !== roomId)) {
-                        console.warn('⚠️ ルーム参加がタイムアウトしました');
-                        this.isJoining = false;
-                        this.updateButtonStates();
-                        UIManager.showError('ルーム参加に時間がかかっています。もう一度お試しください。', 'warning');
-                    }
-                }, 10000);
             } else {
-                this.isJoining = false;
-                this.updateButtonStates();
+                this.forceResetJoinState();
             }
         } catch (error) {
             console.error('ルーム参加処理エラー:', error);
-            this.isJoining = false;
-            this.updateButtonStates();
+            this.forceResetJoinState();
             UIManager.showError('ルーム参加中にエラーが発生しました');
         }
+    }
+
+    // 🔧 【追加】参加状態の強制リセット
+    forceResetJoinState() {
+        console.log('🔧 参加状態を強制リセット');
+        this.isJoining = false;
+        this.isCreating = false;
+        
+        // タイマーもクリア
+        if (this.flagResetTimer) {
+            clearTimeout(this.flagResetTimer);
+            this.flagResetTimer = null;
+        }
+        
+        this.updateButtonStates();
     }
 
     rejoinRoom() {
@@ -398,9 +410,7 @@ export class RoomManager {
         this.game.isSpectator = false;
         
         // フラグもリセット
-        this.isJoining = false;
-        this.isCreating = false;
-        this.updateButtonStates();
+        this.forceResetJoinState();
     }
 
     // ボタンの無効化/有効化
@@ -424,47 +434,64 @@ export class RoomManager {
     }
 
     // 再接続の試行
-attemptReconnection() {
-    try {
-        console.log('🔄 自動復帰処理開始');
+    attemptReconnection() {
+        try {
+            console.log('🔄 自動復帰処理開始');
 
-        const rejoinInfo = StorageManager.getRejoinInfo();
-if (rejoinInfo) {
-    console.log('保存された再入場情報:', rejoinInfo);
-    
-    // 自動復帰を試行
-    if (this.game.socketClient.isConnected() && rejoinInfo.roomId && rejoinInfo.playerName) {
-    console.log('🔍 自動復帰可能性をチェック中...');
-    this.game.socketClient.checkAutoReconnect(rejoinInfo.roomId, rejoinInfo.playerName);
-} else {
-    console.log('🔍 復帰情報が不完全のため自動復帰チェックをスキップ');
-}
-    
-    // UIに情報を設定
-    this.populateRejoinInfo(rejoinInfo);
-    UIManager.showError('前回のゲームへの復帰情報が見つかりました。「ゲームに再入場」ボタンから復帰できます。', 'warning');
-    return;
-}
+            // 🔧 【追加】既存の参加フラグをクリア
+            this.forceResetJoinState();
 
-// 通常の再接続情報もチェック
-const savedPlayerInfo = StorageManager.getPlayerInfo();
-if (savedPlayerInfo && savedPlayerInfo.roomId) {
-    console.log('保存された接続情報で再接続を試行:', savedPlayerInfo);
-    
-    // 少し遅延させて接続を試行
-    setTimeout(() => {
-        if (this.game.socketClient.isConnected()) {
-            console.log('🔄 自動再接続を試行します');
-            this.game.socketClient.reconnectToRoom(savedPlayerInfo.roomId, savedPlayerInfo.playerName);
-        }
-    }, 2000);
-} else {
-    console.log('復帰可能な情報が見つかりませんでした');
-}
+            const rejoinInfo = StorageManager.getRejoinInfo();
+            if (rejoinInfo) {
+                console.log('保存された再入場情報:', rejoinInfo);
+                
+                // 自動復帰を試行
+                if (this.game.socketClient.isConnected() && rejoinInfo.roomId && rejoinInfo.playerName) {
+                    console.log('🔍 自動復帰可能性をチェック中...');
+                    this.game.socketClient.checkAutoReconnect(rejoinInfo.roomId, rejoinInfo.playerName);
+                } else {
+                    console.log('🔍 復帰情報が不完全のため自動復帰チェックをスキップ');
+                }
+                
+                // UIに情報を設定
+                this.populateRejoinInfo(rejoinInfo);
+                UIManager.showError('前回のゲームへの復帰情報が見つかりました。「ゲームに再入場」ボタンから復帰できます。', 'warning');
+                return;
+            }
 
-        
+            // 通常の再接続情報もチェック
+            const savedPlayerInfo = StorageManager.getPlayerInfo();
+            if (savedPlayerInfo && savedPlayerInfo.roomId) {
+                console.log('保存された接続情報で再接続を試行:', savedPlayerInfo);
+                
+                // 🔧 【修正】再接続フラグを一時的に設定
+                this.isJoining = true;
+                this.updateButtonStates();
+                
+                // 少し遅延させて接続を試行
+                setTimeout(() => {
+                    if (this.game.socketClient.isConnected()) {
+                        console.log('🔄 自動再接続を試行します');
+                        this.game.socketClient.reconnectToRoom(savedPlayerInfo.roomId, savedPlayerInfo.playerName);
+                        
+                        // 🔧 【追加】10秒後にフラグをリセット（自動再接続のタイムアウト）
+                        setTimeout(() => {
+                            if (this.isJoining && !this.game.gameData) {
+                                console.warn('⏰ 自動再接続タイムアウト');
+                                this.forceResetJoinState();
+                            }
+                        }, 10000);
+                    } else {
+                        this.forceResetJoinState();
+                    }
+                }, 2000);
+            } else {
+                console.log('復帰可能な情報が見つかりませんでした');
+            }
+            
         } catch (error) {
             console.error('再接続情報の読み込みエラー:', error);
+            this.forceResetJoinState();
             StorageManager.clearAllData();
         }
     }
@@ -504,9 +531,8 @@ if (savedPlayerInfo && savedPlayerInfo.roomId) {
         console.log('✅ ルーム参加成功コールバック:', data);
         
         try {
-            // 参加中フラグをリセット
-            this.isJoining = false;
-            this.updateButtonStates();
+            // 🔧 【重要】フラグとタイマーをクリア
+            this.forceResetJoinState();
             
             if (!data || typeof data !== 'object') {
                 throw new Error('無効なルーム参加データ');
@@ -523,8 +549,7 @@ if (savedPlayerInfo && savedPlayerInfo.roomId) {
             UIManager.showError(`ルーム ${data.roomId} に参加しました！`, 'success');
         } catch (error) {
             console.error('ルーム参加成功処理エラー:', error);
-            this.isJoining = false;
-            this.updateButtonStates();
+            this.forceResetJoinState();
             UIManager.showError('ルーム参加後の処理でエラーが発生しました');
         }
     }
@@ -574,6 +599,9 @@ if (savedPlayerInfo && savedPlayerInfo.roomId) {
         console.log('✅ 再接続成功コールバック:', data);
         
         try {
+            // 🔧 【追加】再接続成功時もフラグリセット
+            this.forceResetJoinState();
+            
             if (!data || typeof data !== 'object') {
                 throw new Error('無効な再接続データ');
             }
@@ -585,6 +613,7 @@ if (savedPlayerInfo && savedPlayerInfo.roomId) {
             UIManager.showError('ゲームに再接続しました！', 'success');
         } catch (error) {
             console.error('再接続成功処理エラー:', error);
+            this.forceResetJoinState();
             UIManager.showError('再接続後の処理でエラーが発生しました');
         }
     }
@@ -608,14 +637,12 @@ if (savedPlayerInfo && savedPlayerInfo.roomId) {
         }
     }
 
-    // エラー時の処理（追加）
+    // エラー時の処理
     onError(error) {
         console.error('RoomManager エラー:', error);
         
-        // フラグをリセット
-        this.isJoining = false;
-        this.isCreating = false;
-        this.updateButtonStates();
+        // 🔧 【重要】フラグを確実にリセット
+        this.forceResetJoinState();
         
         // 具体的なエラーメッセージがあれば表示
         if (error && error.message) {
@@ -632,6 +659,8 @@ if (savedPlayerInfo && savedPlayerInfo.roomId) {
             isCreating: this.isCreating,
             lastJoinAttempt: this.lastJoinAttempt,
             lastCreateAttempt: this.lastCreateAttempt,
+            timeSinceLastJoin: Date.now() - this.lastJoinAttempt,
+            hasResetTimer: !!this.flagResetTimer,
             roomId: this.game.roomId,
             isHost: this.game.isHost,
             isSpectator: this.game.isSpectator,
