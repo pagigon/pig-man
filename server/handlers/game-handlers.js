@@ -1,6 +1,8 @@
 // server/handlers/game-handlers.js - 鍵渡しロジック修正版（該当部分のみ）
 
 function setupGameHandlers(io, socket, socketRequestHistory) {
+    // activeRoomsは room-handlers.js から取得
+    const { getActiveRooms } = require('./room-handlers');
     
     // カード選択処理（鍵渡しロジック修正版）
 socket.on('selectCard', (data) => {
