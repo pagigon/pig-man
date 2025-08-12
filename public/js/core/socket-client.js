@@ -260,23 +260,29 @@ this.socket.on('hostChanged', function(data) {
 
         // 切断イベント
         this.socket.on('disconnect', function(reason) {
-            console.log('❌ Socket.io 切断:', reason);
-            UIManager.showConnectionStatus('disconnected');
-            self.isConnecting = false;
-            
-            if (reason === 'transport close' || reason === 'transport error') {
-                console.log('🔄 Render.com環境での切断を検出 - 再接続準備中...');
-                UIManager.showError('接続が不安定です。自動的に再接続します...', 'warning');
-                
-                setTimeout(function() {
-                    if (!self.socket.connected && !self.isConnecting) {
-                        self.forceReconnect();
-                    }
-                }, 3000);
-            } else if (reason !== 'io client disconnect') {
-                UIManager.showError('サーバーとの接続が切断されました。再接続を試行中...', 'warning');
+    console.log('❌ Socket.io 切断:', reason);
+    UIManager.showConnectionStatus('disconnected');
+    self.isConnecting = false;
+    
+    // 🔧 【追加】切断時もフラグリセット
+    if (self.game.roomManager && typeof self.game.roomManager.forceResetJoinState === 'function') {
+        console.log('🔧 切断時のフラグリセット実行');
+        self.game.roomManager.forceResetJoinState();
+    }
+    
+    if (reason === 'transport close' || reason === 'transport error') {
+        console.log('🔄 Render.com環境での切断を検出 - 再接続準備中...');
+        UIManager.showError('接続が不安定です。自動的に再接続します...', 'warning');
+        
+        setTimeout(function() {
+            if (!self.socket.connected && !self.isConnecting) {
+                self.forceReconnect();
             }
-        });
+        }, 3000);
+    } else if (reason !== 'io client disconnect') {
+        UIManager.showError('サーバーとの接続が切断されました。再接続を試行中...', 'warning');
+    }
+});
 
         // エラーイベント
         this.socket.on('connect_error', function(error) {
@@ -375,15 +381,22 @@ this.socket.on('hostChanged', function(data) {
             }
         });
 
-        this.socket.on('reconnectSuccess', function(data) {
-            console.log('✅ 再接続成功:', data);
-            try {
-                self.game.onReconnectSuccess(data);
-            } catch (error) {
-                console.error('再接続処理エラー:', error);
-                UIManager.showError('再接続後の処理でエラーが発生しました');
-            }
-        });
+        this.socket.on('reconnectFailed', function(data) {
+    console.warn('❌ 再接続失敗:', data);
+    try {
+        // 🔧 【重要】再接続失敗時も必ずフラグリセット
+        if (self.game.roomManager && typeof self.game.roomManager.forceResetJoinState === 'function') {
+            console.log('🔧 再接続失敗時のフラグリセット実行');
+            self.game.roomManager.forceResetJoinState();
+        }
+        
+        const message = data?.message || '再接続に失敗しました';
+        UIManager.showError(message, 'warning');
+        
+    } catch (error) {
+        console.error('再接続失敗処理エラー:', error);
+    }
+});
 
         this.socket.on('gameUpdate', function(gameData) {
             console.log('🎮 ゲーム状態更新');
@@ -429,12 +442,33 @@ this.socket.on('hostChanged', function(data) {
     console.error('❌ エラーメッセージ:', error?.message);
     console.error('❌ エラータイプ:', typeof error);
             try {
-                self.game.onError(error);
-            } catch (e) {
-                console.error('エラー処理中のエラー:', e);
-                UIManager.showError(error.message || 'サーバーエラーが発生しました');
+        // 🔧 【重要】roomManagerのフラグリセットを最優先で実行
+        if (self.game.roomManager && typeof self.game.roomManager.forceResetJoinState === 'function') {
+            console.log('🔧 エラー時のフラグリセット実行');
+            self.game.roomManager.forceResetJoinState();
+        }
+        
+        // その後でゲームのエラー処理
+        self.game.onError(error);
+        
+    } catch (e) {
+        console.error('エラー処理中のエラー:', e);
+        
+        // 🔧 【緊急処置】手動でフラグリセット
+        if (self.game.roomManager) {
+            self.game.roomManager.isJoining = false;
+            self.game.roomManager.isCreating = false;
+            if (self.game.roomManager.flagResetTimer) {
+                clearTimeout(self.game.roomManager.flagResetTimer);
+                self.game.roomManager.flagResetTimer = null;
             }
-        });
+            self.game.roomManager.updateButtonStates();
+            console.log('✅ 緊急フラグリセット完了');
+        }
+        
+        UIManager.showError(error?.message || 'サーバーエラーが発生しました');
+    }
+});
 
         // 🔧 【追加】切断プレイヤー待機の処理
 this.socket.on('waitingForReconnect', function(data) {
