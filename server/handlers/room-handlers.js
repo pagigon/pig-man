@@ -436,30 +436,39 @@ function handlePlayerTempLeave(socket, io) {
     updateRoomList(io);
 }
 
-// プレイヤー退出処理
+// 既存のhandlePlayerLeave関数を修正
 function handlePlayerLeave(socket, io) {
     if (!socket.roomId) return;
     
     const room = activeRooms.get(socket.roomId);
     if (!room) return;
     
+    console.log(`🚪 プレイヤー退出処理: ${socket.playerName} (${socket.id})`);
+    
     // プレイヤーを完全に削除
     room.players = room.players.filter(p => p.id !== socket.id);
     room.gameData.players = room.gameData.players.filter(p => p.id !== socket.id);
     
-    // ホストが退出した場合、次のプレイヤーをホストに
+    // 🔧 【重要】ホストが退出した場合、次のプレイヤーをホストに
     if (room.gameData.host === socket.id) {
         const nextHost = room.players.find(p => p.connected);
         if (nextHost) {
             room.gameData.host = nextHost.id;
-            console.log(`新しいホスト: ${nextHost.name}`);
+            console.log(`👑 新しいホスト: ${nextHost.name} (${nextHost.id})`);
+            
+            // 🔧 【追加】ホスト変更を全員に通知
+            io.to(socket.roomId).emit('hostChanged', {
+                newHostId: nextHost.id,
+                newHostName: nextHost.name,
+                message: `${nextHost.name} が新しいホストになりました`
+            });
         }
     }
     
     // 全員が退出した場合、ルームを削除
     if (room.players.length === 0) {
         activeRooms.delete(socket.roomId);
-        console.log('空のルームを削除:', socket.roomId);
+        console.log('🗑️ 空のルームを削除:', socket.roomId);
     } else {
         // ルーム内の他のプレイヤーに更新を送信
         io.to(socket.roomId).emit('gameUpdate', room.gameData);
@@ -469,12 +478,14 @@ function handlePlayerLeave(socket, io) {
     updateRoomList(io);
 }
 
-// プレイヤー切断処理
+// 🔧 【追加】切断時のホスト変更処理も修正
 function handlePlayerDisconnect(socket, io) {
     if (!socket.roomId) return;
     
     const room = activeRooms.get(socket.roomId);
     if (!room) return;
+    
+    console.log(`🔌 プレイヤー切断処理: ${socket.playerName} (${socket.id})`);
     
     // プレイヤーを切断状態に（削除はしない）
     const player = room.players.find(p => p.id === socket.id);
@@ -483,10 +494,26 @@ function handlePlayerDisconnect(socket, io) {
         console.log(`${player.name} が切断しました`);
     }
     
+    // 🔧 【追加】ホストが切断した場合の処理
+    if (room.gameData.host === socket.id && room.gameData.gameState === 'waiting') {
+        const nextHost = room.players.find(p => p.connected);
+        if (nextHost) {
+            room.gameData.host = nextHost.id;
+            console.log(`👑 ホスト切断により新しいホスト: ${nextHost.name}`);
+            
+            // ホスト変更を通知
+            io.to(socket.roomId).emit('hostChanged', {
+                newHostId: nextHost.id,
+                newHostName: nextHost.name,
+                message: `ホストが切断したため、${nextHost.name} が新しいホストになりました`
+            });
+        }
+    }
+    
     // 全員が切断した場合、ルームを削除
     if (room.players.every(p => !p.connected)) {
         activeRooms.delete(socket.roomId);
-        console.log('全員切断のためルームを削除:', socket.roomId);
+        console.log('🗑️ 全員切断のためルームを削除:', socket.roomId);
     } else {
         // ルーム内の他のプレイヤーに更新を送信
         io.to(socket.roomId).emit('gameUpdate', room.gameData);
