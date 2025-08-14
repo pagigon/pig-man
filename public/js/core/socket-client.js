@@ -436,39 +436,64 @@ this.socket.on('hostChanged', function(data) {
             }
         });
 
-            this.socket.on('error', function(error) {
+            // setupEventListeners メソッド内の error イベントハンドラー
+this.socket.on('error', function(error) {
     console.error('❌ サーバーエラー:', error);
-    console.error('❌ エラー詳細:', JSON.stringify(error, null, 2));
-    console.error('❌ エラーメッセージ:', error?.message);
-    console.error('❌ エラータイプ:', typeof error);
-            try {
-        // 🔧 【重要】roomManagerのフラグリセットを最優先で実行
-        if (self.game.roomManager && typeof self.game.roomManager.forceResetJoinState === 'function') {
-            console.log('🔧 エラー時のフラグリセット実行');
-            self.game.roomManager.forceResetJoinState();
+    
+    // 🔧 【最優先】RoomManager の状態を確実にリセット
+    try {
+        if (self.game && self.game.roomManager) {
+            if (typeof self.game.roomManager.forceResetAllStates === 'function') {
+                console.log('🔧 エラー時：forceResetAllStates 実行');
+                self.game.roomManager.forceResetAllStates();
+            } else if (typeof self.game.roomManager.forceResetJoinState === 'function') {
+                console.log('🔧 エラー時：forceResetJoinState 実行');
+                self.game.roomManager.forceResetJoinState();
+            } else {
+                console.log('🔧 エラー時：手動フラグリセット実行');
+                self.game.roomManager.isJoining = false;
+                self.game.roomManager.isCreating = false;
+                self.game.roomManager.updateButtonStates();
+            }
         }
         
         // その後でゲームのエラー処理
-        self.game.onError(error);
-        
-    } catch (e) {
-        console.error('エラー処理中のエラー:', e);
-        
-        // 🔧 【緊急処置】手動でフラグリセット
-        if (self.game.roomManager) {
-            self.game.roomManager.isJoining = false;
-            self.game.roomManager.isCreating = false;
-            if (self.game.roomManager.flagResetTimer) {
-                clearTimeout(self.game.roomManager.flagResetTimer);
-                self.game.roomManager.flagResetTimer = null;
-            }
-            self.game.roomManager.updateButtonStates();
-            console.log('✅ 緊急フラグリセット完了');
+        if (self.game && typeof self.game.onError === 'function') {
+            self.game.onError(error);
         }
         
+    } catch (resetError) {
+        console.error('❌ エラー時フラグリセット失敗:', resetError);
+        
+        // 🔧 【最後の手段】DOM直接操作
+        try {
+            const joinBtn = document.getElementById('join-room');
+            const createBtn = document.getElementById('create-room');
+            if (joinBtn) {
+                joinBtn.disabled = false;
+                joinBtn.textContent = 'ルームに参加';
+                joinBtn.style.opacity = '1';
+            }
+            if (createBtn) {
+                createBtn.disabled = false;
+                createBtn.textContent = 'ルームを作成';
+                createBtn.style.opacity = '1';
+            }
+            console.log('✅ DOM直接操作でボタン復旧完了');
+        } catch (domError) {
+            console.error('❌ DOM直接操作も失敗:', domError);
+        }
+        
+        // エラーメッセージ表示
         UIManager.showError(error?.message || 'サーバーエラーが発生しました');
     }
 });
+
+        // 🔧 【追加】切断時のフラグリセット強化
+this.socket.on('disconnect', function(reason) {
+    console.log('❌ Socket.io 切断:', reason);
+    UIManager.showConnectionStatus('disconnected');
+    self.isConnecting = false;
 
         // 🔧 【追加】切断プレイヤー待機の処理
 this.socket.on('waitingForReconnect', function(data) {
