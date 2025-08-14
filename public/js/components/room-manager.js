@@ -30,72 +30,86 @@ export class RoomManager {
         console.log('✅ RoomManager 初期化完了（完全修正版）');
     }
 
-    // 🔧 【最重要】確実なフラグリセット機能
-    forceResetAllStates() {
-        console.log('🔧 【緊急】全状態強制リセット開始');
+// 🔧 【最重要】確実なフラグリセット機能
+forceResetAllStates() {
+    console.log('🔧 【緊急】全状態強制リセット開始');
+    
+    // 🔧 【追加】不適切な呼び出しを防ぐチェック
+    const now = Date.now();
+    if (this.lastResetTime && (now - this.lastResetTime) < 1000) {
+        console.warn('⚠️ リセット間隔が短すぎます - スキップ');
+        return false;
+    }
+    this.lastResetTime = now;
+    
+    try {
+        // フラグリセット
+        this.isJoining = false;
+        this.isCreating = false;
+        this.lastJoinAttempt = 0;
+        this.lastCreateAttempt = 0;
         
-        try {
-            // フラグリセット
-            this.isJoining = false;
-            this.isCreating = false;
-            this.lastJoinAttempt = 0;
-            this.lastCreateAttempt = 0;
-            
-            // 全タイマークリア
-            Object.keys(this.timers).forEach(key => {
-                if (this.timers[key]) {
-                    clearTimeout(this.timers[key]);
-                    this.timers[key] = null;
-                }
-            });
-            
-            // ゲーム状態リセット
-            if (this.game) {
-                this.game.roomId = null;
-                this.game.gameData = null;
-                this.game.isHost = false;
-                this.game.isSpectator = false;
+        // 全タイマークリア
+        Object.keys(this.timers).forEach(key => {
+            if (this.timers[key]) {
+                clearTimeout(this.timers[key]);
+                this.timers[key] = null;
             }
-            
-            // ボタン状態修正
-            this.updateButtonStates();
-            
-            // ストレージクリア
+        });
+        
+        // 🔧 【修正】ゲーム状態は条件付きリセット
+        const shouldResetGameState = !this.game.roomId || !this.game.gameData;
+        if (shouldResetGameState) {
+            console.log('🔧 ゲーム状態もリセット（ルーム未参加のため）');
+            this.game.roomId = null;
+            this.game.gameData = null;
+            this.game.isHost = false;
+            this.game.isSpectator = false;
+        } else {
+            console.log('🔧 ゲーム状態は保持（ルーム参加済みのため）');
+        }
+        
+        // ボタン状態修正
+        this.updateButtonStates();
+        
+        // 🔧 【修正】ストレージは条件付きクリア
+        if (shouldResetGameState) {
             try {
                 StorageManager.clearAllData();
             } catch (e) {
                 console.warn('ストレージクリア失敗:', e);
             }
-            
-            // デバッグカウンター更新
-            this.debug.resetCount++;
-            
-            console.log('✅ 全状態強制リセット完了');
-            return true;
-            
-        } catch (error) {
-            console.error('❌ 強制リセットエラー:', error);
-            
-            // 最後の手段：DOM直接操作
-            try {
-                const joinBtn = document.getElementById('join-room');
-                const createBtn = document.getElementById('create-room');
-                if (joinBtn) {
-                    joinBtn.disabled = false;
-                    joinBtn.textContent = 'ルームに参加';
-                }
-                if (createBtn) {
-                    createBtn.disabled = false;
-                    createBtn.textContent = 'ルームを作成';
-                }
-                console.log('✅ DOM直接修正完了');
-            } catch (domError) {
-                console.error('❌ DOM修正失敗:', domError);
-            }
-            
-            return false;
         }
+        
+        // デバッグカウンター更新
+        this.debug.resetCount++;
+        
+        console.log('✅ 全状態強制リセット完了');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ 強制リセットエラー:', error);
+        
+        // 最後の手段：DOM直接操作
+        try {
+            const joinBtn = document.getElementById('join-room');
+            const createBtn = document.getElementById('create-room');
+            if (joinBtn) {
+                joinBtn.disabled = false;
+                joinBtn.textContent = 'ルームに参加';
+            }
+            if (createBtn) {
+                createBtn.disabled = false;
+                createBtn.textContent = 'ルームを作成';
+            }
+            console.log('✅ DOM直接修正完了');
+        } catch (domError) {
+            console.error('❌ DOM修正失敗:', domError);
+        }
+        
+        return false;
     }
+}
 
     // 🔧 【修正】安全な参加処理
     joinRoom() {
