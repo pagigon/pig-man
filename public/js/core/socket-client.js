@@ -69,111 +69,143 @@ export class SocketClient {
         }
     }
 
-    initializeSocket() {
-        console.log('Socket.io 初期化開始 (Render.com最適化v3)');
-        
-        if (typeof io === 'undefined') {
-            console.error('❌ Socket.io が読み込まれていません');
-            UIManager.showError('Socket.io ライブラリが読み込まれていません');
-            return;
-        }
+    // 🔧 public/js/core/socket-client.js の initializeSocket 関数を修正
 
-        if (this.isConnecting) {
-            console.warn('⚠️ Socket初期化中のため処理をスキップ');
-            return;
-        }
-
-        this.isConnecting = true;
-
+initializeSocket() {
+    console.log('Socket.io 初期化開始 (重複接続防止v4)');
+    
+    // 🔧 【重要】既存Socket接続の完全チェック
+    if (window.globalSocketInstance) {
+        console.warn('⚠️ 既存のグローバルSocket接続を検出 - 強制切断');
         try {
-            // 🔧 【修正】Render.com環境に最適化されたSocket.io設定v3
-            const socketConfig = {
-                // 🔧 【重要】pollingでスタートしてWebSocketにアップグレード
-                transports: ['polling', 'websocket'],
-                
-                // 🔧 【修正】Render.com環境での接続設定
-                forceNew: true,
-                timeout: 60000,                    // 1分に延長
-                pingTimeout: 180000,               // 3分に延長
-                pingInterval: 90000,               // 1.5分間隔
-                
-                // 🔧 【重要】再接続設定の最適化
-                reconnection: true,
-                reconnectionAttempts: 5,           // 5回に増加
-                reconnectionDelay: 3000,           // 3秒に延長
-                reconnectionDelayMax: 15000,       // 15秒最大
-                
-                // 🔧 【修正】アップグレード設定
-                upgrade: true,                     // アップグレード有効
-                upgradeTimeout: 30000,             // 30秒タイムアウト
-                rememberUpgrade: false,            // アップグレード記憶無効
-                
-                // 🔧 【追加】Render.com安定性向上
-                autoConnect: true,
-                withCredentials: false,
-                timestampRequests: true,           // タイムスタンプ有効化
-                
-                // 🔧 【追加】エラー対策とパフォーマンス
-                jsonp: false,
-                forceJSONP: false,
-                forceBase64: false,
-                enablesXDR: false,
-                
-                // 🔧 【重要】キャッシュ対策
-                query: {
-                    t: Date.now(),                 // キャッシュ回避
-                    r: Math.random().toString(36)  // ランダム値追加
+            window.globalSocketInstance.removeAllListeners();
+            window.globalSocketInstance.disconnect();
+            window.globalSocketInstance.close();
+        } catch (e) {
+            console.warn('既存Socket切断エラー:', e);
+        }
+        window.globalSocketInstance = null;
+    }
+    
+    if (typeof io === 'undefined') {
+        console.error('❌ Socket.io が読み込まれていません');
+        UIManager.showError('Socket.io ライブラリが読み込まれていません');
+        return;
+    }
+
+    if (this.isConnecting) {
+        console.warn('⚠️ Socket初期化中のため処理をスキップ');
+        return;
+    }
+
+    // 🔧 【追加】重複初期化防止フラグ
+    if (this.socket && this.socket.connected) {
+        console.warn('⚠️ 既に接続済みのSocketが存在 - 初期化スキップ');
+        return;
+    }
+
+    this.isConnecting = true;
+
+    try {
+        // 🔧 【修正】Render.com環境に最適化されたSocket.io設定v4
+        const socketConfig = {
+            // 🔧 【重要】重複接続防止設定
+            forceNew: true,                    // 新しい接続を強制
+            multiplex: false,                  // 多重化無効
+            
+            // 🔧 【重要】pollingでスタートしてWebSocketにアップグレード
+            transports: ['polling', 'websocket'],
+            
+            // 🔧 【修正】Render.com環境での接続設定
+            timeout: 60000,                    // 1分に延長
+            pingTimeout: 180000,               // 3分に延長
+            pingInterval: 90000,               // 1.5分間隔
+            
+            // 🔧 【重要】再接続設定の最適化
+            reconnection: true,
+            reconnectionAttempts: 5,           // 5回に増加
+            reconnectionDelay: 3000,           // 3秒に延長
+            reconnectionDelayMax: 15000,       // 15秒最大
+            
+            // 🔧 【修正】アップグレード設定
+            upgrade: true,                     // アップグレード有効
+            upgradeTimeout: 30000,             // 30秒タイムアウト
+            rememberUpgrade: false,            // アップグレード記憶無効
+            
+            // 🔧 【追加】Render.com安定性向上
+            autoConnect: true,
+            withCredentials: false,
+            timestampRequests: true,           // タイムスタンプ有効化
+            
+            // 🔧 【追加】エラー対策とパフォーマンス
+            jsonp: false,
+            forceJSONP: false,
+            forceBase64: false,
+            enablesXDR: false,
+            
+            // 🔧 【重要】重複防止用ユニークキー
+            query: {
+                t: Date.now(),                           // キャッシュ回避
+                r: Math.random().toString(36),           // ランダム値追加
+                clientId: 'pig-game-' + Date.now(),      // クライアント識別子
+                preventDuplicate: 'true'                 // 重複防止フラグ
+            },
+            
+            // 🔧 【追加】Render.com特有の設定
+            transportOptions: {
+                polling: {
+                    extraHeaders: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache',
+                        'X-Client-Id': 'pig-game-' + Date.now()  // 重複防止ヘッダー
+                    }
                 },
-                
-                // 🔧 【追加】Render.com特有の設定
-                transportOptions: {
-                    polling: {
-                        extraHeaders: {
-                            'Cache-Control': 'no-cache',
-                            'Pragma': 'no-cache'
-                        }
-                    },
-                    websocket: {
-                        extraHeaders: {
-                            'Cache-Control': 'no-cache'
-                        }
+                websocket: {
+                    extraHeaders: {
+                        'Cache-Control': 'no-cache',
+                        'X-Client-Id': 'pig-game-' + Date.now()
                     }
                 }
-            };
-
-            console.log('🔧 Socket.io設定 (Render.com v3):', {
-                transports: socketConfig.transports,
-                timeout: socketConfig.timeout,
-                reconnectionAttempts: socketConfig.reconnectionAttempts,
-                upgrade: socketConfig.upgrade
-            });
-            
-            // 既存のSocketがあれば完全に切断
-            if (this.socket) {
-                console.log('🔧 既存Socket切断中...');
-                try {
-                    this.socket.removeAllListeners();
-                    this.socket.disconnect();
-                    this.socket.close();
-                } catch (e) {
-                    console.warn('既存Socket切断時のエラー:', e);
-                }
-                this.socket = null;
             }
+        };
 
-            // 新しいSocket接続を作成
-            this.socket = io(socketConfig);
-
-            console.log('✅ Socket.io インスタンス作成成功 (Render.com対応v3)');
-            this.setupEventListeners();
-            this.setupConnectionMonitoring();
-            
-        } catch (error) {
-            console.error('❌ Socket.io 初期化エラー:', error);
-            UIManager.showError('サーバー接続の初期化に失敗しました');
-            this.isConnecting = false;
+        console.log('🔧 Socket.io設定 (重複防止v4):', {
+            transports: socketConfig.transports,
+            forceNew: socketConfig.forceNew,
+            multiplex: socketConfig.multiplex,
+            timeout: socketConfig.timeout,
+            clientId: socketConfig.query.clientId
+        });
+        
+        // 既存のSocketがあれば完全に切断
+        if (this.socket) {
+            console.log('🔧 既存Socket切断中...');
+            try {
+                this.socket.removeAllListeners();
+                this.socket.disconnect();
+                this.socket.close();
+            } catch (e) {
+                console.warn('既存Socket切断時のエラー:', e);
+            }
+            this.socket = null;
         }
+
+        // 新しいSocket接続を作成
+        this.socket = io(socketConfig);
+        
+        // 🔧 【重要】グローバル参照設定（重複防止）
+        window.globalSocketInstance = this.socket;
+
+        console.log('✅ Socket.io インスタンス作成成功 (重複防止対応v4)');
+        this.setupEventListeners();
+        this.setupConnectionMonitoring();
+        
+    } catch (error) {
+        console.error('❌ Socket.io 初期化エラー:', error);
+        UIManager.showError('サーバー接続の初期化に失敗しました');
+        this.isConnecting = false;
     }
+}
 
     setupConnectionMonitoring() {
         const self = this;
