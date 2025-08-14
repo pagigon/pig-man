@@ -320,32 +320,63 @@ export class RoomManager {
 
     // 🔧 【修正】成功コールバック
     onJoinSuccess(data) {
-        console.log('✅ 参加成功:', data);
+    console.log('✅ 参加成功:', data);
+    
+    try {
+        // 🔧 【重要修正】フラグのみリセット（ゲーム状態は保持）
+        this.isJoining = false;
+        this.isCreating = false;
         
-        try {
-            // 最優先でフラグリセット
-            this.forceResetAllStates();
-            
-            if (!data || typeof data !== 'object') {
-                throw new Error('無効な参加データ');
+        // タイマークリア
+        Object.keys(this.timers).forEach(key => {
+            if (this.timers[key]) {
+                clearTimeout(this.timers[key]);
+                this.timers[key] = null;
             }
-            
-            this.game.roomId = data.roomId;
-            this.game.gameData = data.gameData;
-            this.game.isHost = data.playerInfo?.isHost || false;
-            
-            if (data.playerInfo) {
-                StorageManager.savePlayerInfo(data.playerInfo);
-            }
-
-            UIManager.showError(`ルーム ${data.roomId} に参加しました！`, 'success');
-            
-        } catch (error) {
-            console.error('❌ 参加成功処理エラー:', error);
-            this.forceResetAllStates();
-            UIManager.showError('参加後の処理でエラーが発生しました');
+        });
+        
+        // ボタン状態更新
+        this.updateButtonStates();
+        
+        if (!data || typeof data !== 'object') {
+            throw new Error('無効な参加データ');
         }
+        
+        // 🔧 【重要】ゲーム状態設定（成功確認後）
+        this.game.roomId = data.roomId;
+        this.game.gameData = data.gameData;
+        this.game.isHost = data.playerInfo?.isHost || false;
+        
+        // 🔧 【追加】プレイヤー名設定（成功確認後）
+        if (data.playerInfo && data.playerInfo.playerName) {
+            this.game.myName = data.playerInfo.playerName;
+            UIManager.showPlayerName(this.game.myName);
+        }
+        
+        if (data.playerInfo) {
+            StorageManager.savePlayerInfo(data.playerInfo);
+        }
+
+        // 🔧 【追加】再接続の場合の特別メッセージ
+        if (data.playerInfo?.isReconnection) {
+            UIManager.showError(`ルーム ${data.roomId} に再接続しました！`, 'success');
+        } else {
+            UIManager.showError(`ルーム ${data.roomId} に参加しました！`, 'success');
+        }
+        
+        console.log('✅ 参加処理完全成功 - ゲーム状態保持');
+        
+    } catch (error) {
+        console.error('❌ 参加成功処理エラー:', error);
+        
+        // 🔧 【修正】エラー時のみリセット
+        this.isJoining = false;
+        this.isCreating = false;
+        this.updateButtonStates();
+        
+        UIManager.showError('参加後の処理でエラーが発生しました');
     }
+}
 
     onRoomCreated(data) {
         console.log('✅ ルーム作成成功:', data);
