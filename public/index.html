@@ -317,19 +317,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button id="game-leave-room" class="btn btn-secondary btn-small">豚小屋から一時退出</button>
             </div>
 
-            <!-- チャット -->
-            <div class="collapsible-section">
-                <button class="section-toggle" onclick="toggleSection('chat-section')">
-                    <span>探検隊通信</span> <span class="toggle-icon">▼</span>
-                </button>
-                <div id="chat-section" class="collapsed">
-                    <div id="chat-container" class="chat-container mobile"></div>
-                    <div class="chat-input-container">
-                        <input type="text" id="chat-input" placeholder="探検隊にメッセージ..." maxlength="100">
-                        <button id="send-chat" class="btn btn-small">送信</button>
-                    </div>
-                </div>
-            </div>
+            <!-- チャットセクション修正 -->
+<div class="collapsible-section">
+    <button class="section-toggle" onclick="toggleSection('chat-section')">
+        <span>探検隊通信</span> <span class="toggle-icon">▼</span>
+    </button>
+    <div id="chat-section" class="collapsed">
+        <!-- 🔧 【修正】chat-container のIDを追加 -->
+        <div id="chat-container" class="chat-container mobile"></div>
+        <div class="chat-input-container">
+            <input type="text" id="chat-input" placeholder="探検隊にメッセージ..." maxlength="100">
+            <button id="send-chat" class="btn btn-small">送信</button>
+        </div>
+    </div>
+</div>
         </div>
 
         <!-- 正しいカードリサイクル対応のラウンド開始演出 -->
@@ -339,16 +340,23 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
 
-        <!-- 勝利画面 -->
-        <div id="victory-screen" class="victory-screen">
-            <div class="victory-content">
-                <h2 id="victory-title"></h2>
-                <p id="victory-message"></p>
-                <div id="winners-list" style="margin: 20px 0;">
-                    <!-- JavaScriptで動的に生成されるボタンエリア -->
-                </div>
-            </div>
+
+        <!-- 🔧 【修正】勝利画面のボタンエリア構造 -->
+<div id="victory-screen" class="victory-screen">
+    <div class="victory-content">
+        <h2 id="victory-title"></h2>
+        <p id="victory-message"></p>
+        <div id="winners-list" style="margin: 20px 0;">
+            <!-- JavaScriptで動的に生成されるボタンエリア -->
         </div>
+        <!-- 🔧 【追加】固定のボタンエリア -->
+        <div id="victory-buttons" class="victory-buttons" style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+            <button id="return-to-lobby" class="btn btn-secondary">🏠 ロビーに戻る</button>
+            <button id="restart-game" class="btn btn-primary" style="display: none;">🔄 もう一戦！</button>
+        </div>
+    </div>
+</div>
+        
     </div>
 
     <!-- JavaScript統合版 → ES6モジュール版 -->
