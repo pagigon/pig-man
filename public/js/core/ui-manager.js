@@ -2,89 +2,87 @@
 
 export class UIManager {
     // 🔧 【修正】メッセージ更新処理（ゲームログ表示対応）
-    // UIManager の updateMessages メソッド - 100件対応版
+    static updateMessages(messages) {
+        try {
+            const container = this.safeGetElement('chat-container');
+            if (!container) return;
+            
+            if (!messages || !Array.isArray(messages)) return;
+            
+            // 🔧 【修正】最新100件を表示（20件から100件に拡張）
+            const recentMessages = messages.slice(-100);
+            
+            // 🔧 【追加】パフォーマンス最適化: 大量メッセージ用の仮想スクロール検討
+            // 現在のメッセージ数をログ出力
+            if (recentMessages.length > 50) {
+                console.log(`💬 チャット履歴: ${recentMessages.length}件のメッセージを表示中`);
+            }
+            
+            container.innerHTML = '';
+            recentMessages.forEach(function(msg, index) {
+                try {
+                    if (!msg || typeof msg !== 'object') return;
 
-static updateMessages(messages) {
-    try {
-        const container = this.safeGetElement('chat-container');
-        if (!container) return;
-        
-        if (!messages || !Array.isArray(messages)) return;
-        
-        // 🔧 【修正】最新100件を表示（20件から100件に拡張）
-        const recentMessages = messages.slice(-100);
-        
-        // 🔧 【追加】パフォーマンス最適化: 大量メッセージ用の仮想スクロール検討
-        // 現在のメッセージ数をログ出力
-        if (recentMessages.length > 50) {
-            console.log(`💬 チャット履歴: ${recentMessages.length}件のメッセージを表示中`);
-        }
-        
-        container.innerHTML = '';
-        recentMessages.forEach(function(msg, index) {
-            try {
-                if (!msg || typeof msg !== 'object') return;
-
-                const div = document.createElement('div');
-                
-                // ゲームログの適切な表示処理
-                if (msg.type === 'game-log') {
-                    div.className = 'chat-message game-log';
-                    div.textContent = msg.text || '';
+                    const div = document.createElement('div');
                     
-                    // ゲームログの特別な装飾
-                    if (msg.text && msg.text.includes('♻️')) {
-                        div.style.background = 'rgba(50, 205, 50, 0.2)';
-                        div.style.borderLeft = '4px solid #32CD32';
-                        div.style.fontWeight = 'bold';
-                    } else if (msg.text && msg.text.includes('🐷')) {
-                        div.style.background = 'rgba(255, 215, 0, 0.1)';
-                        div.style.borderLeft = '4px solid #FFD700';
-                    } else if (msg.text && msg.text.includes('💀')) {
-                        div.style.background = 'rgba(220, 20, 60, 0.1)';
-                        div.style.borderLeft = '4px solid #DC143C';
+                    // ゲームログの適切な表示処理
+                    if (msg.type === 'game-log') {
+                        div.className = 'chat-message game-log';
+                        div.textContent = msg.text || '';
+                        
+                        // ゲームログの特別な装飾
+                        if (msg.text && msg.text.includes('♻️')) {
+                            div.style.background = 'rgba(50, 205, 50, 0.2)';
+                            div.style.borderLeft = '4px solid #32CD32';
+                            div.style.fontWeight = 'bold';
+                        } else if (msg.text && msg.text.includes('🐷')) {
+                            div.style.background = 'rgba(255, 215, 0, 0.1)';
+                            div.style.borderLeft = '4px solid #FFD700';
+                        } else if (msg.text && msg.text.includes('💀')) {
+                            div.style.background = 'rgba(220, 20, 60, 0.1)';
+                            div.style.borderLeft = '4px solid #DC143C';
+                        }
+                        
+                    } else if (msg.type === 'player') {
+                        div.className = 'chat-message player';
+                        const playerName = msg.playerName || '名前なし';
+                        const text = msg.text || '';
+                        div.textContent = playerName + ': ' + text;
+                        
+                    } else {
+                        // システムメッセージ
+                        div.className = 'chat-message system';
+                        div.textContent = msg.text || '';
                     }
                     
-                } else if (msg.type === 'player') {
-                    div.className = 'chat-message player';
-                    const playerName = msg.playerName || '名前なし';
-                    const text = msg.text || '';
-                    div.textContent = playerName + ': ' + text;
+                    // 🔧 【追加】タイムスタンプ表示（任意）
+                    if (msg.timestamp && recentMessages.length > 20) {
+                        const timestamp = new Date(msg.timestamp);
+                        const timeStr = timestamp.toLocaleTimeString('ja-JP', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        });
+                        div.title = timeStr; // ホバー時に時刻表示
+                    }
                     
-                } else {
-                    // システムメッセージ
-                    div.className = 'chat-message system';
-                    div.textContent = msg.text || '';
+                    container.appendChild(div);
+                } catch (error) {
+                    console.error('メッセージアイテム作成エラー:', error);
                 }
-                
-                // 🔧 【追加】タイムスタンプ表示（任意）
-                if (msg.timestamp && recentMessages.length > 20) {
-                    const timestamp = new Date(msg.timestamp);
-                    const timeStr = timestamp.toLocaleTimeString('ja-JP', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                    });
-                    div.title = timeStr; // ホバー時に時刻表示
-                }
-                
-                container.appendChild(div);
-            } catch (error) {
-                console.error('メッセージアイテム作成エラー:', error);
+            });
+            
+            // スクロール位置を最下部に移動
+            container.scrollTop = container.scrollHeight;
+            
+            // 🔧 【追加】大量メッセージ時のパフォーマンス警告
+            if (recentMessages.length > 80) {
+                console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
             }
-        });
-        
-        // スクロール位置を最下部に移動
-        container.scrollTop = container.scrollHeight;
-        
-        // 🔧 【追加】大量メッセージ時のパフォーマンス警告
-        if (recentMessages.length > 80) {
-            console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
+            
+        } catch (error) {
+            console.error('メッセージ更新エラー:', error);
         }
-        
-    } catch (error) {
-        console.error('メッセージ更新エラー:', error);
     }
-}
 
     // 🔧 【追加】ラウンド開始表示（リサイクル情報付き）
     static showRoundStartWithRecycle(roundNumber) {
@@ -294,7 +292,7 @@ static updateMessages(messages) {
         }
     }
 
-    // 勝利画面表示（正しいカードリサイクル統計付き）
+    // 🔧 【完全修正】勝利画面表示（固定ボタン対応）
     static showVictoryScreen(gameData) {
         try {
             if (!gameData || typeof gameData !== 'object') {
@@ -377,66 +375,50 @@ static updateMessages(messages) {
                 winnersList.appendChild(winnersDiv);
             }
             
-             // 🔧 【追加】ロビー復帰・連戦ボタンエリア
-        const buttonArea = document.createElement('div');
-        buttonArea.style.cssText = 'margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;';
-        
-        // ロビーに戻るボタン
-        const lobbyBtn = document.createElement('button');
-        lobbyBtn.className = 'btn btn-secondary';
-        lobbyBtn.textContent = '🏠 ロビーに戻る';
-        lobbyBtn.style.minWidth = '140px';
-        
-        lobbyBtn.onclick = function() {
-            console.log('🏠 ロビー復帰ボタンクリック');
-            if (window.pigGame && typeof window.pigGame.onReturnToLobby === 'function') {
-                window.pigGame.onReturnToLobby();
-            } else if (window.pigGame && typeof window.pigGame.returnToLobby === 'function') {
-                window.pigGame.returnToLobby();
-            } else {
-                console.error('❌ pigGame.returnToLobby メソッドが見つかりません');
-                if (window.pigGame && window.pigGame.socketClient) {
-                    window.pigGame.socketClient.returnToLobby();
+            // 🔧 【重要】固定ボタンの表示制御
+            const lobbyBtn = this.safeGetElement('return-to-lobby');
+            const restartBtn = this.safeGetElement('restart-game');
+            
+            if (lobbyBtn) {
+                lobbyBtn.style.display = 'block';
+                // イベントリスナーが重複しないようにクリア
+                lobbyBtn.onclick = null;
+                lobbyBtn.onclick = function() {
+                    console.log('🏠 ロビー復帰ボタンクリック（固定ボタン）');
+                    if (window.pigGame && typeof window.pigGame.returnToLobby === 'function') {
+                        window.pigGame.returnToLobby();
+                    } else {
+                        console.error('❌ pigGame.returnToLobby メソッドが見つかりません');
+                    }
+                };
+            }
+            
+            if (restartBtn) {
+                // ホストのみ連戦ボタンを表示
+                if (window.pigGame && window.pigGame.isHost) {
+                    restartBtn.style.display = 'block';
+                    restartBtn.onclick = null;
+                    restartBtn.onclick = function() {
+                        console.log('🔄 連戦開始ボタンクリック（固定ボタン）');
+                        if (window.pigGame && typeof window.pigGame.restartGame === 'function') {
+                            window.pigGame.restartGame();
+                        } else {
+                            console.error('❌ pigGame.restartGame メソッドが見つかりません');
+                        }
+                    };
+                } else {
+                    restartBtn.style.display = 'none';
                 }
             }
-        };
-        
-        buttonArea.appendChild(lobbyBtn);
-        
-        // 🔧 【追加】連戦ボタン（ホストのみ表示）
-        if (window.pigGame && window.pigGame.isHost) {
-            const restartBtn = document.createElement('button');
-            restartBtn.className = 'btn btn-primary';
-            restartBtn.textContent = '🔄 もう一戦！';
-            restartBtn.style.minWidth = '140px';
             
-            restartBtn.onclick = function() {
-                console.log('🔄 連戦開始ボタンクリック');
-                if (window.pigGame && typeof window.pigGame.onRestartGame === 'function') {
-                    window.pigGame.onRestartGame();
-                } else if (window.pigGame && typeof window.pigGame.restartGame === 'function') {
-                    window.pigGame.restartGame();
-                } else {
-                    console.error('❌ pigGame.restartGame メソッドが見つかりません');
-                    if (window.pigGame && window.pigGame.socketClient) {
-                        window.pigGame.socketClient.restartGame();
-                    }
-                }
-            };
+            screen.style.display = 'flex';
             
-            buttonArea.appendChild(restartBtn);
+            console.log('✅ 勝利画面表示完了（固定ボタン対応）');
+            
+        } catch (error) {
+            console.error('勝利画面表示エラー:', error);
         }
-        
-        winnersList.appendChild(buttonArea);
-        
-        screen.style.display = 'flex';
-        
-        console.log('✅ 勝利画面表示完了（連戦機能付き）');
-        
-    } catch (error) {
-        console.error('勝利画面表示エラー:', error);
     }
-}
 
     // 進行中ゲーム一覧更新（正しいカードリサイクル情報付き）
     static updateOngoingGames(games) {
