@@ -3,11 +3,42 @@ const { setupRoomHandlers, handlePlayerDisconnect, updateRoomList } = require('.
 const { setupGameHandlers } = require('./game-handlers');
 const { setupChatHandlers } = require('./chat-handlers');
 
+
+// server/handlers/connection-handlers.js の setupConnectionHandlers 関数に追加
+
 function setupConnectionHandlers(io) {
     const socketRequestHistory = new Map();
     
+    // 🔧 【追加】クライアント接続管理
+    const clientConnections = new Map(); // clientId -> socketId のマッピング
+    
     io.on('connection', (socket) => {
         console.log('✅ 新しい接続確認:', socket.id);
+        
+        // 🔧 【重要】重複接続チェック
+        const clientId = socket.handshake.query.clientId;
+        const preventDuplicate = socket.handshake.query.preventDuplicate;
+        
+        if (clientId && preventDuplicate === 'true') {
+            console.log('🔍 重複接続チェック:', { clientId, socketId: socket.id });
+            
+            // 既存の同じクライアントIDの接続があるかチェック
+            const existingSocketId = clientConnections.get(clientId);
+            if (existingSocketId && existingSocketId !== socket.id) {
+                const existingSocket = io.sockets.sockets.get(existingSocketId);
+                if (existingSocket && existingSocket.connected) {
+                    console.warn(`⚠️ 重複接続検出: クライアント ${clientId} が既に接続中 (${existingSocketId}) - 古い接続を切断`);
+                    
+                    // 古い接続を切断
+                    existingSocket.emit('error', { message: '新しい接続により切断されました' });
+                    existingSocket.disconnect(true);
+                }
+            }
+            
+            // 新しい接続を記録
+            clientConnections.set(clientId, socket.id);
+            socket.clientId = clientId;
+        }
         
         // Socket毎の要求履歴を初期化
         socketRequestHistory.set(socket.id, {
@@ -23,27 +54,30 @@ function setupConnectionHandlers(io) {
         }, 1000);
         
         // 各種ハンドラーを設定
-        // 各種ハンドラーを設定
         setupRoomHandlers(io, socket, socketRequestHistory);
         setupGameHandlers(io, socket, socketRequestHistory);
         setupChatHandlers(io, socket, socketRequestHistory);
-        
-        // 🔧 【追加】ロビー復帰・連戦機能のハンドラー
         setupLobbyHandlers(io, socket);
         
         // クライアントエラー受信
         socket.on('clientError', (errorInfo) => {
             console.error('クライアントエラー受信:', {
                 socketId: socket.id,
+                clientId: socket.clientId,
                 error: errorInfo,
                 timestamp: new Date().toISOString()
             });
-            // エラー情報をログに記録（本番では外部ログシステムに送信）
         });
         
         // 切断時の処理
         socket.on('disconnect', (reason) => {
             console.log('🔌 切断:', socket.id, 'reason:', reason);
+            
+            // 🔧 【追加】クライアント接続記録削除
+            if (socket.clientId) {
+                clientConnections.delete(socket.clientId);
+                console.log('🗑️ クライアント接続記録削除:', socket.clientId);
+            }
             
             // 履歴削除
             socketRequestHistory.delete(socket.id);
@@ -61,8 +95,27 @@ function setupConnectionHandlers(io) {
         console.log('🎯 Socket接続処理完了:', socket.id);
     });
     
+    // 🔧 【追加】定期的なクライアント接続クリーンアップ
+    setInterval(() => {
+        const currentTime = Date.now();
+        let cleanedCount = 0;
+        
+        for (const [clientId, socketId] of clientConnections) {
+            const socket = io.sockets.sockets.get(socketId);
+            if (!socket || !socket.connected) {
+                clientConnections.delete(clientId);
+                cleanedCount++;
+            }
+        }
+        
+        if (cleanedCount > 0) {
+            console.log(`🧹 クライアント接続記録クリーンアップ: ${cleanedCount}件削除`);
+        }
+    }, 30000); // 30秒ごと
+    
     return socketRequestHistory;
 }
+
 
 // 🔧 【追加】ロビー復帰・連戦機能のハンドラー
 function setupLobbyHandlers(io, socket) {
