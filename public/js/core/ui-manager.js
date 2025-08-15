@@ -48,14 +48,7 @@ export class UIManager {
         // 🔧 【修正】最新100件を表示（20件から100件に拡張）
         const recentMessages = messages.slice(-100);
         
-        // 🔧 【追加】表示前の状態確認
-        console.log(`💬 表示準備: ${recentMessages.length}件のメッセージ`, {
-            containerHTML: container.innerHTML.length,
-            containerVisible: container.offsetHeight > 0,
-            containerDisplay: getComputedStyle(container).display
-        });
-        
-        // 🔧 【追加】パフォーマンス最適化: 大量メッセージ用の仮想スクロール検討
+       // 🔧 【追加】パフォーマンス最適化: 大量メッセージ用の仮想スクロール検討
         // 現在のメッセージ数をログ出力
         if (recentMessages.length > 50) {
             console.log(`💬 チャット履歴: ${recentMessages.length}件のメッセージを表示中`);
@@ -92,9 +85,6 @@ export class UIManager {
                     const text = msg.text || '';
                     div.textContent = playerName + ': ' + text;
                     
-                    // 🔧 【追加】プレイヤーメッセージのデバッグ
-                    console.log(`👤 プレイヤーメッセージ作成: ${playerName}: ${text}`);
-                    
                 } else {
                     // システムメッセージ
                     div.className = 'chat-message system';
@@ -112,15 +102,22 @@ export class UIManager {
                 }
                 
                 container.appendChild(div);
-                
-                // 🔧 【追加】DOM追加確認
-                if (index < 3) { // 最初の3件のみログ出力
-                    console.log(`✅ メッセージ ${index} DOM追加完了:`, div.textContent);
-                }
-                
             } catch (error) {
                 console.error('メッセージアイテム作成エラー:', error);
             }
+        });
+        
+        // スクロール位置を最下部に移動
+        container.scrollTop = container.scrollHeight;
+        
+        // 🔧 【追加】大量メッセージ時のパフォーマンス警告
+        if (recentMessages.length > 80) {
+            console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
+        }
+        
+    } catch (error) {
+        console.error('メッセージ更新エラー:', error);
+    }
         });
         
         // スクロール位置を最下部に移動
