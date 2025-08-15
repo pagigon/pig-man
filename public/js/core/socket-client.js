@@ -1,4 +1,4 @@
-// public/js/core/socket-client.js - 完全版（再接続システム対応 + チャット・ラウンド開始修正）
+// public/js/core/socket-client.js - 完全版（再接続システム対応）
 
 import { UIManager } from './ui-manager.js';
 
@@ -10,103 +10,90 @@ export class SocketClient {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.connectionTimeout = null;
-        // 🔧 【修正】各タブ/ウィンドウで独立したclientIdを生成
-    this.clientId = 'pig-game-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) + '-' + Math.floor(Math.random() * 10000);
-    
-    // 🔧 【追加】複数タブサポート
-    this.tabId = 'tab-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-    
-    // 🔧 【追加】再接続管理
-    this.lastDisconnectReason = null;
-    this.reconnectTimer = null;
-    this.isInGame = false; // ゲーム中フラグ
-    this.savedRoomData = null; // ルーム情報保存
-    
-    this.initialize();
-}
-
-    // 🔧 【修正】Socket.io設定で重複防止を無効化
-initialize() {
-    console.log('🔧 Socket.io 初期化開始（複数タブ対応版）');
-    
-    try {
-        this.isConnecting = true;
+        this.clientId = 'pig-game-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         
-        // Socket.io設定
-        const socketConfig = {
-            transports: ['websocket', 'polling'],
-            timeout: 30000,
-            forceNew: true,
-            multiplex: false,
-            upgrade: true,
-            rememberUpgrade: true,
-            autoConnect: true,
-            query: {
-                clientId: this.clientId,
-                tabId: this.tabId,
-                preventDuplicate: 'false', // 🔧 【重要】重複防止を無効化
-                timestamp: Date.now(),
-                allowMultipleTabs: 'true' // 🔧 【追加】複数タブ許可フラグ
-            },
-            transportOptions: {
-                polling: {
-                    extraHeaders: {
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache',
-                        'X-Client-Id': this.clientId,
-                        'X-Tab-Id': this.tabId // 🔧 【追加】タブID
-                    }
+        // 🔧 【追加】再接続管理
+        this.lastDisconnectReason = null;
+        this.reconnectTimer = null;
+        this.isInGame = false; // ゲーム中フラグ
+        this.savedRoomData = null; // ルーム情報保存
+        
+        this.initialize();
+    }
+    
+    // 🔧 【追加】初期化メソッド
+    initialize() {
+        console.log('🔧 Socket.io 初期化開始（再接続対応版）');
+        
+        try {
+            this.isConnecting = true;
+            
+            // Socket.io設定
+            const socketConfig = {
+                transports: ['websocket', 'polling'],
+                timeout: 30000,
+                forceNew: true,
+                multiplex: false,
+                upgrade: true,
+                rememberUpgrade: true,
+                autoConnect: true,
+                query: {
+                    clientId: this.clientId,
+                    preventDuplicate: 'true',
+                    timestamp: Date.now()
                 },
-                websocket: {
-                    extraHeaders: {
-                        'Cache-Control': 'no-cache',
-                        'X-Client-Id': this.clientId,
-                        'X-Tab-Id': this.tabId // 🔧 【追加】タブID
+                transportOptions: {
+                    polling: {
+                        extraHeaders: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache',
+                            'X-Client-Id': this.clientId
+                        }
+                    },
+                    websocket: {
+                        extraHeaders: {
+                            'Cache-Control': 'no-cache',
+                            'X-Client-Id': this.clientId
+                        }
                     }
                 }
+            };
+
+            console.log('🔧 Socket.io設定:', {
+                transports: socketConfig.transports,
+                forceNew: socketConfig.forceNew,
+                clientId: socketConfig.query.clientId
+            });
+            
+            // 既存のSocketがあれば完全に切断
+            if (this.socket) {
+                console.log('🔧 既存Socket切断中...');
+                try {
+                    this.socket.removeAllListeners();
+                    this.socket.disconnect();
+                    this.socket.close();
+                } catch (e) {
+                    console.warn('既存Socket切断時のエラー:', e);
+                }
+                this.socket = null;
             }
-        };
 
-        console.log('🔧 Socket.io設定（複数タブ対応）:', {
-            transports: socketConfig.transports,
-            forceNew: socketConfig.forceNew,
-            clientId: socketConfig.query.clientId,
-            tabId: socketConfig.query.tabId,
-            preventDuplicate: socketConfig.query.preventDuplicate
-        });
-        
-        // 既存のSocketがあれば完全に切断
-        if (this.socket) {
-            console.log('🔧 既存Socket切断中...');
-            try {
-                this.socket.removeAllListeners();
-                this.socket.disconnect();
-                this.socket.close();
-            } catch (e) {
-                console.warn('既存Socket切断時のエラー:', e);
-            }
-            this.socket = null;
+            // 新しいSocket接続を作成
+            this.socket = io(socketConfig);
+            
+            // 🔧 【重要】グローバル参照設定（重複防止）
+            window.globalSocketInstance = this.socket;
+
+            console.log('✅ Socket.io インスタンス作成成功（再接続対応版）');
+            this.setupEventListeners();
+            this.setupConnectionMonitoring();
+            
+        } catch (error) {
+            console.error('❌ Socket.io 初期化エラー:', error);
+            UIManager.showError('サーバー接続の初期化に失敗しました');
+            this.isConnecting = false;
         }
-
-        // 新しいSocket接続を作成
-        this.socket = io(socketConfig);
-        
-        // 🔧 【修正】グローバル参照設定（タブIDを含む）
-        if (!window.globalSocketInstances) {
-            window.globalSocketInstances = new Map();
-        }
-        window.globalSocketInstances.set(this.tabId, this.socket);
-
-        console.log('✅ Socket.io インスタンス作成成功（複数タブ対応版）');
-        this.setupEventListeners();
-        this.setupConnectionMonitoring();
-        
-    } catch (error) {
-        console.error('❌ Socket.io 初期化エラー:', error);
-        UIManager.showError('サーバー接続の初期化に失敗しました');
-        this.isConnecting = false;
     }
-}
     
     // 🔧 【追加】接続監視
     setupConnectionMonitoring() {
@@ -353,7 +340,92 @@ initialize() {
         console.log('✅ Socket イベントリスナー設定完了（再接続対応）');
     }
     
-    // 🔧 【修正】その他のイベントリスナー設定（完全版）
+    // 🔧 【追加】スケジュール再接続
+    scheduleReconnect(delay = 3000) {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+        }
+        
+        this.reconnectTimer = setTimeout(() => {
+            if (!this.isConnected() && !this.isConnecting) {
+                console.log('🔄 スケジュール再接続実行');
+                this.forceReconnect();
+            }
+        }, delay);
+    }
+    
+    // 🔧 【修正】強制再接続
+    forceReconnect() {
+        console.log('🔄 強制再接続開始');
+        
+        if (this.isConnecting) {
+            console.warn('⚠️ 既に接続処理中');
+            return;
+        }
+        
+        this.isConnecting = true;
+        
+        try {
+            // 既存接続を完全に切断
+            if (this.socket) {
+                this.socket.removeAllListeners();
+                this.socket.disconnect();
+                this.socket.close();
+                this.socket = null;
+            }
+            
+            // 新しい接続を作成
+            setTimeout(() => {
+                this.initialize();
+            }, 1000);
+            
+        } catch (error) {
+            console.error('❌ 強制再接続エラー:', error);
+            this.isConnecting = false;
+            UIManager.showError('再接続に失敗しました');
+        }
+    }
+    
+    // 🔧 【追加】ゲーム情報の保存/取得
+    saveGameInfo(gameInfo) {
+        try {
+            localStorage.setItem('pigGame_reconnectInfo', JSON.stringify(gameInfo));
+            console.log('💾 ゲーム情報保存:', gameInfo);
+        } catch (error) {
+            console.error('❌ ゲーム情報保存エラー:', error);
+        }
+    }
+    
+    getSavedGameInfo() {
+        try {
+            const data = localStorage.getItem('pigGame_reconnectInfo');
+            if (!data) return null;
+            
+            const gameInfo = JSON.parse(data);
+            
+            // 30分以上古い情報は削除
+            if (Date.now() - gameInfo.timestamp > 30 * 60 * 1000) {
+                this.clearSavedGameInfo();
+                return null;
+            }
+            
+            return gameInfo;
+        } catch (error) {
+            console.error('❌ ゲーム情報取得エラー:', error);
+            return null;
+        }
+    }
+    
+    clearSavedGameInfo() {
+        try {
+            localStorage.removeItem('pigGame_reconnectInfo');
+            console.log('🗑️ ゲーム情報クリア');
+        } catch (error) {
+            console.error('❌ ゲーム情報クリアエラー:', error);
+        }
+    }
+    
+    // 🔧 【修正】その他のイベントリスナー設定
     setupOtherEventListeners() {
         const self = this;
         
@@ -477,30 +549,6 @@ initialize() {
             self.clearSavedGameInfo(); // ゲーム終了時は保存情報をクリア
         });
         
-        // 🔧 【修正】チャットメッセージ受信（正しいイベント名）
-        this.socket.on('newMessage', function(messages) {
-            console.log('💬 チャットメッセージ受信:', messages);
-            try {
-                if (messages && Array.isArray(messages)) {
-                    UIManager.updateMessages(messages);
-                }
-            } catch (error) {
-                console.error('チャットメッセージ処理エラー:', error);
-            }
-        });
-        
-        // 🔧 【追加】ラウンド開始イベント
-        this.socket.on('roundStart', function(roundNumber) {
-            console.log('🎮 ラウンド開始イベント受信:', roundNumber);
-            try {
-                // UIManagerでラウンド開始表示を実行
-                UIManager.showRoundStartWithRecycle(roundNumber);
-                console.log(`✅ ラウンド ${roundNumber} 開始表示完了`);
-            } catch (error) {
-                console.error('ラウンド開始表示エラー:', error);
-            }
-        });
-        
         // 🔧 【追加】切断プレイヤー待機の処理
         this.socket.on('waitingForReconnect', function(data) {
             console.log('⏸️ プレイヤー切断により待機中:', data);
@@ -563,91 +611,6 @@ initialize() {
         });
     }
     
-    // 🔧 【追加】スケジュール再接続
-    scheduleReconnect(delay = 3000) {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-        }
-        
-        this.reconnectTimer = setTimeout(() => {
-            if (!this.isConnected() && !this.isConnecting) {
-                console.log('🔄 スケジュール再接続実行');
-                this.forceReconnect();
-            }
-        }, delay);
-    }
-    
-    // 🔧 【修正】強制再接続
-    forceReconnect() {
-        console.log('🔄 強制再接続開始');
-        
-        if (this.isConnecting) {
-            console.warn('⚠️ 既に接続処理中');
-            return;
-        }
-        
-        this.isConnecting = true;
-        
-        try {
-            // 既存接続を完全に切断
-            if (this.socket) {
-                this.socket.removeAllListeners();
-                this.socket.disconnect();
-                this.socket.close();
-                this.socket = null;
-            }
-            
-            // 新しい接続を作成
-            setTimeout(() => {
-                this.initialize();
-            }, 1000);
-            
-        } catch (error) {
-            console.error('❌ 強制再接続エラー:', error);
-            this.isConnecting = false;
-            UIManager.showError('再接続に失敗しました');
-        }
-    }
-    
-    // 🔧 【追加】ゲーム情報の保存/取得（再接続用）
-    saveGameInfo(gameInfo) {
-        try {
-            localStorage.setItem('pigGame_reconnectInfo', JSON.stringify(gameInfo));
-            console.log('💾 ゲーム情報保存:', gameInfo);
-        } catch (error) {
-            console.error('❌ ゲーム情報保存エラー:', error);
-        }
-    }
-    
-    getSavedGameInfo() {
-        try {
-            const data = localStorage.getItem('pigGame_reconnectInfo');
-            if (!data) return null;
-            
-            const gameInfo = JSON.parse(data);
-            
-            // 30分以上古い情報は削除
-            if (Date.now() - gameInfo.timestamp > 30 * 60 * 1000) {
-                this.clearSavedGameInfo();
-                return null;
-            }
-            
-            return gameInfo;
-        } catch (error) {
-            console.error('❌ ゲーム情報取得エラー:', error);
-            return null;
-        }
-    }
-    
-    clearSavedGameInfo() {
-        try {
-            localStorage.removeItem('pigGame_reconnectInfo');
-            console.log('🗑️ ゲーム情報クリア');
-        } catch (error) {
-            console.error('❌ ゲーム情報クリアエラー:', error);
-        }
-    }
-    
     // 🔧 【追加】Transport名取得
     getTransportName() {
         try {
@@ -704,6 +667,11 @@ initialize() {
         
         if (!playerName || playerName.trim().length === 0) {
             UIManager.showError('プレイヤー名を入力してください');
+            return false;
+        }
+        
+        if (playerName.trim().length > 20) {
+            UIManager.showError('プレイヤー名は20文字以内で入力してください');
             return false;
         }
         
@@ -792,7 +760,6 @@ initialize() {
         return this.emit('selectCard', { targetPlayerId, cardIndex });
     }
 
-    // 🔧 【修正】チャット送信（正しいイベント名・データ形式）
     sendChatMessage(message) {
         console.log('💬 チャット送信:', message);
         
@@ -800,13 +767,12 @@ initialize() {
             return false;
         }
         
-        if (message.trim().length > 100) { // サーバー側に合わせて100文字制限
-            UIManager.showError('メッセージは100文字以内で入力してください');
+        if (message.trim().length > 200) {
+            UIManager.showError('メッセージは200文字以内で入力してください');
             return false;
         }
         
-        // 🔧 【修正】サーバー側と一致するイベント名とデータ形式
-        return this.emit('sendChat', message.trim());
+        return this.emit('chatMessage', { message: message.trim() });
     }
     
     // 状態確認メソッド
