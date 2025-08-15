@@ -12,10 +12,21 @@ export class UIManager {
     });
     
     try {
-        // 🔧 【追加】チャットセクション自動展開
+        const container = this.safeGetElement('chat-container');
+        if (!container) {
+            // 🔧 【追加】詳細なエラー情報
+            console.error('❌ chat-container が見つかりません。DOM状況:', {
+                byId: !!document.getElementById('chat-container'),
+                byClass: document.getElementsByClassName('chat-container').length,
+                allIds: Array.from(document.querySelectorAll('[id]')).map(el => el.id)
+            });
+            return;
+        }
+        
+        // 🔧 【追加】チャットセクション展開状態の確認
         const chatSection = document.getElementById('chat-section');
         if (chatSection && chatSection.classList.contains('collapsed')) {
-            console.log('📂 チャットセクションを自動展開中...');
+            console.log('📂 チャットセクションが閉じています - 自動展開中...');
             
             // toggleSection関数を安全に呼び出し
             if (typeof window.toggleSection === 'function') {
@@ -32,28 +43,8 @@ export class UIManager {
             }
         }
         
-        const container = this.safeGetElement('chat-container');
-        if (!container) {
-            // 🔧 【追加】詳細なエラー情報
-            console.error('❌ chat-container が見つかりません。DOM状況:', {
-                byId: !!document.getElementById('chat-container'),
-                byClass: document.getElementsByClassName('chat-container').length,
-                allIds: Array.from(document.querySelectorAll('[id]')).map(el => el.id)
-            });
-            return;
-        }
-        
         if (!messages || !Array.isArray(messages)) return;
         
-        // 🔧 【追加】チャットセクション展開状態の確認
-        const chatSection = document.getElementById('chat-section');
-        if (chatSection && chatSection.classList.contains('collapsed')) {
-            console.log('📂 チャットセクションが閉じています - 手動で開いてください');
-        }
-        
-        if (!messages || !Array.isArray(messages)) return;
-        
-
         // 🔧 【修正】最新100件を表示（20件から100件に拡張）
         const recentMessages = messages.slice(-100);
         
