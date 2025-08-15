@@ -3,143 +3,86 @@
 export class UIManager {
     // 🔧 【修正】メッセージ更新処理（ゲームログ表示対応）
     static updateMessages(messages) {
-    // 🔧 【追加】デバッグ情報のみ
-    console.log('💬 updateMessages デバッグ:', { 
-        messages: messages,
-        isArray: Array.isArray(messages),
-        length: messages ? messages.length : 0,
-        containerExists: !!this.safeGetElement('chat-container')
-    });
-    
-    try {
-        const container = this.safeGetElement('chat-container');
-        if (!container) {
-            // 🔧 【追加】詳細なエラー情報
-            console.error('❌ chat-container が見つかりません。DOM状況:', {
-                byId: !!document.getElementById('chat-container'),
-                byClass: document.getElementsByClassName('chat-container').length,
-                allIds: Array.from(document.querySelectorAll('[id]')).map(el => el.id)
-            });
-            return;
-        }
-        
-        // 🔧 【追加】チャットセクション展開状態の確認
-        const chatSection = document.getElementById('chat-section');
-        if (chatSection && chatSection.classList.contains('collapsed')) {
-            console.log('📂 チャットセクションが閉じています - 自動展開中...');
+        try {
+            const container = this.safeGetElement('chat-container');
+            if (!container) return;
             
-            // toggleSection関数を安全に呼び出し
-            if (typeof window.toggleSection === 'function') {
-                window.toggleSection('chat-section');
-                console.log('✅ toggleSection関数でチャットセクション展開');
-            } else {
-                // 手動でクラス操作
-                chatSection.classList.remove('collapsed');
-                const toggleIcon = chatSection.parentElement.querySelector('.toggle-icon');
-                if (toggleIcon) {
-                    toggleIcon.textContent = '▲';
-                }
-                console.log('✅ 手動でチャットセクション展開');
+            if (!messages || !Array.isArray(messages)) return;
+            
+            // 🔧 【修正】最新100件を表示（20件から100件に拡張）
+            const recentMessages = messages.slice(-100);
+            
+            // 🔧 【追加】パフォーマンス最適化: 大量メッセージ用の仮想スクロール検討
+            // 現在のメッセージ数をログ出力
+            if (recentMessages.length > 50) {
+                console.log(`💬 チャット履歴: ${recentMessages.length}件のメッセージを表示中`);
             }
-        }
-        
-        if (!messages || !Array.isArray(messages)) return;
-        
-        // 🔧 【修正】最新100件を表示（20件から100件に拡張）
-        const recentMessages = messages.slice(-100);
-        
-       // 🔧 【追加】パフォーマンス最適化: 大量メッセージ用の仮想スクロール検討
-        // 現在のメッセージ数をログ出力
-        if (recentMessages.length > 50) {
-            console.log(`💬 チャット履歴: ${recentMessages.length}件のメッセージを表示中`);
-        }
-        
-        container.innerHTML = '';
-        recentMessages.forEach(function(msg, index) {
-            try {
-                if (!msg || typeof msg !== 'object') return;
+            
+            container.innerHTML = '';
+            recentMessages.forEach(function(msg, index) {
+                try {
+                    if (!msg || typeof msg !== 'object') return;
 
-                const div = document.createElement('div');
-                
-                // ゲームログの適切な表示処理
-                if (msg.type === 'game-log') {
-                    div.className = 'chat-message game-log';
-                    div.textContent = msg.text || '';
+                    const div = document.createElement('div');
                     
-                    // ゲームログの特別な装飾
-                    if (msg.text && msg.text.includes('♻️')) {
-                        div.style.background = 'rgba(50, 205, 50, 0.2)';
-                        div.style.borderLeft = '4px solid #32CD32';
-                        div.style.fontWeight = 'bold';
-                    } else if (msg.text && msg.text.includes('🐷')) {
-                        div.style.background = 'rgba(255, 215, 0, 0.1)';
-                        div.style.borderLeft = '4px solid #FFD700';
-                    } else if (msg.text && msg.text.includes('💀')) {
-                        div.style.background = 'rgba(220, 20, 60, 0.1)';
-                        div.style.borderLeft = '4px solid #DC143C';
+                    // ゲームログの適切な表示処理
+                    if (msg.type === 'game-log') {
+                        div.className = 'chat-message game-log';
+                        div.textContent = msg.text || '';
+                        
+                        // ゲームログの特別な装飾
+                        if (msg.text && msg.text.includes('♻️')) {
+                            div.style.background = 'rgba(50, 205, 50, 0.2)';
+                            div.style.borderLeft = '4px solid #32CD32';
+                            div.style.fontWeight = 'bold';
+                        } else if (msg.text && msg.text.includes('🐷')) {
+                            div.style.background = 'rgba(255, 215, 0, 0.1)';
+                            div.style.borderLeft = '4px solid #FFD700';
+                        } else if (msg.text && msg.text.includes('💀')) {
+                            div.style.background = 'rgba(220, 20, 60, 0.1)';
+                            div.style.borderLeft = '4px solid #DC143C';
+                        }
+                        
+                    } else if (msg.type === 'player') {
+                        div.className = 'chat-message player';
+                        const playerName = msg.playerName || '名前なし';
+                        const text = msg.text || '';
+                        div.textContent = playerName + ': ' + text;
+                        
+                    } else {
+                        // システムメッセージ
+                        div.className = 'chat-message system';
+                        div.textContent = msg.text || '';
                     }
                     
-                } else if (msg.type === 'player') {
-                    div.className = 'chat-message player';
-                    const playerName = msg.playerName || '名前なし';
-                    const text = msg.text || '';
-                    div.textContent = playerName + ': ' + text;
+                    // 🔧 【追加】タイムスタンプ表示（任意）
+                    if (msg.timestamp && recentMessages.length > 20) {
+                        const timestamp = new Date(msg.timestamp);
+                        const timeStr = timestamp.toLocaleTimeString('ja-JP', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        });
+                        div.title = timeStr; // ホバー時に時刻表示
+                    }
                     
-                } else {
-                    // システムメッセージ
-                    div.className = 'chat-message system';
-                    div.textContent = msg.text || '';
+                    container.appendChild(div);
+                } catch (error) {
+                    console.error('メッセージアイテム作成エラー:', error);
                 }
-                
-                // 🔧 【追加】タイムスタンプ表示（任意）
-                if (msg.timestamp && recentMessages.length > 20) {
-                    const timestamp = new Date(msg.timestamp);
-                    const timeStr = timestamp.toLocaleTimeString('ja-JP', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                    });
-                    div.title = timeStr; // ホバー時に時刻表示
-                }
-                
-                container.appendChild(div);
-            } catch (error) {
-                console.error('メッセージアイテム作成エラー:', error);
+            });
+            
+            // スクロール位置を最下部に移動
+            container.scrollTop = container.scrollHeight;
+            
+            // 🔧 【追加】大量メッセージ時のパフォーマンス警告
+            if (recentMessages.length > 80) {
+                console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
             }
-        });
-        
-        // スクロール位置を最下部に移動
-        container.scrollTop = container.scrollHeight;
-        
-        // 🔧 【追加】大量メッセージ時のパフォーマンス警告
-        if (recentMessages.length > 80) {
-            console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
+            
+        } catch (error) {
+            console.error('メッセージ更新エラー:', error);
         }
-        
-    } catch (error) {
-        console.error('メッセージ更新エラー:', error);
     }
-        });
-        
-        // スクロール位置を最下部に移動
-        container.scrollTop = container.scrollHeight;
-        
-        // 🔧 【追加】最終確認
-        console.log(`✅ チャット更新完了:`, {
-            表示件数: recentMessages.length,
-            DOM子要素数: container.children.length,
-            scrollHeight: container.scrollHeight,
-            containerHeight: container.offsetHeight
-        });
-        
-        // 🔧 【追加】大量メッセージ時のパフォーマンス警告
-        if (recentMessages.length > 80) {
-            console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
-        }
-        
-    } catch (error) {
-        console.error('メッセージ更新エラー:', error);
-    }
-}
 
     // 🔧 【追加】ラウンド開始表示（リサイクル情報付き）
     static showRoundStartWithRecycle(roundNumber) {
@@ -647,161 +590,146 @@ export class UIManager {
     }
 
     static updateRoomList(rooms) {
-    try {
-        const container = this.safeGetElement('room-list-container');
-        if (!container) return;
-        
-        container.innerHTML = '';
+        try {
+            const container = this.safeGetElement('room-list-container');
+            if (!container) return;
+            
+            container.innerHTML = '';
 
-        if (!rooms || !Array.isArray(rooms) || rooms.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #87CEEB;">現在開設中のルームはありません</p>';
-            return;
-        }
-
-        const self = this;
-        rooms.forEach(function(room, index) {
-            try {
-                if (!room || typeof room !== 'object') return;
-
-                const roomDiv = document.createElement('div');
-                roomDiv.className = 'room-item';
-                
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'room-item-info';
-                
-                const roomId = room.id || 'ROOM' + index;
-                const hostName = room.hostName || '不明';
-                const playerCount = room.playerCount || 0;
-                const hasPassword = room.hasPassword || false;
-                
-                infoDiv.innerHTML = '<strong>ID: ' + roomId + '</strong>' +
-                                   (hasPassword ? '<span class="password-icon">🔒</span>' : '') +
-                                   '<br>ホスト: ' + hostName +
-                                   '<br>プレイヤー: ' + playerCount + '/4';
-                
-                const joinButton = document.createElement('button');
-                joinButton.className = 'btn btn-primary';
-                joinButton.textContent = '参加する';
-                joinButton.onclick = function() {
-                    try {
-                        // ルームIDを自動入力
-                        const roomInput = document.getElementById('room-id-input');
-                        if (roomInput) {
-                            roomInput.value = roomId;
-                        }
-                        
-                        // 参加セクションを展開
-                        if (typeof window.toggleSection === 'function') {
-                            const joinSection = document.getElementById('join-section');
-                            if (joinSection && joinSection.classList.contains('collapsed')) {
-                                window.toggleSection('join-section');
-                            }
-                        }
-                        
-                        // 🔧 【追加】フォーカスを名前入力欄に移動
-                        const nameInput = document.getElementById('player-name-join');
-                        if (nameInput) {
-                            nameInput.focus();
-                        }
-                        
-                    } catch (error) {
-                        console.error('ルーム参加ボタンエラー:', error);
-                    }
-                };
-                
-                roomDiv.appendChild(infoDiv);
-                roomDiv.appendChild(joinButton);
-                container.appendChild(roomDiv);
-                
-            } catch (error) {
-                console.error('ルームアイテム作成エラー:', error);
+            if (!rooms || !Array.isArray(rooms) || rooms.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #87CEEB;">現在開設中のルームはありません</p>';
+                return;
             }
-        });
-        
-        console.log(`✅ ルーム一覧更新完了: ${rooms.length}件`);
-        
-    } catch (error) {
-        console.error('ルーム一覧更新エラー:', error);
-    }
-}
 
-static updateOngoingGames(games) {
-    try {
-        const container = this.safeGetElement('ongoing-games-container');
-        if (!container) return;
-        
-        container.innerHTML = '';
+            const self = this;
+            rooms.forEach(function(room, index) {
+                try {
+                    if (!room || typeof room !== 'object') return;
 
-        if (!games || !Array.isArray(games) || games.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #87CEEB;">現在進行中のゲームはありません</p>';
-            return;
-        }
-
-        games.forEach(function(game, index) {
-            try {
-                if (!game || typeof game !== 'object') return;
-
-                const gameDiv = document.createElement('div');
-                gameDiv.className = 'room-item';
-                
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'room-item-info';
-                
-                const roomId = game.id || 'GAME' + index;
-                const hostName = game.hostName || '不明';
-                const playerCount = game.playerCount || 0;
-                const currentRound = game.currentRound || 1;
-                
-                infoDiv.innerHTML = '<strong>ID: ' + roomId + '</strong>' +
-                                   '<br>ホスト: ' + hostName +
-                                   '<br>プレイヤー: ' + playerCount + '/4' +
-                                   '<br>ラウンド: ' + currentRound + '/4';
-                
-                const spectateButton = document.createElement('button');
-                spectateButton.className = 'btn btn-secondary';
-                spectateButton.textContent = '観戦する';
-                spectateButton.onclick = function() {
-                    try {
-                        // ルームIDを自動入力
-                        const roomInput = document.getElementById('spectate-room-id');
-                        if (roomInput) {
-                            roomInput.value = roomId;
-                        }
-                        
-                        // 観戦セクションを展開
-                        if (typeof window.toggleSection === 'function') {
-                            const spectateSection = document.getElementById('spectate-section');
-                            if (spectateSection && spectateSection.classList.contains('collapsed')) {
-                                window.toggleSection('spectate-section');
+                    const roomDiv = document.createElement('div');
+                    roomDiv.className = 'room-item';
+                    
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'room-item-info';
+                    
+                    const roomId = room.id || 'ROOM' + index;
+                    const hostName = room.hostName || '不明';
+                    const playerCount = room.playerCount || 0;
+                    const hasPassword = room.hasPassword || false;
+                    
+                    infoDiv.innerHTML = '<strong>ID: ' + roomId + '</strong>' +
+                                       (hasPassword ? '<span class="password-icon">🔒</span>' : '') +
+                                       '<br>ホスト: ' + hostName + ' | プレイヤー: ' + playerCount + '/10';
+                    
+                    const joinBtn = document.createElement('button');
+                    joinBtn.className = 'btn btn-small';
+                    joinBtn.textContent = '参加';
+                    
+                    joinBtn.onclick = function() {
+                        try {
+                            const roomIdInput = self.safeGetElement('room-id-input');
+                            if (roomIdInput) {
+                                roomIdInput.value = roomId;
                             }
+                            
+                            if (hasPassword) {
+                                const passwordGroup = self.safeGetElement('join-password-group');
+                                if (passwordGroup) {
+                                    passwordGroup.style.display = 'block';
+                                }
+                            }
+                            
+                            const playerNameInput = self.safeGetElement('player-name-join');
+                            if (playerNameInput) {
+                                playerNameInput.focus();
+                            }
+                        } catch (error) {
+                            console.error('ルーム参加ボタンクリックエラー:', error);
                         }
-                        
-                        // 🔧 【追加】フォーカスを名前入力欄に移動
-                        const nameInput = document.getElementById('spectator-name');
-                        if (nameInput) {
-                            nameInput.focus();
-                        }
-                        
-                    } catch (error) {
-                        console.error('観戦ボタンエラー:', error);
-                    }
-                };
-                
-                gameDiv.appendChild(infoDiv);
-                gameDiv.appendChild(spectateButton);
-                container.appendChild(gameDiv);
-                
-            } catch (error) {
-                console.error('ゲームアイテム作成エラー:', error);
-            }
-        });
-        
-        console.log(`✅ 進行中ゲーム一覧更新完了: ${games.length}件`);
-        
-    } catch (error) {
-        console.error('進行中ゲーム一覧更新エラー:', error);
+                    };
+                    
+                    roomDiv.appendChild(infoDiv);
+                    roomDiv.appendChild(joinBtn);
+                    container.appendChild(roomDiv);
+                } catch (error) {
+                    console.error('ルームアイテム作成エラー:', error);
+                }
+            });
+        } catch (error) {
+            console.error('ルーム一覧更新エラー:', error);
+        }
     }
-}
+
+    static showScreen(screenName) {
+        try {
+            const screens = ['lobby', 'room-info', 'game-board', 'victory-screen'];
+            
+            const self = this;
+            screens.forEach(function(screen) {
+                const element = self.safeGetElement(screen);
+                if (element) {
+                    element.style.display = 'none';
+                }
+            });
+            
+            if (screenName) {
+                const screen = this.safeGetElement(screenName);
+                if (screen) {
+                    screen.style.display = 'block';
+                }
+            }
+        } catch (error) {
+            console.error('画面切り替えエラー:', error);
+        }
+    }
+
+    static updatePlayersList(players, hostId) {
+        try {
+            const container = this.safeGetElement('players-list');
+            const countEl = this.safeGetElement('player-count');
+            
+            if (!container || !countEl) return;
+            
+            if (!players || !Array.isArray(players)) {
+                container.innerHTML = '<p>プレイヤー情報を取得できませんでした</p>';
+                countEl.textContent = '0';
+                return;
+            }
+            
+            const count = players.filter(function(p) { return p && p.connected; }).length;
+            countEl.textContent = count;
+            
+            container.innerHTML = '';
+            players.forEach(function(player) {
+                try {
+                    if (!player || typeof player !== 'object') return;
+
+                    const div = document.createElement('div');
+                    div.className = 'player-item';
+                    
+                    if (player.id === hostId) {
+                        div.classList.add('host');
+                    }
+                    
+                    const status = player.connected ? '🟢' : '🔴';
+                    const playerName = player.name || '名前なし';
+                    const disconnectedText = player.connected ? '' : ' (切断中)';
+                    div.textContent = status + ' ' + playerName + disconnectedText;
+                    
+                    if (!player.connected) {
+                        div.style.opacity = '0.6';
+                        div.style.fontStyle = 'italic';
+                    }
+                    
+                    container.appendChild(div);
+                } catch (error) {
+                    console.error('プレイヤーアイテム作成エラー:', error);
+                }
+            });
+        } catch (error) {
+            console.error('プレイヤー一覧更新エラー:', error);
+        }
+    }
 
     // ユーティリティメソッド
     static safeGetElement(id) {
