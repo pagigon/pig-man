@@ -184,7 +184,7 @@ if (window.pigGameInitialized) {
                 return true;
             };
             
-            // 🔧 【修正】動的ボタンのフォールバック処理（イベント委譲で重複防止）
+            // 🔧 【修正】動的ボタンのフォールバック処理（誤クリック防止強化）
             let lastClickTime = 0;
             const clickCooldown = 1000; // 1秒のクールダウン
             
@@ -213,12 +213,30 @@ if (window.pigGameInitialized) {
                 if (isButton && isInVictoryScreen && target.textContent) {
                     const buttonText = target.textContent.trim();
                     
+                    // 🔧 【追加】安全性チェック
+                    if (window.disableDynamicButtons) {
+                        console.log('🔧 動的ボタン処理が無効化されています');
+                        return;
+                    }
+                    
+                    // 🔧 【追加】固定ボタンとの競合チェック
+                    if (window.validateButtonClick && !window.validateButtonClick(target)) {
+                        return;
+                    }
+                    
                     // より具体的なテキストマッチング
                     if (buttonText === 'ロビーに戻る' || buttonText === '🏠 ロビーに戻る') {
                         e.preventDefault();
+                        e.stopPropagation();
                         lastClickTime = now;
                         
                         console.log('🏠 フォールバック: 動的ロビー復帰ボタンクリック');
+                        
+                        // 🔧 【追加】確認ダイアログ（誤クリック防止）
+                        if (!confirm('ロビーに戻りますか？\n（ゲームが終了します）')) {
+                            return;
+                        }
+                        
                         if (window.pigGame && typeof window.pigGame.returnToLobby === 'function') {
                             window.pigGame.returnToLobby();
                         } else if (window.pigGame && typeof window.pigGame.onReturnToLobby === 'function') {
@@ -235,9 +253,16 @@ if (window.pigGameInitialized) {
                     
                     if (buttonText === 'もう一戦！' || buttonText === '🔄 もう一戦！') {
                         e.preventDefault();
+                        e.stopPropagation();
                         lastClickTime = now;
                         
                         console.log('🔄 フォールバック: 動的連戦開始ボタンクリック');
+                        
+                        // 🔧 【追加】確認ダイアログ（誤クリック防止）
+                        if (!confirm('新しいゲームを開始しますか？')) {
+                            return;
+                        }
+                        
                         if (window.pigGame && typeof window.pigGame.restartGame === 'function') {
                             window.pigGame.restartGame();
                         } else if (window.pigGame && typeof window.pigGame.onRestartGame === 'function') {
