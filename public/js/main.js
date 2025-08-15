@@ -75,12 +75,17 @@ if (window.pigGameInitialized) {
             }
             
             // 🔧 【重要】勝利画面の固定ボタンイベント処理
-            const returnToLobbyBtn = document.getElementById('return-to-lobby');
+             const returnToLobbyBtn = document.getElementById('return-to-lobby');
             const restartGameBtn = document.getElementById('restart-game');
             
             if (returnToLobbyBtn) {
-                returnToLobbyBtn.addEventListener('click', function(e) {
+                // 既存のイベントリスナーをクリア（重複防止）
+                returnToLobbyBtn.replaceWith(returnToLobbyBtn.cloneNode(true));
+                const newReturnBtn = document.getElementById('return-to-lobby');
+                
+                newReturnBtn.addEventListener('click', function(e) {
                     e.preventDefault();
+                    e.stopPropagation(); // 🔧 【追加】イベント伝播を停止
                     console.log('🏠 固定ロビー復帰ボタンクリック');
                     
                     // 🔧 【重要】重複実行防止
@@ -90,7 +95,13 @@ if (window.pigGameInitialized) {
                     }
                     
                     this.disabled = true;
-                    setTimeout(() => { this.disabled = false; }, 2000); // 2秒間無効化
+                    this.textContent = '処理中...';
+                    setTimeout(() => { 
+                        if (this) {
+                            this.disabled = false; 
+                            this.textContent = '🏠 ロビーに戻る';
+                        }
+                    }, 3000); // 3秒間無効化
                     
                     if (window.pigGame && typeof window.pigGame.returnToLobby === 'function') {
                         window.pigGame.returnToLobby();
@@ -102,14 +113,19 @@ if (window.pigGameInitialized) {
                         }
                     }
                 });
-                console.log('✅ 固定ロビー復帰ボタンのイベントリスナー登録完了');
+                console.log('✅ 固定ロビー復帰ボタンのイベントリスナー登録完了（安全化済み）');
             } else {
                 console.warn('⚠️ return-to-lobby ボタンが見つかりません（動的生成される可能性あり）');
             }
             
             if (restartGameBtn) {
-                restartGameBtn.addEventListener('click', function(e) {
+                // 既存のイベントリスナーをクリア（重複防止）
+                restartGameBtn.replaceWith(restartGameBtn.cloneNode(true));
+                const newRestartBtn = document.getElementById('restart-game');
+                
+                newRestartBtn.addEventListener('click', function(e) {
                     e.preventDefault();
+                    e.stopPropagation(); // 🔧 【追加】イベント伝播を停止
                     console.log('🔄 固定連戦開始ボタンクリック');
                     
                     // 🔧 【重要】重複実行防止
@@ -119,7 +135,13 @@ if (window.pigGameInitialized) {
                     }
                     
                     this.disabled = true;
-                    setTimeout(() => { this.disabled = false; }, 3000); // 3秒間無効化
+                    this.textContent = '処理中...';
+                    setTimeout(() => { 
+                        if (this) {
+                            this.disabled = false; 
+                            this.textContent = '🔄 もう一戦！';
+                        }
+                    }, 5000); // 5秒間無効化
                     
                     if (window.pigGame && typeof window.pigGame.restartGame === 'function') {
                         window.pigGame.restartGame();
@@ -131,10 +153,36 @@ if (window.pigGameInitialized) {
                         }
                     }
                 });
-                console.log('✅ 固定連戦開始ボタンのイベントリスナー登録完了');
+                console.log('✅ 固定連戦開始ボタンのイベントリスナー登録完了（安全化済み）');
             } else {
                 console.warn('⚠️ restart-game ボタンが見つかりません（動的生成される可能性あり）');
             }
+            
+            // 🔧 【追加】動的ボタン処理の無効化フラグ
+            window.disableDynamicButtons = false; // デフォルトは有効
+            
+            // 🔧 【追加】安全なボタン検証関数
+            window.validateButtonClick = function(element) {
+                // 固定ボタンが存在し、機能している場合は動的処理を無効化
+                const fixedReturnBtn = document.getElementById('return-to-lobby');
+                const fixedRestartBtn = document.getElementById('restart-game');
+                
+                if (fixedReturnBtn && !fixedReturnBtn.disabled && fixedReturnBtn.style.display !== 'none') {
+                    if (element.textContent && element.textContent.includes('ロビー')) {
+                        console.log('🔧 固定ボタンが利用可能なため動的処理をスキップ');
+                        return false;
+                    }
+                }
+                
+                if (fixedRestartBtn && !fixedRestartBtn.disabled && fixedRestartBtn.style.display !== 'none') {
+                    if (element.textContent && element.textContent.includes('もう一戦')) {
+                        console.log('🔧 固定ボタンが利用可能なため動的処理をスキップ');
+                        return false;
+                    }
+                }
+                
+                return true;
+            };
             
             // 🔧 【修正】動的ボタンのフォールバック処理（イベント委譲で重複防止）
             let lastClickTime = 0;
