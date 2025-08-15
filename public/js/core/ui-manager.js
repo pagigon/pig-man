@@ -3,13 +3,35 @@
 export class UIManager {
     // 🔧 【修正】メッセージ更新処理（ゲームログ表示対応）
     static updateMessages(messages) {
-        console.log('💬 updateMessages デバッグ:', { 
+    // 🔧 【追加】デバッグ情報のみ
+    console.log('💬 updateMessages デバッグ:', { 
         messages: messages,
         isArray: Array.isArray(messages),
         length: messages ? messages.length : 0,
         containerExists: !!this.safeGetElement('chat-container')
     });
-        try {
+    
+    try {
+        // 🔧 【追加】チャットセクション自動展開
+        const chatSection = document.getElementById('chat-section');
+        if (chatSection && chatSection.classList.contains('collapsed')) {
+            console.log('📂 チャットセクションを自動展開中...');
+            
+            // toggleSection関数を安全に呼び出し
+            if (typeof window.toggleSection === 'function') {
+                window.toggleSection('chat-section');
+                console.log('✅ toggleSection関数でチャットセクション展開');
+            } else {
+                // 手動でクラス操作
+                chatSection.classList.remove('collapsed');
+                const toggleIcon = chatSection.parentElement.querySelector('.toggle-icon');
+                if (toggleIcon) {
+                    toggleIcon.textContent = '▲';
+                }
+                console.log('✅ 手動でチャットセクション展開');
+            }
+        }
+        
         const container = this.safeGetElement('chat-container');
         if (!container) {
             // 🔧 【追加】詳細なエラー情報
@@ -20,6 +42,8 @@ export class UIManager {
             });
             return;
         }
+        
+        if (!messages || !Array.isArray(messages)) return;
         
         // 🔧 【追加】チャットセクション展開状態の確認
         const chatSection = document.getElementById('chat-section');
