@@ -150,41 +150,75 @@ if (window.pigGameInitialized) {
                     return;
                 }
                 
-                // 動的に生成されるボタンのクリックイベント処理
-                if (e.target && e.target.textContent && e.target.textContent.includes('ロビーに戻る')) {
-                    e.preventDefault();
-                    lastClickTime = now;
+                // 🔧 【重要】より厳格な要素チェック（誤クリック防止）
+                const target = e.target;
+                
+                // ボタン要素かどうかの厳格なチェック
+                const isButton = target.tagName === 'BUTTON' || 
+                                target.classList.contains('btn') || 
+                                target.closest('button') !== null;
+                
+                // 勝利画面内の要素かどうかのチェック
+                const isInVictoryScreen = target.closest('#victory-screen') !== null;
+                
+                // 🔧 【修正】厳格な条件でのみ動的ボタン処理を実行
+                if (isButton && isInVictoryScreen && target.textContent) {
+                    const buttonText = target.textContent.trim();
                     
-                    console.log('🏠 フォールバック: 動的ロビー復帰ボタンクリック');
-                    if (window.pigGame && typeof window.pigGame.returnToLobby === 'function') {
-                        window.pigGame.returnToLobby();
-                    } else if (window.pigGame && typeof window.pigGame.onReturnToLobby === 'function') {
-                        window.pigGame.onReturnToLobby();
-                    } else {
-                        console.error('❌ pigGame.returnToLobby メソッドが見つかりません');
-                        // 最終フォールバック
-                        if (window.pigGame && window.pigGame.socketClient) {
-                            window.pigGame.socketClient.returnToLobby();
+                    // より具体的なテキストマッチング
+                    if (buttonText === 'ロビーに戻る' || buttonText === '🏠 ロビーに戻る') {
+                        e.preventDefault();
+                        lastClickTime = now;
+                        
+                        console.log('🏠 フォールバック: 動的ロビー復帰ボタンクリック');
+                        if (window.pigGame && typeof window.pigGame.returnToLobby === 'function') {
+                            window.pigGame.returnToLobby();
+                        } else if (window.pigGame && typeof window.pigGame.onReturnToLobby === 'function') {
+                            window.pigGame.onReturnToLobby();
+                        } else {
+                            console.error('❌ pigGame.returnToLobby メソッドが見つかりません');
+                            // 最終フォールバック
+                            if (window.pigGame && window.pigGame.socketClient) {
+                                window.pigGame.socketClient.returnToLobby();
+                            }
                         }
+                        return;
+                    }
+                    
+                    if (buttonText === 'もう一戦！' || buttonText === '🔄 もう一戦！') {
+                        e.preventDefault();
+                        lastClickTime = now;
+                        
+                        console.log('🔄 フォールバック: 動的連戦開始ボタンクリック');
+                        if (window.pigGame && typeof window.pigGame.restartGame === 'function') {
+                            window.pigGame.restartGame();
+                        } else if (window.pigGame && typeof window.pigGame.onRestartGame === 'function') {
+                            window.pigGame.onRestartGame();
+                        } else {
+                            console.error('❌ pigGame.restartGame メソッドが見つかりません');
+                            // 最終フォールバック
+                            if (window.pigGame && window.pigGame.socketClient) {
+                                window.pigGame.socketClient.restartGame();
+                            }
+                        }
+                        return;
                     }
                 }
                 
-                if (e.target && e.target.textContent && e.target.textContent.includes('もう一戦')) {
-                    e.preventDefault();
-                    lastClickTime = now;
-                    
-                    console.log('🔄 フォールバック: 動的連戦開始ボタンクリック');
-                    if (window.pigGame && typeof window.pigGame.restartGame === 'function') {
-                        window.pigGame.restartGame();
-                    } else if (window.pigGame && typeof window.pigGame.onRestartGame === 'function') {
-                        window.pigGame.onRestartGame();
-                    } else {
-                        console.error('❌ pigGame.restartGame メソッドが見つかりません');
-                        // 最終フォールバック
-                        if (window.pigGame && window.pigGame.socketClient) {
-                            window.pigGame.socketClient.restartGame();
-                        }
-                    }
+                // 🔧 【追加】デバッグ情報（開発時のみ）
+                if (target.textContent && (
+                    target.textContent.includes('ロビー') || 
+                    target.textContent.includes('もう一戦') ||
+                    target.textContent.includes('戻る')
+                )) {
+                    console.log('🔍 疑わしいクリック検出:', {
+                        tagName: target.tagName,
+                        className: target.className,
+                        textContent: target.textContent,
+                        isButton: isButton,
+                        isInVictoryScreen: isInVictoryScreen,
+                        parentElement: target.parentElement?.tagName
+                    });
                 }
             });
             
