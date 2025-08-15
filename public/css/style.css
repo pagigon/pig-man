@@ -2364,3 +2364,93 @@ body {
     border-radius: 15px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     border: 2px solid rgba(255, 255, 255, 0.1);
+
+/* カード選択中の視覚効果 */
+.other-card.selecting {
+    border: 3px solid #FFD700 !important;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.8) !important;
+    transform: scale(1.05) !important;
+    z-index: 10;
+    position: relative;
+    background: linear-gradient(135deg, #065a7a, #0876a0) !important;
+    animation: cardPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes cardPulse {
+    0% {
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+    }
+    100% {
+        box-shadow: 0 0 25px rgba(255, 215, 0, 1);
+    }
+}
+
+/* カード選択不可の状態 */
+.other-card.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(50%);
+}
+
+.other-card.disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* 処理中の状態表示 */
+.other-card.processing {
+    pointer-events: none;
+    opacity: 0.7;
+    cursor: wait;
+}
+
+/* カード選択クールダウン中の表示 */
+.other-card.cooldown {
+    pointer-events: none;
+    opacity: 0.5;
+    filter: brightness(0.7);
+}
+
+/* タッチデバイス用の改善 */
+@media (hover: none) {
+    .other-card:not(.disabled):not(.revealed):not(.selecting) {
+        /* タッチ時の視覚フィードバック */
+        transition: all 0.2s ease;
+    }
+    
+    .other-card:not(.disabled):not(.revealed):active {
+        transform: scale(0.95);
+        opacity: 0.8;
+    }
+}
+
+/* 連打防止のためのユーザー選択無効化 */
+.other-card {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    
+    /* タッチ操作の最適化 */
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+}
+
+/* アニメーション無効化対応 */
+@media (prefers-reduced-motion: reduce) {
+    .other-card.selecting {
+        animation: none;
+    }
+    
+    .other-card {
+        transition: none;
+    }
+}
+
+/* 高コントラストモード対応 */
+@media (prefers-contrast: high) {
+    .other-card.selecting {
+        border: 4px solid #FFFF00 !important;
+        background: #000080 !important;
+    }
+}
