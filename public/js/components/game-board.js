@@ -301,7 +301,7 @@ safeShowPlayerRole() {
                             img.className = 'other-card-image';
                             img.alt = card.type;
                             
-                            // 🔧 【修正】PC用高解像度画像
+                            // PC用高解像度画像
                             const isPC = window.innerWidth >= 769;
                             const imageSize = isPC ? 'large' : 'medium';
                             img.src = `/images/cards/${card.type}-${imageSize}.webp`;
@@ -315,7 +315,7 @@ safeShowPlayerRole() {
                             
                             cardDiv.appendChild(img);
                         } else {
-                            // 🔧 【修正】カード裏面は絵文字のみ使用
+                            // カード裏面は絵文字のみ使用
                             const emojiDiv = document.createElement('div');
                             emojiDiv.className = 'other-card-back-emoji';
                             emojiDiv.style.cssText = `
@@ -332,11 +332,33 @@ safeShowPlayerRole() {
                             
                             cardDiv.appendChild(emojiDiv);
                             
-                            // 🔧 【修正】クリック処理
+                            // 🔧 【修正】クリック処理（連打防止対応）
                             if (isMyTurn && !card.revealed && player.connected && !this.game.isSpectator) {
-                                cardDiv.addEventListener('click', () => {
+                                // 🔧 【重要】一度だけイベントリスナーを追加
+                                cardDiv.addEventListener('click', (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    // 🔧 【追加】既に選択中のカードかチェック
+                                    if (cardDiv.classList.contains('selecting')) {
+                                        console.warn('⚠️ 既に選択処理中のカードです');
+                                        return;
+                                    }
+                                    
+                                    // 🔧 【追加】処理中フラグチェック
+                                    if (this.isProcessingCardSelection) {
+                                        console.warn('⚠️ 他のカード選択処理中');
+                                        return;
+                                    }
+                                    
                                     this.selectCard(player.id, index);
                                 });
+                                
+                                // タッチデバイス対応
+                                cardDiv.addEventListener('touchstart', (e) => {
+                                    e.preventDefault();
+                                }, { passive: false });
+                                
                             } else {
                                 cardDiv.classList.add('disabled');
                             }
@@ -355,54 +377,7 @@ safeShowPlayerRole() {
         }
     }
 
-    // 🔧 【追加】カード絵文字フォールバック処理（独立メソッド）
-    setCardEmojiFallback(img, cardType) {
-        try {
-            img.style.display = 'none';
-            
-            let emojiElement = img.nextElementSibling;
-            if (!emojiElement || !emojiElement.classList.contains('card-emoji-fallback')) {
-                emojiElement = document.createElement('div');
-                emojiElement.className = 'card-emoji-fallback';
-                emojiElement.style.cssText = `
-                    font-size: 2.5em;
-                    text-align: center;
-                    line-height: 1;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    height: 100%;
-                    width: 100%;
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                `;
-                img.parentNode.style.position = 'relative';
-                img.parentNode.appendChild(emojiElement);
-            }
-            
-            switch (cardType) {
-                case 'treasure':
-                    emojiElement.textContent = '🐷';
-                    break;
-                case 'trap':
-                    emojiElement.textContent = '💀';
-                    break;
-                case 'empty':
-                    emojiElement.textContent = '🏠';
-                    break;
-                default:
-                    emojiElement.textContent = '❓';
-            }
-            
-            console.log(`🎯 カード絵文字フォールバック: ${cardType} → ${emojiElement.textContent}`);
-            
-        } catch (error) {
-            console.error('カード絵文字フォールバック処理エラー:', error);
-        }
-    }
-
-    // 既存のメソッドはそのまま維持
+    // 🔧 【追加】ゲーム更新時の処理フラグリセット
     updateGameUI() {
         try {
             console.log('🎨 ゲームUI更新開始');
@@ -412,13 +387,18 @@ safeShowPlayerRole() {
                 return;
             }
 
+            // 🔧 【追加】ゲーム更新時に処理フラグをリセット（サーバーからの更新を受信したため）
+            if (this.isProcessingCardSelection) {
+                console.log('🔧 ゲーム更新によりカード選択処理フラグをリセット');
+                this.isProcessingCardSelection = false;
+            }
+
             UIManager.showScreen('game-board');
 
             // 安全にUI更新を実行
             this.safeUpdateGameOverview();
             this.safeUpdateProgressBars();
             this.safeUpdateGameInfo();
-            // 🔧 正しいカードリサイクル情報も更新
             UIManager.updateRoundDisplayWithCards(this.game.gameData);
             this.safeUpdateKeyHolder();
             this.safeShowPlayerRole();
