@@ -53,6 +53,7 @@ export class UIManager {
         
         if (!messages || !Array.isArray(messages)) return;
         
+
         // 🔧 【修正】最新100件を表示（20件から100件に拡張）
         const recentMessages = messages.slice(-100);
         
