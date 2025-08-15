@@ -650,146 +650,161 @@ export class UIManager {
     }
 
     static updateRoomList(rooms) {
-        try {
-            const container = this.safeGetElement('room-list-container');
-            if (!container) return;
-            
-            container.innerHTML = '';
+    try {
+        const container = this.safeGetElement('room-list-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
 
-            if (!rooms || !Array.isArray(rooms) || rooms.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #87CEEB;">現在開設中のルームはありません</p>';
-                return;
-            }
+        if (!rooms || !Array.isArray(rooms) || rooms.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #87CEEB;">現在開設中のルームはありません</p>';
+            return;
+        }
 
-            const self = this;
-            rooms.forEach(function(room, index) {
-                try {
-                    if (!room || typeof room !== 'object') return;
+        const self = this;
+        rooms.forEach(function(room, index) {
+            try {
+                if (!room || typeof room !== 'object') return;
 
-                    const roomDiv = document.createElement('div');
-                    roomDiv.className = 'room-item';
-                    
-                    const infoDiv = document.createElement('div');
-                    infoDiv.className = 'room-item-info';
-                    
-                    const roomId = room.id || 'ROOM' + index;
-                    const hostName = room.hostName || '不明';
-                    const playerCount = room.playerCount || 0;
-                    const hasPassword = room.hasPassword || false;
-                    
-                    infoDiv.innerHTML = '<strong>ID: ' + roomId + '</strong>' +
-                                       (hasPassword ? '<span class="password-icon">🔒</span>' : '') +
-                                       '<br>ホスト: ' + hostName + ' | プレイヤー: ' + playerCount + '/10';
-                    
-                    const joinBtn = document.createElement('button');
-                    joinBtn.className = 'btn btn-small';
-                    joinBtn.textContent = '参加';
-                    
-                    joinBtn.onclick = function() {
-                        try {
-                            const roomIdInput = self.safeGetElement('room-id-input');
-                            if (roomIdInput) {
-                                roomIdInput.value = roomId;
-                            }
-                            
-                            if (hasPassword) {
-                                const passwordGroup = self.safeGetElement('join-password-group');
-                                if (passwordGroup) {
-                                    passwordGroup.style.display = 'block';
-                                }
-                            }
-                            
-                            const playerNameInput = self.safeGetElement('player-name-join');
-                            if (playerNameInput) {
-                                playerNameInput.focus();
-                            }
-                        } catch (error) {
-                            console.error('ルーム参加ボタンクリックエラー:', error);
+                const roomDiv = document.createElement('div');
+                roomDiv.className = 'room-item';
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'room-item-info';
+                
+                const roomId = room.id || 'ROOM' + index;
+                const hostName = room.hostName || '不明';
+                const playerCount = room.playerCount || 0;
+                const hasPassword = room.hasPassword || false;
+                
+                infoDiv.innerHTML = '<strong>ID: ' + roomId + '</strong>' +
+                                   (hasPassword ? '<span class="password-icon">🔒</span>' : '') +
+                                   '<br>ホスト: ' + hostName +
+                                   '<br>プレイヤー: ' + playerCount + '/4';
+                
+                const joinButton = document.createElement('button');
+                joinButton.className = 'btn btn-primary';
+                joinButton.textContent = '参加する';
+                joinButton.onclick = function() {
+                    try {
+                        // ルームIDを自動入力
+                        const roomInput = document.getElementById('room-id-input');
+                        if (roomInput) {
+                            roomInput.value = roomId;
                         }
-                    };
-                    
-                    roomDiv.appendChild(infoDiv);
-                    roomDiv.appendChild(joinBtn);
-                    container.appendChild(roomDiv);
-                } catch (error) {
-                    console.error('ルームアイテム作成エラー:', error);
-                }
-            });
-        } catch (error) {
-            console.error('ルーム一覧更新エラー:', error);
-        }
-    }
-
-    static showScreen(screenName) {
-        try {
-            const screens = ['lobby', 'room-info', 'game-board', 'victory-screen'];
-            
-            const self = this;
-            screens.forEach(function(screen) {
-                const element = self.safeGetElement(screen);
-                if (element) {
-                    element.style.display = 'none';
-                }
-            });
-            
-            if (screenName) {
-                const screen = this.safeGetElement(screenName);
-                if (screen) {
-                    screen.style.display = 'block';
-                }
-            }
-        } catch (error) {
-            console.error('画面切り替えエラー:', error);
-        }
-    }
-
-    static updatePlayersList(players, hostId) {
-        try {
-            const container = this.safeGetElement('players-list');
-            const countEl = this.safeGetElement('player-count');
-            
-            if (!container || !countEl) return;
-            
-            if (!players || !Array.isArray(players)) {
-                container.innerHTML = '<p>プレイヤー情報を取得できませんでした</p>';
-                countEl.textContent = '0';
-                return;
-            }
-            
-            const count = players.filter(function(p) { return p && p.connected; }).length;
-            countEl.textContent = count;
-            
-            container.innerHTML = '';
-            players.forEach(function(player) {
-                try {
-                    if (!player || typeof player !== 'object') return;
-
-                    const div = document.createElement('div');
-                    div.className = 'player-item';
-                    
-                    if (player.id === hostId) {
-                        div.classList.add('host');
+                        
+                        // 参加セクションを展開
+                        if (typeof window.toggleSection === 'function') {
+                            const joinSection = document.getElementById('join-section');
+                            if (joinSection && joinSection.classList.contains('collapsed')) {
+                                window.toggleSection('join-section');
+                            }
+                        }
+                        
+                        // 🔧 【追加】フォーカスを名前入力欄に移動
+                        const nameInput = document.getElementById('player-name-join');
+                        if (nameInput) {
+                            nameInput.focus();
+                        }
+                        
+                    } catch (error) {
+                        console.error('ルーム参加ボタンエラー:', error);
                     }
-                    
-                    const status = player.connected ? '🟢' : '🔴';
-                    const playerName = player.name || '名前なし';
-                    const disconnectedText = player.connected ? '' : ' (切断中)';
-                    div.textContent = status + ' ' + playerName + disconnectedText;
-                    
-                    if (!player.connected) {
-                        div.style.opacity = '0.6';
-                        div.style.fontStyle = 'italic';
-                    }
-                    
-                    container.appendChild(div);
-                } catch (error) {
-                    console.error('プレイヤーアイテム作成エラー:', error);
-                }
-            });
-        } catch (error) {
-            console.error('プレイヤー一覧更新エラー:', error);
-        }
+                };
+                
+                roomDiv.appendChild(infoDiv);
+                roomDiv.appendChild(joinButton);
+                container.appendChild(roomDiv);
+                
+            } catch (error) {
+                console.error('ルームアイテム作成エラー:', error);
+            }
+        });
+        
+        console.log(`✅ ルーム一覧更新完了: ${rooms.length}件`);
+        
+    } catch (error) {
+        console.error('ルーム一覧更新エラー:', error);
     }
+}
+
+static updateOngoingGames(games) {
+    try {
+        const container = this.safeGetElement('ongoing-games-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+
+        if (!games || !Array.isArray(games) || games.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #87CEEB;">現在進行中のゲームはありません</p>';
+            return;
+        }
+
+        games.forEach(function(game, index) {
+            try {
+                if (!game || typeof game !== 'object') return;
+
+                const gameDiv = document.createElement('div');
+                gameDiv.className = 'room-item';
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'room-item-info';
+                
+                const roomId = game.id || 'GAME' + index;
+                const hostName = game.hostName || '不明';
+                const playerCount = game.playerCount || 0;
+                const currentRound = game.currentRound || 1;
+                
+                infoDiv.innerHTML = '<strong>ID: ' + roomId + '</strong>' +
+                                   '<br>ホスト: ' + hostName +
+                                   '<br>プレイヤー: ' + playerCount + '/4' +
+                                   '<br>ラウンド: ' + currentRound + '/4';
+                
+                const spectateButton = document.createElement('button');
+                spectateButton.className = 'btn btn-secondary';
+                spectateButton.textContent = '観戦する';
+                spectateButton.onclick = function() {
+                    try {
+                        // ルームIDを自動入力
+                        const roomInput = document.getElementById('spectate-room-id');
+                        if (roomInput) {
+                            roomInput.value = roomId;
+                        }
+                        
+                        // 観戦セクションを展開
+                        if (typeof window.toggleSection === 'function') {
+                            const spectateSection = document.getElementById('spectate-section');
+                            if (spectateSection && spectateSection.classList.contains('collapsed')) {
+                                window.toggleSection('spectate-section');
+                            }
+                        }
+                        
+                        // 🔧 【追加】フォーカスを名前入力欄に移動
+                        const nameInput = document.getElementById('spectator-name');
+                        if (nameInput) {
+                            nameInput.focus();
+                        }
+                        
+                    } catch (error) {
+                        console.error('観戦ボタンエラー:', error);
+                    }
+                };
+                
+                gameDiv.appendChild(infoDiv);
+                gameDiv.appendChild(spectateButton);
+                container.appendChild(gameDiv);
+                
+            } catch (error) {
+                console.error('ゲームアイテム作成エラー:', error);
+            }
+        });
+        
+        console.log(`✅ 進行中ゲーム一覧更新完了: ${games.length}件`);
+        
+    } catch (error) {
+        console.error('進行中ゲーム一覧更新エラー:', error);
+    }
+}
 
     // ユーティリティメソッド
     static safeGetElement(id) {
