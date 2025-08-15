@@ -1,4 +1,4 @@
-// public/js/main.js - 完全版（再接続システム対応）
+// public/js/main.js - 修正版（構文エラー解決）
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🎮 豚小屋探検隊 - DOMロード完了');
@@ -468,3 +468,101 @@ emergencyReload()     - 緊急リロード
                     console.log('⚠️ 重複クリック防止');
                     return;
                 }
+                window.lastButtonClickTime = now;
+                
+                // ボタン種別判定とフォールバック処理
+                try {
+                    if (buttonText.includes('ルームを作成') && target.id === 'create-room') {
+                        console.log('🔧 フォールバック: ルーム作成ボタン');
+                        if (window.pigGame && window.pigGame.roomManager) {
+                            window.pigGame.roomManager.createRoom();
+                        }
+                    } else if (buttonText.includes('ルームに参加') && target.id === 'join-room') {
+                        console.log('🔧 フォールバック: ルーム参加ボタン');
+                        if (window.pigGame && window.pigGame.roomManager) {
+                            window.pigGame.roomManager.joinRoom();
+                        }
+                    } else if (buttonText.includes('再入場') && target.id === 'rejoin-room') {
+                        console.log('🔧 フォールバック: 再入場ボタン');
+                        if (window.pigGame && window.pigGame.roomManager) {
+                            window.pigGame.roomManager.rejoinRoom();
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ フォールバック処理エラー:', error);
+                }
+            });
+            
+        }).catch(error => {
+            console.error('❌ PigManGame モジュール読み込みエラー:', error);
+            const errorMessage = document.getElementById('error-message');
+            if (errorMessage) {
+                errorMessage.textContent = 'ゲームの初期化に失敗しました。ページをリロードしてください。';
+                errorMessage.style.display = 'block';
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ main.js 初期化エラー:', error);
+        const errorMessage = document.getElementById('error-message');
+        if (errorMessage) {
+            errorMessage.textContent = 'アプリケーションの起動に失敗しました。';
+            errorMessage.style.display = 'block';
+        }
+    }
+});
+
+// 🔧 【追加】緊急リロード関数（グローバル）
+window.emergencyReload = function() {
+    console.log('🚨 緊急リロード実行');
+    const confirmed = confirm('ページを強制的にリロードしますか？\n（進行中のデータは失われます）');
+    if (confirmed) {
+        // キャッシュクリア付きリロード
+        window.location.reload(true);
+    }
+};
+
+// 🔧 【追加】エラー捕捉（グローバル）
+window.addEventListener('error', function(e) {
+    console.error('❌ グローバルエラー捕捉:', e.error);
+    
+    // main.jsの構文エラー特別処理
+    if (e.filename && e.filename.includes('main.js') && e.message.includes('Unexpected')) {
+        console.error('🚨 main.js 構文エラー検出 - 緊急対応モード');
+        const errorMessage = document.getElementById('error-message');
+        if (errorMessage) {
+            errorMessage.innerHTML = `
+                <strong>⚠️ スクリプトエラーが発生しました</strong><br>
+                ファイル: main.js<br>
+                エラー: ${e.message}<br>
+                <button onclick="window.emergencyReload()" style="margin-top: 10px; padding: 8px 16px; background: #DC143C; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    🔄 ページリロード
+                </button>
+            `;
+            errorMessage.style.display = 'block';
+        }
+    }
+});
+
+// 🔧 【追加】未処理の Promise rejection 捕捉
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('❌ 未処理のPromise rejection:', e.reason);
+    
+    // import エラーの特別処理
+    if (e.reason && e.reason.message && e.reason.message.includes('module')) {
+        console.error('🚨 モジュール読み込みエラー検出');
+        const errorMessage = document.getElementById('error-message');
+        if (errorMessage) {
+            errorMessage.innerHTML = `
+                <strong>⚠️ モジュール読み込みエラー</strong><br>
+                詳細: ${e.reason.message}<br>
+                <button onclick="window.emergencyReload()" style="margin-top: 10px; padding: 8px 16px; background: #DC143C; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    🔄 ページリロード
+                </button>
+            `;
+            errorMessage.style.display = 'block';
+        }
+    }
+});
+
+console.log('✅ main.js 読み込み完了（エラーハンドリング強化版）');
