@@ -355,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
 
-            <!-- 正しいカードリサイクル対応のゲーム情報 -->
+            <!-- 🔧 【修正】ゲーム情報（不足していた要素を追加） -->
             <div class="game-info mobile-compact">
                 <div class="info-row">
                     <div class="info-item">
@@ -367,12 +367,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="value"><span id="cards-per-player">5</span>枚</span>
                     </div>
                     <div class="info-item">
-                        <span class="label">残り子豚</span>
-                        <span class="value"><span id="remaining-treasures">7</span>匹</span>
+                        <span class="label">救出済み</span>
+                        <span class="value"><span id="treasure-found">0</span>/<span id="treasure-goal">7</span></span>
                     </div>
                     <div class="info-item">
-                        <span class="label">残り罠</span>
-                        <span class="value"><span id="remaining-traps">2</span>個</span>
+                        <span class="label">発動済み</span>
+                        <span class="value"><span id="trap-triggered">0</span>/<span id="trap-goal">2</span></span>
                     </div>
                     <div class="info-item">
                         <span class="label">公開済み</span>
@@ -386,11 +386,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
 
-            <!-- 役職カード -->
-            <div class="role-card compact" style="display: none;">
+            <!-- 🔧 【追加】役職表示要素 -->
+            <div id="role-reveal" class="role-card compact" style="display: none;">
                 <div class="role-header">
+                    <img id="role-image" class="role-image-small" src="" alt="役職画像" style="display: none;">
                     <div class="role-info">
-                        <div id="role-name"></div>
+                        <div id="player-role"></div>
                         <p id="role-description"></p>
                     </div>
                 </div>
@@ -403,6 +404,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span id="key-holder-name">---</span>
                 </div>
                 <p class="turn-status" id="turn-status">鍵の準備中...</p>
+                <!-- 🔧 【追加】ターンメッセージ -->
+                <p id="turn-message" class="turn-message" style="font-size: 12px; margin-top: 5px;"></p>
             </div>
 
             <!-- 自分のカード -->
