@@ -1,4 +1,4 @@
-// public/js/core/socket-client.js - 完全版（再接続システム対応）
+// public/js/core/socket-client.js - イベント修正版（チャット・ラウンド開始対応）
 
 import { UIManager } from './ui-manager.js';
 
@@ -340,92 +340,7 @@ export class SocketClient {
         console.log('✅ Socket イベントリスナー設定完了（再接続対応）');
     }
     
-    // 🔧 【追加】スケジュール再接続
-    scheduleReconnect(delay = 3000) {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-        }
-        
-        this.reconnectTimer = setTimeout(() => {
-            if (!this.isConnected() && !this.isConnecting) {
-                console.log('🔄 スケジュール再接続実行');
-                this.forceReconnect();
-            }
-        }, delay);
-    }
-    
-    // 🔧 【修正】強制再接続
-    forceReconnect() {
-        console.log('🔄 強制再接続開始');
-        
-        if (this.isConnecting) {
-            console.warn('⚠️ 既に接続処理中');
-            return;
-        }
-        
-        this.isConnecting = true;
-        
-        try {
-            // 既存接続を完全に切断
-            if (this.socket) {
-                this.socket.removeAllListeners();
-                this.socket.disconnect();
-                this.socket.close();
-                this.socket = null;
-            }
-            
-            // 新しい接続を作成
-            setTimeout(() => {
-                this.initialize();
-            }, 1000);
-            
-        } catch (error) {
-            console.error('❌ 強制再接続エラー:', error);
-            this.isConnecting = false;
-            UIManager.showError('再接続に失敗しました');
-        }
-    }
-    
-    // 🔧 【追加】ゲーム情報の保存/取得
-    saveGameInfo(gameInfo) {
-        try {
-            localStorage.setItem('pigGame_reconnectInfo', JSON.stringify(gameInfo));
-            console.log('💾 ゲーム情報保存:', gameInfo);
-        } catch (error) {
-            console.error('❌ ゲーム情報保存エラー:', error);
-        }
-    }
-    
-    getSavedGameInfo() {
-        try {
-            const data = localStorage.getItem('pigGame_reconnectInfo');
-            if (!data) return null;
-            
-            const gameInfo = JSON.parse(data);
-            
-            // 30分以上古い情報は削除
-            if (Date.now() - gameInfo.timestamp > 30 * 60 * 1000) {
-                this.clearSavedGameInfo();
-                return null;
-            }
-            
-            return gameInfo;
-        } catch (error) {
-            console.error('❌ ゲーム情報取得エラー:', error);
-            return null;
-        }
-    }
-    
-    clearSavedGameInfo() {
-        try {
-            localStorage.removeItem('pigGame_reconnectInfo');
-            console.log('🗑️ ゲーム情報クリア');
-        } catch (error) {
-            console.error('❌ ゲーム情報クリアエラー:', error);
-        }
-    }
-    
-    // 🔧 【修正】その他のイベントリスナー設定
+    // 🔧 【修正】その他のイベントリスナー設定（チャット・ラウンド開始対応）
     setupOtherEventListeners() {
         const self = this;
         
@@ -549,6 +464,30 @@ export class SocketClient {
             self.clearSavedGameInfo(); // ゲーム終了時は保存情報をクリア
         });
         
+        // 🔧 【修正】チャットメッセージ受信（正しいイベント名）
+        this.socket.on('newMessage', function(messages) {
+            console.log('💬 チャットメッセージ受信:', messages);
+            try {
+                if (messages && Array.isArray(messages)) {
+                    UIManager.updateMessages(messages);
+                }
+            } catch (error) {
+                console.error('チャットメッセージ処理エラー:', error);
+            }
+        });
+        
+        // 🔧 【追加】ラウンド開始イベント
+        this.socket.on('roundStart', function(roundNumber) {
+            console.log('🎮 ラウンド開始イベント受信:', roundNumber);
+            try {
+                // UIManagerでラウンド開始表示を実行
+                UIManager.showRoundStartWithRecycle(roundNumber);
+                console.log(`✅ ラウンド ${roundNumber} 開始表示完了`);
+            } catch (error) {
+                console.error('ラウンド開始表示エラー:', error);
+            }
+        });
+        
         // 🔧 【追加】切断プレイヤー待機の処理
         this.socket.on('waitingForReconnect', function(data) {
             console.log('⏸️ プレイヤー切断により待機中:', data);
@@ -611,13 +550,21 @@ export class SocketClient {
         });
     }
     
-    // 🔧 【追加】Transport名取得
-    getTransportName() {
-        try {
-            return this.socket?.io?.engine?.transport?.name || 'unknown';
-        } catch (error) {
-            return 'unknown';
+    // 🔧 【修正】チャット送信（正しいイベント名）
+    sendChatMessage(message) {
+        console.log('💬 チャット送信:', message);
+        
+        if (!message || message.trim().length === 0) {
+            return false;
         }
+        
+        if (message.trim().length > 100) { // サーバー側に合わせて100文字制限
+            UIManager.showError('メッセージは100文字以内で入力してください');
+            return false;
+        }
+        
+        // 🔧 【修正】サーバー側と一致するイベント名とデータ形式
+        return this.emit('sendChat', message.trim());
     }
     
     // 基本的なSocket操作メソッド
@@ -651,6 +598,102 @@ export class SocketClient {
         }
     }
 
+    // その他のメソッド（省略）...
+    
+    // 🔧 【追加】スケジュール再接続
+    scheduleReconnect(delay = 3000) {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+        }
+        
+        this.reconnectTimer = setTimeout(() => {
+            if (!this.isConnected() && !this.isConnecting) {
+                console.log('🔄 スケジュール再接続実行');
+                this.forceReconnect();
+            }
+        }, delay);
+    }
+    
+    // 🔧 【修正】強制再接続
+    forceReconnect() {
+        console.log('🔄 強制再接続開始');
+        
+        if (this.isConnecting) {
+            console.warn('⚠️ 既に接続処理中');
+            return;
+        }
+        
+        this.isConnecting = true;
+        
+        try {
+            // 既存接続を完全に切断
+            if (this.socket) {
+                this.socket.removeAllListeners();
+                this.socket.disconnect();
+                this.socket.close();
+                this.socket = null;
+            }
+            
+            // 新しい接続を作成
+            setTimeout(() => {
+                this.initialize();
+            }, 1000);
+            
+        } catch (error) {
+            console.error('❌ 強制再接続エラー:', error);
+            this.isConnecting = false;
+            UIManager.showError('再接続に失敗しました');
+        }
+    }
+    
+    // 🔧 【追加】ゲーム情報の保存/取得（再接続用）
+    saveGameInfo(gameInfo) {
+        try {
+            localStorage.setItem('pigGame_reconnectInfo', JSON.stringify(gameInfo));
+            console.log('💾 ゲーム情報保存:', gameInfo);
+        } catch (error) {
+            console.error('❌ ゲーム情報保存エラー:', error);
+        }
+    }
+    
+    getSavedGameInfo() {
+        try {
+            const data = localStorage.getItem('pigGame_reconnectInfo');
+            if (!data) return null;
+            
+            const gameInfo = JSON.parse(data);
+            
+            // 30分以上古い情報は削除
+            if (Date.now() - gameInfo.timestamp > 30 * 60 * 1000) {
+                this.clearSavedGameInfo();
+                return null;
+            }
+            
+            return gameInfo;
+        } catch (error) {
+            console.error('❌ ゲーム情報取得エラー:', error);
+            return null;
+        }
+    }
+    
+    clearSavedGameInfo() {
+        try {
+            localStorage.removeItem('pigGame_reconnectInfo');
+            console.log('🗑️ ゲーム情報クリア');
+        } catch (error) {
+            console.error('❌ ゲーム情報クリアエラー:', error);
+        }
+    }
+    
+    // 🔧 【追加】Transport名取得
+    getTransportName() {
+        try {
+            return this.socket?.io?.engine?.transport?.name || 'unknown';
+        } catch (error) {
+            return 'unknown';
+        }
+    }
+    
     // 基本的なSocket操作メソッド
     getRoomList() {
         console.log('📋 ルーム一覧要求');
@@ -758,21 +801,6 @@ export class SocketClient {
     selectCard(targetPlayerId, cardIndex) {
         console.log('🎯 カード選択要求:', { targetPlayerId, cardIndex });
         return this.emit('selectCard', { targetPlayerId, cardIndex });
-    }
-
-    sendChatMessage(message) {
-        console.log('💬 チャット送信:', message);
-        
-        if (!message || message.trim().length === 0) {
-            return false;
-        }
-        
-        if (message.trim().length > 200) {
-            UIManager.showError('メッセージは200文字以内で入力してください');
-            return false;
-        }
-        
-        return this.emit('chatMessage', { message: message.trim() });
     }
     
     // 状態確認メソッド
