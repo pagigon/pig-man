@@ -1,4 +1,4 @@
-// ルーム関連のSocket.ioイベントハンドラー
+// ルーム関連のSocket.ioイベントハンドラー - 重複参加防止強化版
 const { generateRoomId } = require('../game/game-Logic');
 const { validatePlayerName, validateRoomId } = require('../utils/validation');
 const { checkRateLimit } = require('../utils/rate-limiter');
@@ -143,190 +143,227 @@ function setupRoomHandlers(io, socket, socketRequestHistory) {
         }
     });
     
-    // ルーム参加
+    // 🔧 【重要修正】ルーム参加 - 重複防止強化
     socket.on('joinRoom', (data) => {
-    console.log('🔍 joinRoom処理開始:', data);
-    console.log('🔍 現在のSocket状態:', {
-        socketId: socket.id,
-        currentRoomId: socket.roomId,
-        playerName: socket.playerName
-    });
-    
-    // 🔧 【最重要】既にルームに参加している場合は拒否
-    if (socket.roomId) {
-        console.warn(`⚠️ Socket ${socket.id} は既にルーム ${socket.roomId} に参加中 - 重複参加拒否`);
-        socket.emit('error', { message: '既に他のルームに参加しています。一度退出してから参加してください。' });
-        return;
-    }
-    
-    if (!checkRateLimit(socket.id, 'join', socketRequestHistory)) {
-        console.log('❌ joinRoomエラー送信: レート制限');
-        socket.emit('error', { message: 'しばらく待ってから再試行してください' });
-        return;
-    }
-    
-    console.log('👥 ルーム参加要求:', data, 'Socket:', socket.id);
-    const { roomId, playerName, password } = data;
-    
-    // バリデーション
-    if (!validatePlayerName(playerName) || !validateRoomId(roomId)) {
-        console.log('❌ joinRoomエラー送信: バリデーション失敗');
-        socket.emit('error', { message: '入力データが無効です' });
-        return;
-    }
-    
-    const room = activeRooms.get(roomId);
-    if (!room) {
-        console.log('❌ joinRoomエラー送信: ルーム不存在');
-        socket.emit('error', { message: 'ルームが見つかりません' });
-        return;
-    }
-    
-    // パスワードチェック
-    if (room.gameData.password && room.gameData.password !== password) {
-        console.log('❌ joinRoomエラー送信: パスワード不一致');
-        socket.emit('error', { message: 'パスワードが正しくありません' });
-        return;
-    }
-    
-    // ゲーム状態チェック
-    if (room.gameData.gameState !== 'waiting') {
-        console.log('❌ joinRoomエラー送信: ゲーム進行中');
-        socket.emit('error', { message: 'このルームはゲーム中です。観戦モードで参加してください。' });
-        return;
-    }
-    
-    // 🔧 【重要修正】全ルーム検索による重複チェック（改良版）
-    for (const [existingRoomId, existingRoom] of activeRooms) {
-        // Socket IDによる重複チェック
-        const duplicateBySocketId = existingRoom.players.find(p => p.id === socket.id);
-        if (duplicateBySocketId) {
-            console.warn(`⚠️ Socket重複検出: ${socket.id} がルーム ${existingRoomId} に既存 - 自動削除`);
+        console.log('🔍 joinRoom処理開始:', data);
+        console.log('🔍 現在のSocket状態:', {
+            socketId: socket.id,
+            currentRoomId: socket.roomId,
+            playerName: socket.playerName
+        });
+        
+        // 🔧 【最重要】既にルームに参加している場合は即座に拒否
+        if (socket.roomId) {
+            console.warn(`⚠️ Socket ${socket.id} は既にルーム ${socket.roomId} に参加中 - 重複参加拒否`);
+            socket.emit('error', { message: '既に他のルームに参加しています。一度退出してから参加してください。' });
+            return;
+        }
+        
+        if (!checkRateLimit(socket.id, 'join', socketRequestHistory)) {
+            console.log('❌ joinRoomエラー送信: レート制限');
+            socket.emit('error', { message: 'しばらく待ってから再試行してください' });
+            return;
+        }
+        
+        console.log('👥 ルーム参加要求:', data, 'Socket:', socket.id);
+        const { roomId, playerName, password } = data;
+        
+        // バリデーション
+        if (!validatePlayerName(playerName) || !validateRoomId(roomId)) {
+            console.log('❌ joinRoomエラー送信: バリデーション失敗');
+            socket.emit('error', { message: '入力データが無効です' });
+            return;
+        }
+        
+        const room = activeRooms.get(roomId);
+        if (!room) {
+            console.log('❌ joinRoomエラー送信: ルーム不存在');
+            socket.emit('error', { message: 'ルームが見つかりません' });
+            return;
+        }
+        
+        // パスワードチェック
+        if (room.gameData.password && room.gameData.password !== password) {
+            console.log('❌ joinRoomエラー送信: パスワード不一致');
+            socket.emit('error', { message: 'パスワードが正しくありません' });
+            return;
+        }
+        
+        // ゲーム状態チェック
+        if (room.gameData.gameState !== 'waiting') {
+            console.log('❌ joinRoomエラー送信: ゲーム進行中');
+            socket.emit('error', { message: 'このルームはゲーム中です。観戦モードで参加してください。' });
+            return;
+        }
+        
+        // 🔧 【重要修正】包括的な重複チェック（全ルーム対象）
+        let foundDuplicates = false;
+        
+        for (const [existingRoomId, existingRoom] of activeRooms) {
+            // Socket IDによる重複チェック
+            const duplicateBySocketId = existingRoom.players.find(p => p.id === socket.id);
+            if (duplicateBySocketId) {
+                console.warn(`⚠️ Socket重複検出: ${socket.id} がルーム ${existingRoomId} に既存 - 自動削除`);
+                
+                // 既存エントリを削除
+                existingRoom.players = existingRoom.players.filter(p => p.id !== socket.id);
+                existingRoom.gameData.players = existingRoom.gameData.players.filter(p => p.id !== socket.id);
+                foundDuplicates = true;
+                
+                // 空ルーム削除
+                if (existingRoom.players.length === 0) {
+                    activeRooms.delete(existingRoomId);
+                    console.log('🗑️ 空のルーム削除:', existingRoomId);
+                }
+            }
             
-            // 既存エントリを削除
-            existingRoom.players = existingRoom.players.filter(p => p.id !== socket.id);
-            existingRoom.gameData.players = existingRoom.gameData.players.filter(p => p.id !== socket.id);
-            
-            // 空ルーム削除
-            if (existingRoom.players.length === 0) {
-                activeRooms.delete(existingRoomId);
-                console.log('🗑️ 空のルーム削除:', existingRoomId);
+            // 🔧 【強化】同名プレイヤーの厳格チェック（対象ルームのみ）
+            if (existingRoomId === roomId) {
+                const sameNameActivePlayer = existingRoom.players.find(p => 
+                    p.name === playerName && 
+                    p.connected && 
+                    p.id !== socket.id
+                );
+                if (sameNameActivePlayer) {
+                    console.warn(`⚠️ 同名アクティブプレイヤー検出: "${playerName}" は既に使用中`);
+                    socket.emit('error', { 
+                        message: `プレイヤー名 "${playerName}" は既に使用されています。別の名前を選んでください。` 
+                    });
+                    return;
+                }
             }
         }
         
-        // 🔧 【追加】同名アクティブプレイヤーの厳格チェック
-        if (existingRoomId === roomId) {
-            const sameNameActivePlayer = existingRoom.players.find(p => 
-                p.name === playerName && 
-                p.connected && 
-                p.id !== socket.id
+        // 重複削除があった場合はルーム一覧を更新
+        if (foundDuplicates) {
+            console.log('🔧 重複削除によりルーム一覧更新');
+            updateRoomList(io);
+        }
+        
+        // 最大プレイヤー数チェック
+        const connectedCount = room.players.filter(p => p.connected).length;
+        if (connectedCount >= 10) {
+            console.log('❌ joinRoomエラー送信: 満員');
+            socket.emit('error', { message: 'ルームが満員です' });
+            return;
+        }
+        
+        // 🔧 【修正】切断済みの同名プレイヤーを探す（再接続処理）
+        const disconnectedPlayer = room.players.find(p => 
+            p.name === playerName && 
+            !p.connected
+        );
+        
+        let isReconnection = false;
+        let processedPlayer = null;
+        
+        if (disconnectedPlayer) {
+            // 再接続処理
+            console.log(`🔄 ${playerName} の再接続処理開始`);
+            
+            // 既存プレイヤーデータを更新
+            disconnectedPlayer.id = socket.id;
+            disconnectedPlayer.connected = true;
+            processedPlayer = disconnectedPlayer;
+            isReconnection = true;
+            
+            console.log(`${playerName} が再接続しました（プレイヤー更新）`);
+            
+        } else {
+            // 🔧 【重要】新規プレイヤー追加前の最終重複チェック
+            const finalDuplicateCheck = room.players.find(p => 
+                (p.name === playerName && p.connected) || p.id === socket.id
             );
-            if (sameNameActivePlayer) {
-                console.warn(`⚠️ 同名アクティブプレイヤー検出: "${playerName}" は既に使用中`);
+            
+            if (finalDuplicateCheck) {
+                console.error(`❌ 最終重複チェック失敗: ${playerName} または ${socket.id} が既に存在`);
                 socket.emit('error', { 
-                    message: `プレイヤー名 "${playerName}" は既に使用されています。別の名前を選んでください。` 
+                    message: 'プレイヤーの追加に失敗しました。もう一度お試しください。' 
                 });
                 return;
             }
+            
+            // 新規プレイヤー追加
+            console.log(`👤 ${playerName} の新規参加処理開始`);
+            
+            const newPlayer = {
+                id: socket.id,
+                name: playerName,
+                connected: true,
+                role: null,
+                hand: []
+            };
+            
+            // 🔧 【重要】原子的操作で重複を防ぐ
+            room.players.push(newPlayer);
+            room.gameData.players.push(newPlayer);
+            processedPlayer = newPlayer;
+            
+            console.log(`${playerName} が新規参加しました（プレイヤー追加完了）`);
         }
-    }
-    
-    // 最大プレイヤー数チェック
-    const connectedCount = room.players.filter(p => p.connected).length;
-    if (connectedCount >= 10) {
-        console.log('❌ joinRoomエラー送信: 満員');
-        socket.emit('error', { message: 'ルームが満員です' });
-        return;
-    }
-    
-    // 🔧 【修正】切断済みの同名プレイヤーを探す（再接続処理）
-    const disconnectedPlayer = room.players.find(p => 
-        p.name === playerName && 
-        !p.connected
-    );
-    
-    let isReconnection = false;
-    let processedPlayer = null;
-    
-    if (disconnectedPlayer) {
-        // 再接続処理
-        console.log(`🔄 ${playerName} の再接続処理開始`);
         
-        // 既存プレイヤーデータを更新
-        disconnectedPlayer.id = socket.id;
-        disconnectedPlayer.connected = true;
-        processedPlayer = disconnectedPlayer;
-        isReconnection = true;
+        // 🔧 【重要】ソケット情報設定（参加処理完了後）
+        socket.join(roomId);
+        socket.roomId = roomId;
+        socket.playerName = playerName;
         
-        console.log(`${playerName} が再接続しました（プレイヤー更新）`);
+        console.log(`🔧 Socket設定完了: ${socket.id} -> ${roomId} (${playerName})`);
         
-    } else {
-        // 新規プレイヤー追加
-        console.log(`👤 ${playerName} の新規参加処理開始`);
+        // 🔧 【追加】参加後の整合性チェック
+        const finalPlayerCount = room.players.length;
+        const finalGameDataPlayerCount = room.gameData.players.length;
+        const connectedPlayerCount = room.players.filter(p => p.connected).length;
         
-        const newPlayer = {
-            id: socket.id,
-            name: playerName,
-            connected: true,
-            role: null,
-            hand: []
-        };
+        console.log(`📊 参加後の状態: ルーム ${roomId}`);
+        console.log(`- room.players: ${finalPlayerCount}人`);
+        console.log(`- room.gameData.players: ${finalGameDataPlayerCount}人`);
+        console.log(`- 接続中: ${connectedPlayerCount}人`);
         
-        // 🔧 【重要】原子的操作で重複を防ぐ
-        room.players.push(newPlayer);
-        room.gameData.players.push(newPlayer);
-        processedPlayer = newPlayer;
+        // 🔧 【重要】整合性エラーチェック
+        if (finalPlayerCount !== finalGameDataPlayerCount) {
+            console.error(`❌ 整合性エラー: players=${finalPlayerCount}, gameData.players=${finalGameDataPlayerCount}`);
+            
+            // 自動修復試行
+            room.gameData.players = [...room.players];
+            console.log(`🔧 自動修復完了: gameData.players=${room.gameData.players.length}`);
+        }
         
-        console.log(`${playerName} が新規参加しました（プレイヤー追加完了）`);
-    }
-    
-    // 🔧 【重要】ソケット情報設定
-    socket.join(roomId);
-    socket.roomId = roomId;
-    socket.playerName = playerName;
-    
-    console.log(`🔧 Socket設定完了: ${socket.id} -> ${roomId} (${playerName})`);
-    
-    // 🔧 【追加】参加後の整合性チェック
-    const finalPlayerCount = room.players.length;
-    const finalGameDataPlayerCount = room.gameData.players.length;
-    const connectedPlayerCount = room.players.filter(p => p.connected).length;
-    
-    console.log(`📊 参加後の状態: ルーム ${roomId}`);
-    console.log(`- room.players: ${finalPlayerCount}人`);
-    console.log(`- room.gameData.players: ${finalGameDataPlayerCount}人`);
-    console.log(`- 接続中: ${connectedPlayerCount}人`);
-    
-    // 🔧 【重要】整合性エラーチェック
-    if (finalPlayerCount !== finalGameDataPlayerCount) {
-        console.error(`❌ 整合性エラー: players=${finalPlayerCount}, gameData.players=${finalGameDataPlayerCount}`);
+        // 🔧 【追加】最終的な重複チェック（念のため）
+        const uniquePlayerIds = new Set(room.players.map(p => p.id));
+        const uniquePlayerNames = new Set(room.players.filter(p => p.connected).map(p => p.name));
         
-        // 自動修復試行
-        room.gameData.players = [...room.players];
-        console.log(`🔧 自動修復完了: gameData.players=${room.gameData.players.length}`);
-    }
-    
-    // 成功応答
-    console.log('✅ joinSuccess送信準備完了');
-    socket.emit('joinSuccess', {
-        roomId: roomId,
-        gameData: room.gameData,
-        playerInfo: {
+        if (uniquePlayerIds.size !== room.players.length) {
+            console.error(`❌ Socket ID重複検出: ${room.players.length}人中${uniquePlayerIds.size}個のユニークID`);
+            // 重複削除処理
+            const uniquePlayers = room.players.filter((player, index, self) => 
+                self.findIndex(p => p.id === player.id) === index
+            );
+            room.players = uniquePlayers;
+            room.gameData.players = uniquePlayers;
+            console.log(`🔧 重複削除完了: ${uniquePlayers.length}人に修正`);
+        }
+        
+        // 成功応答
+        console.log('✅ joinSuccess送信準備完了');
+        socket.emit('joinSuccess', {
             roomId: roomId,
-            playerName: playerName,
-            isHost: room.gameData.host === socket.id,
-            isReconnection: isReconnection
-        }
+            gameData: room.gameData,
+            playerInfo: {
+                roomId: roomId,
+                playerName: playerName,
+                isHost: room.gameData.host === socket.id,
+                isReconnection: isReconnection
+            }
+        });
+        
+        // ルーム内の全員に更新を送信
+        io.to(roomId).emit('gameUpdate', room.gameData);
+        
+        // ルーム一覧更新
+        updateRoomList(io);
+        
+        console.log(`✅ ${playerName} がルーム ${roomId} に参加完了（重複防止強化済み）`);
     });
-    
-    // ルーム内の全員に更新を送信
-    io.to(roomId).emit('gameUpdate', room.gameData);
-    
-    // ルーム一覧更新
-    updateRoomList(io);
-    
-    console.log(`✅ ${playerName} がルーム ${roomId} に参加完了（重複防止強化済み）`);
-});
     
     // 再入場
     socket.on('rejoinRoom', (data) => {
@@ -483,6 +520,10 @@ function handlePlayerTempLeave(socket, io) {
         console.log(`${player.name} が一時退出しました`);
     }
     
+    // 🔧 【追加】ソケット情報をクリア
+    socket.roomId = null;
+    socket.playerName = null;
+    
     // ルーム内の他のプレイヤーに更新を送信
     io.to(socket.roomId).emit('gameUpdate', room.gameData);
     
@@ -490,7 +531,7 @@ function handlePlayerTempLeave(socket, io) {
     updateRoomList(io);
 }
 
-// 既存のhandlePlayerLeave関数を修正
+// 🔧 【修正】handlePlayerLeave関数 - ソケット情報クリア追加
 function handlePlayerLeave(socket, io) {
     if (!socket.roomId) return;
     
@@ -519,20 +560,25 @@ function handlePlayerLeave(socket, io) {
         }
     }
     
+    // 🔧 【追加】退出前にソケット情報をクリア
+    const roomIdToNotify = socket.roomId;
+    socket.roomId = null;
+    socket.playerName = null;
+    
     // 全員が退出した場合、ルームを削除
     if (room.players.length === 0) {
-        activeRooms.delete(socket.roomId);
-        console.log('🗑️ 空のルームを削除:', socket.roomId);
+        activeRooms.delete(roomIdToNotify);
+        console.log('🗑️ 空のルームを削除:', roomIdToNotify);
     } else {
         // ルーム内の他のプレイヤーに更新を送信
-        io.to(socket.roomId).emit('gameUpdate', room.gameData);
+        io.to(roomIdToNotify).emit('gameUpdate', room.gameData);
     }
     
     // ルーム一覧更新
     updateRoomList(io);
 }
 
-// 🔧 【追加】切断時のホスト変更処理も修正
+// 🔧 【修正】切断時のホスト変更処理も修正
 function handlePlayerDisconnect(socket, io) {
     if (!socket.roomId) return;
     
@@ -563,6 +609,10 @@ function handlePlayerDisconnect(socket, io) {
             });
         }
     }
+    
+    // 🔧 【追加】切断時のソケット情報クリア
+    socket.roomId = null;
+    socket.playerName = null;
     
     // 全員が切断した場合、ルームを削除
     if (room.players.every(p => !p.connected)) {
