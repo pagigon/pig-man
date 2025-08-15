@@ -5,6 +5,9 @@ import { safeGetElement, safeSetText, vibrate } from '../utils/helpers.js';
 export class GameBoard {
     constructor(game) {
         this.game = game;
+        this.lastCardSelection = 0;
+        this.cardSelectionCooldown = 500; // 0.5秒のクールダウン
+        this.isProcessingCardSelection = false;
     }
 
     // 🔧 【修正】画像読み込みとフォールバック処理
