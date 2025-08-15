@@ -1,4 +1,4 @@
-// public/js/core/socket-client.js - イベント修正版（チャット・ラウンド開始対応）
+// public/js/core/socket-client.js - 完全版（再接続システム対応 + チャット・ラウンド開始修正）
 
 import { UIManager } from './ui-manager.js';
 
@@ -340,7 +340,7 @@ export class SocketClient {
         console.log('✅ Socket イベントリスナー設定完了（再接続対応）');
     }
     
-    // 🔧 【修正】その他のイベントリスナー設定（チャット・ラウンド開始対応）
+    // 🔧 【修正】その他のイベントリスナー設定（完全版）
     setupOtherEventListeners() {
         const self = this;
         
@@ -550,56 +550,6 @@ export class SocketClient {
         });
     }
     
-    // 🔧 【修正】チャット送信（正しいイベント名）
-    sendChatMessage(message) {
-        console.log('💬 チャット送信:', message);
-        
-        if (!message || message.trim().length === 0) {
-            return false;
-        }
-        
-        if (message.trim().length > 100) { // サーバー側に合わせて100文字制限
-            UIManager.showError('メッセージは100文字以内で入力してください');
-            return false;
-        }
-        
-        // 🔧 【修正】サーバー側と一致するイベント名とデータ形式
-        return this.emit('sendChat', message.trim());
-    }
-    
-    // 基本的なSocket操作メソッド
-    emit(event, data) {
-        console.log('📤 Socket送信: ' + event, data);
-        
-        if (!this.socket) {
-            console.error('❌ Socket が存在しません');
-            UIManager.showError('サーバー接続が初期化されていません');
-            return false;
-        }
-
-        if (!this.socket.connected) {
-            console.error('❌ Socket 未接続');
-            UIManager.showError('サーバーに接続されていません。接続を確認中...');
-            
-            if (!this.isConnecting) {
-                this.forceReconnect();
-            }
-            return false;
-        }
-
-        try {
-            this.socket.emit(event, data);
-            console.log('✅ Socket送信成功: ' + event);
-            return true;
-        } catch (error) {
-            console.error('❌ Socket送信エラー: ' + event, error);
-            UIManager.showError('通信エラーが発生しました');
-            return false;
-        }
-    }
-
-    // その他のメソッド（省略）...
-    
     // 🔧 【追加】スケジュール再接続
     scheduleReconnect(delay = 3000) {
         if (this.reconnectTimer) {
@@ -695,6 +645,37 @@ export class SocketClient {
     }
     
     // 基本的なSocket操作メソッド
+    emit(event, data) {
+        console.log('📤 Socket送信: ' + event, data);
+        
+        if (!this.socket) {
+            console.error('❌ Socket が存在しません');
+            UIManager.showError('サーバー接続が初期化されていません');
+            return false;
+        }
+
+        if (!this.socket.connected) {
+            console.error('❌ Socket 未接続');
+            UIManager.showError('サーバーに接続されていません。接続を確認中...');
+            
+            if (!this.isConnecting) {
+                this.forceReconnect();
+            }
+            return false;
+        }
+
+        try {
+            this.socket.emit(event, data);
+            console.log('✅ Socket送信成功: ' + event);
+            return true;
+        } catch (error) {
+            console.error('❌ Socket送信エラー: ' + event, error);
+            UIManager.showError('通信エラーが発生しました');
+            return false;
+        }
+    }
+
+    // 基本的なSocket操作メソッド
     getRoomList() {
         console.log('📋 ルーム一覧要求');
         return this.emit('getRoomList');
@@ -710,11 +691,6 @@ export class SocketClient {
         
         if (!playerName || playerName.trim().length === 0) {
             UIManager.showError('プレイヤー名を入力してください');
-            return false;
-        }
-        
-        if (playerName.trim().length > 20) {
-            UIManager.showError('プレイヤー名は20文字以内で入力してください');
             return false;
         }
         
@@ -801,6 +777,23 @@ export class SocketClient {
     selectCard(targetPlayerId, cardIndex) {
         console.log('🎯 カード選択要求:', { targetPlayerId, cardIndex });
         return this.emit('selectCard', { targetPlayerId, cardIndex });
+    }
+
+    // 🔧 【修正】チャット送信（正しいイベント名・データ形式）
+    sendChatMessage(message) {
+        console.log('💬 チャット送信:', message);
+        
+        if (!message || message.trim().length === 0) {
+            return false;
+        }
+        
+        if (message.trim().length > 100) { // サーバー側に合わせて100文字制限
+            UIManager.showError('メッセージは100文字以内で入力してください');
+            return false;
+        }
+        
+        // 🔧 【修正】サーバー側と一致するイベント名とデータ形式
+        return this.emit('sendChat', message.trim());
     }
     
     // 状態確認メソッド
