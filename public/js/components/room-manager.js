@@ -1,4 +1,4 @@
-// public/js/components/room-manager.js - 完全版（再接続システム対応）
+// public/js/components/room-manager.js - 修正完全版（再接続システム対応）
 
 import { UIManager } from '../core/ui-manager.js';
 import { StorageManager } from '../utils/storage.js';
@@ -76,147 +76,7 @@ export class RoomManager {
             }
             
         } catch (error) {
-            console.error('ルーム情報表示エラー:', error);
-        }
-    }
-
-    populateRejoinInfo(rejoinInfo) {
-        try {
-            if (!rejoinInfo || typeof rejoinInfo !== 'object') return;
-            
-            const rejoinPlayerNameEl = safeGetElement('rejoin-player-name');
-            const rejoinRoomIdEl = safeGetElement('rejoin-room-id');
-            
-            if (rejoinPlayerNameEl && rejoinInfo.playerName) {
-                rejoinPlayerNameEl.value = rejoinInfo.playerName;
-            }
-            if (rejoinRoomIdEl && rejoinInfo.roomId) {
-                rejoinRoomIdEl.value = rejoinInfo.roomId;
-            }
-        } catch (error) {
-            console.error('再入場情報設定エラー:', error);
-        }
-    }
-
-    // 🔧 【追加】その他の成功コールバック
-    onSpectateSuccess(data) {
-        console.log('✅ 観戦成功:', data);
-        try {
-            this.game.roomId = data.roomId;
-            this.game.gameData = data.gameData;
-            this.game.isSpectator = true;
-            UIManager.showSpectatorMode(true);
-            UIManager.showError(`ルーム ${data.roomId} の観戦を開始しました！`, 'success');
-        } catch (error) {
-            console.error('観戦成功処理エラー:', error);
-        }
-    }
-
-    onRoomCreated(data) {
-        console.log('✅ ルーム作成成功:', data);
-        
-        try {
-            // タイマークリア
-            if (this.timers.createTimeout) {
-                clearTimeout(this.timers.createTimeout);
-                this.timers.createTimeout = null;
-            }
-            
-            this.forceResetAllStates();
-            
-            // ゲーム状態を更新
-            this.game.roomId = data.roomId;
-            this.game.gameData = data.gameData;
-            this.game.isHost = true;
-            
-            // 🔧 【追加】再接続用の情報保存
-            if (this.game.myName && this.game.roomId) {
-                this.saveReconnectInfo(
-                    this.game.roomId,
-                    this.game.myName,
-                    'waiting',
-                    true
-                );
-            }
-            
-            // プレイヤー情報保存
-            if (data.playerInfo) {
-                StorageManager.savePlayerInfo(data.playerInfo);
-            }
-            
-            // 画面遷移
-            UIManager.showScreen('room-info');
-            this.showRoomInfo();
-            
-            UIManager.showError(`ルーム ${data.roomId} を作成しました！`, 'success');
-            
-        } catch (error) {
-            console.error('ルーム作成成功処理エラー:', error);
-        }
-    }
-
-    // 🔧 【追加】一時退出関連
-    showTempLeaveDialog() {
-        if (this.game.gameData?.gameState === 'playing') {
-            const tempLeaveSection = safeGetElement('temp-leave-section');
-            if (tempLeaveSection) tempLeaveSection.style.display = 'block';
-            UIManager.showScreen('room-info');
-        } else {
-            this.leaveRoom();
-        }
-    }
-
-    cancelTempLeave() {
-        const tempLeaveSection = safeGetElement('temp-leave-section');
-        if (tempLeaveSection) tempLeaveSection.style.display = 'none';
-        if (this.game.gameData?.gameState === 'playing') {
-            UIManager.showScreen('game-board');
-        }
-    }
-
-    // 🔧 【追加】強制リセット（公開メソッド）
-    forceResetJoinState() {
-        console.log('🔧 参加状態強制リセット（外部呼出）');
-        this.forceResetAllStates();
-    }
-
-    // 🔧 【追加】デバッグ情報拡張
-    getDebugInfo() {
-        return {
-            // 基本フラグ状態
-            isJoining: this.isJoining,
-            isCreating: this.isCreating,
-            
-            // 再接続関連
-            isReconnecting: this.reconnectInfo.isReconnecting,
-            reconnectAttempts: this.reconnectInfo.reconnectAttempts,
-            lastReconnectAttempt: this.reconnectInfo.lastReconnectAttempt,
-            hasReconnectInfo: !!this.getReconnectInfo(),
-            
-            // 時間情報
-            lastJoinAttempt: this.lastJoinAttempt,
-            lastCreateAttempt: this.lastCreateAttempt,
-            timeSinceLastJoin: Date.now() - this.lastJoinAttempt,
-            timeSinceLastCreate: Date.now() - this.lastCreateAttempt,
-            
-            // タイマー状態
-            activeTimers: Object.keys(this.timers).filter(key => this.timers[key] !== null),
-            
-            // デバッグカウンター
-            resetCount: this.debug.resetCount,
-            joinAttempts: this.debug.joinAttempts,
-            lastError: this.debug.lastError,
-            
-            // ゲーム状態
-            roomId: this.game.roomId,
-            isHost: this.game.isHost,
-            gameState: this.game.gameData?.gameState || 'なし',
-            
-            // Socket状態
-            socketConnected: this.game.socketClient?.isConnected() || false
-        };
-    }
-}error('❌ 自動復帰エラー:', error);
+            console.error('❌ 自動復帰エラー:', error);
             this.forceResetAllStates();
         }
     }
@@ -451,249 +311,6 @@ export class RoomManager {
         }
     }
     
-    // 🔧 【修正】参加成功時に再接続情報保存
-    onJoinSuccess(data) {
-        console.log('✅ ルーム参加成功:', data);
-        
-        try {
-            this.forceResetAllStates();
-            
-            // ゲーム状態を更新
-            this.game.roomId = data.roomId;
-            this.game.gameData = data.gameData;
-            this.game.isHost = data.playerInfo?.isHost || false;
-            
-            // 🔧 【追加】再接続用の情報保存
-            if (this.game.myName && this.game.roomId) {
-                this.saveReconnectInfo(
-                    this.game.roomId,
-                    this.game.myName,
-                    data.gameData?.gameState || 'waiting',
-                    this.game.isHost
-                );
-            }
-            
-            // プレイヤー情報保存
-            if (data.playerInfo) {
-                StorageManager.savePlayerInfo(data.playerInfo);
-            }
-            
-            // 画面遷移
-            UIManager.showScreen('room-info');
-            this.showRoomInfo();
-            
-            UIManager.showError('ルームに参加しました！', 'success');
-            
-        } catch (error) {
-            console.error('参加成功処理エラー:', error);
-        }
-    }
-    
-    // 🔧 【修正】再入場成功処理
-    onRejoinSuccess(data) {
-        console.log('✅ 再入場成功:', data);
-        
-        try {
-            // 再接続フラグをクリア
-            this.reconnectInfo.isReconnecting = false;
-            this.reconnectInfo.reconnectAttempts = 0;
-            
-            this.forceResetAllStates();
-            
-            // ゲーム状態を更新
-            this.game.roomId = data.roomId;
-            this.game.gameData = data.gameData;
-            this.game.isHost = data.isHost || false;
-            
-            // 🔧 【追加】再接続情報を更新
-            this.saveReconnectInfo(
-                this.game.roomId,
-                this.game.myName,
-                data.gameData?.gameState || 'playing',
-                this.game.isHost
-            );
-            
-            // 復帰情報をクリア
-            StorageManager.clearRejoinInfo();
-            
-            // 画面遷移
-            if (data.gameData?.gameState === 'playing') {
-                UIManager.showScreen('game-board');
-            } else {
-                UIManager.showScreen('room-info');
-            }
-            
-            UIManager.showError('ゲームに再入場しました！', 'success');
-            
-        } catch (error) {
-            console.error('再入場成功処理エラー:', error);
-        }
-    }
-    
-    // 🔧 【修正】ルーム退出時に再接続情報をクリア
-    leaveRoom() {
-        try {
-            console.log('🚪 ルーム退出処理');
-            
-            // 再接続情報をクリア（意図的な退出のため）
-            this.clearReconnectInfo();
-            
-            if (this.game.socketClient && this.game.socketClient.isConnected()) {
-                this.game.socketClient.leaveRoom();
-            }
-            
-            this.forceResetAllStates();
-            this.game.roomId = null;
-            this.game.gameData = null;
-            this.game.isHost = false;
-            
-            StorageManager.clearPlayerInfo();
-            StorageManager.clearRejoinInfo();
-            
-            UIManager.showScreen('lobby');
-            UIManager.showError('ルームを退出しました', 'warning');
-            
-        } catch (error) {
-            console.error('ルーム退出エラー:', error);
-        }
-    }
-    
-    // 🔧 【修正】一時退出時の処理改良
-    tempLeaveRoom() {
-        try {
-            console.log('⏸️ 一時退出処理');
-            
-            // 一時退出情報を保存
-            const rejoinInfo = {
-                roomId: this.game.roomId,
-                playerName: this.game.myName,
-                tempLeft: true,
-                timestamp: Date.now()
-            };
-            
-            StorageManager.saveRejoinInfo(rejoinInfo);
-            
-            // 🔧 【重要】再接続情報は保持（自動復帰用）
-            // this.clearReconnectInfo(); ← これは実行しない
-            
-            // Socket切断
-            if (this.game.socketClient && this.game.socketClient.isConnected()) {
-                this.game.socketClient.tempLeaveRoom();
-            }
-            
-            this.forceResetAllStates();
-            UIManager.showScreen('lobby');
-            this.populateRejoinInfo(rejoinInfo);
-            UIManager.showError('一時退出しました。再入場情報が入力されています。', 'warning');
-            
-        } catch (error) {
-            console.error('一時退出エラー:', error);
-        }
-    }
-    
-    // 🔧 【追加】エラーハンドリング強化
-    onError(error) {
-        console.error('❌ RoomManager エラー:', error);
-        
-        // 最優先でフラグリセット（再接続フラグも含む）
-        this.forceResetAllStates();
-        
-        this.debug.lastError = error;
-        
-        // エラーメッセージ表示
-        const message = error?.message || 'エラーが発生しました';
-        UIManager.showError(message);
-        
-        // 特定のエラーへの対応
-        if (message.includes('ルームが見つかりません')) {
-            this.clearReconnectInfo(); // ルームが存在しない場合は再接続情報もクリア
-            UIManager.showError('指定されたルームが存在しません。ルームIDを確認してください。', 'warning');
-        } else if (message.includes('接続')) {
-            UIManager.showError('サーバー接続に問題があります。しばらく待ってから再試行してください。', 'warning');
-        } else if (message.includes('既に接続中')) {
-            this.clearReconnectInfo(); // 重複接続の場合も再接続情報をクリア
-            UIManager.showError('このプレイヤーは既に接続中です。', 'warning');
-        }
-    }
-    
-    // 🔧 【追加】ボタン状態更新（再接続状態も考慮）
-    updateButtonStates() {
-        try {
-            const createBtn = safeGetElement('create-room');
-            const joinBtn = safeGetElement('join-room');
-            const rejoinBtn = safeGetElement('rejoin-room');
-            
-            const isOperationInProgress = this.isCreating || this.isJoining || this.reconnectInfo.isReconnecting;
-            
-            if (createBtn) {
-                createBtn.disabled = isOperationInProgress;
-                createBtn.textContent = this.isCreating ? '作成中...' : 'ルームを作成';
-                createBtn.style.opacity = isOperationInProgress ? '0.6' : '1';
-            }
-            
-            if (joinBtn) {
-                joinBtn.disabled = isOperationInProgress;
-                joinBtn.textContent = this.isJoining ? '参加中...' : 'ルームに参加';
-                joinBtn.style.opacity = isOperationInProgress ? '0.6' : '1';
-            }
-            
-            if (rejoinBtn) {
-                rejoinBtn.disabled = isOperationInProgress;
-                rejoinBtn.textContent = this.reconnectInfo.isReconnecting ? '再接続中...' : 'ゲームに再入場';
-                rejoinBtn.style.opacity = isOperationInProgress ? '0.6' : '1';
-            }
-            
-        } catch (error) {
-            console.error('❌ ボタン状態更新エラー:', error);
-        }
-    }
-    
-    // 🔧 【基本機能】再入場機能
-    rejoinRoom() {
-        try {
-            const nameInput = safeGetElement('rejoin-player-name');
-            const roomInput = safeGetElement('rejoin-room-id');
-            
-            const playerName = nameInput?.value.trim();
-            const roomId = roomInput?.value.trim().toUpperCase();
-
-            if (!playerName || !roomId) {
-                UIManager.showError('プレイヤー名とルームIDを入力してください');
-                return;
-            }
-
-            // 🔧 【追加】再接続フラグ設定
-            this.reconnectInfo.isReconnecting = true;
-            this.reconnectInfo.lastReconnectAttempt = Date.now();
-            
-            this.game.myName = playerName;
-            this.game.roomId = roomId;
-            UIManager.showPlayerName(this.game.myName);
-            
-            const success = this.game.socketClient.rejoinRoom(roomId, playerName);
-            
-            if (success) {
-                this.updateButtonStates();
-                
-                // タイムアウト設定
-                this.timers.reconnectTimeout = setTimeout(() => {
-                    if (this.reconnectInfo.isReconnecting) {
-                        this.onReconnectTimeout();
-                    }
-                }, 10000);
-            } else {
-                this.reconnectInfo.isReconnecting = false;
-                UIManager.showError('再入場リクエストの送信に失敗しました');
-            }
-            
-        } catch (error) {
-            console.error('再入場エラー:', error);
-            this.reconnectInfo.isReconnecting = false;
-            this.updateButtonStates();
-            UIManager.showError('再入場処理でエラーが発生しました');
-        }
-    }
-    
     // 🔧 【基本機能】ルーム作成
     createRoom() {
         console.log('🏠 ルーム作成処理開始（完全修正版）');
@@ -849,7 +466,53 @@ export class RoomManager {
         }
     }
     
-    // その他のメソッド（observeモード、ルーム情報表示など）
+    // 🔧 【基本機能】再入場機能
+    rejoinRoom() {
+        try {
+            const nameInput = safeGetElement('rejoin-player-name');
+            const roomInput = safeGetElement('rejoin-room-id');
+            
+            const playerName = nameInput?.value.trim();
+            const roomId = roomInput?.value.trim().toUpperCase();
+
+            if (!playerName || !roomId) {
+                UIManager.showError('プレイヤー名とルームIDを入力してください');
+                return;
+            }
+
+            // 🔧 【追加】再接続フラグ設定
+            this.reconnectInfo.isReconnecting = true;
+            this.reconnectInfo.lastReconnectAttempt = Date.now();
+            
+            this.game.myName = playerName;
+            this.game.roomId = roomId;
+            UIManager.showPlayerName(this.game.myName);
+            
+            const success = this.game.socketClient.rejoinRoom(roomId, playerName);
+            
+            if (success) {
+                this.updateButtonStates();
+                
+                // タイムアウト設定
+                this.timers.reconnectTimeout = setTimeout(() => {
+                    if (this.reconnectInfo.isReconnecting) {
+                        this.onReconnectTimeout();
+                    }
+                }, 10000);
+            } else {
+                this.reconnectInfo.isReconnecting = false;
+                UIManager.showError('再入場リクエストの送信に失敗しました');
+            }
+            
+        } catch (error) {
+            console.error('再入場エラー:', error);
+            this.reconnectInfo.isReconnecting = false;
+            this.updateButtonStates();
+            UIManager.showError('再入場処理でエラーが発生しました');
+        }
+    }
+    
+    // その他のメソッド（観戦、ルーム情報表示など）
     spectateRoom() {
         try {
             const nameInput = safeGetElement('spectator-name');
@@ -887,4 +550,341 @@ export class RoomManager {
             }
             
         } catch (error) {
-            console.
+            console.error('ルーム情報表示エラー:', error);
+        }
+    }
+
+    populateRejoinInfo(rejoinInfo) {
+        try {
+            if (!rejoinInfo || typeof rejoinInfo !== 'object') return;
+            
+            const rejoinPlayerNameEl = safeGetElement('rejoin-player-name');
+            const rejoinRoomIdEl = safeGetElement('rejoin-room-id');
+            
+            if (rejoinPlayerNameEl && rejoinInfo.playerName) {
+                rejoinPlayerNameEl.value = rejoinInfo.playerName;
+            }
+            if (rejoinRoomIdEl && rejoinInfo.roomId) {
+                rejoinRoomIdEl.value = rejoinInfo.roomId;
+            }
+        } catch (error) {
+            console.error('再入場情報設定エラー:', error);
+        }
+    }
+
+    // 成功コールバック
+    onSpectateSuccess(data) {
+        console.log('✅ 観戦成功:', data);
+        try {
+            this.game.roomId = data.roomId;
+            this.game.gameData = data.gameData;
+            this.game.isSpectator = true;
+            UIManager.showSpectatorMode(true);
+            UIManager.showError(`ルーム ${data.roomId} の観戦を開始しました！`, 'success');
+        } catch (error) {
+            console.error('観戦成功処理エラー:', error);
+        }
+    }
+
+    onRoomCreated(data) {
+        console.log('✅ ルーム作成成功:', data);
+        
+        try {
+            // タイマークリア
+            if (this.timers.createTimeout) {
+                clearTimeout(this.timers.createTimeout);
+                this.timers.createTimeout = null;
+            }
+            
+            this.forceResetAllStates();
+            
+            // ゲーム状態を更新
+            this.game.roomId = data.roomId;
+            this.game.gameData = data.gameData;
+            this.game.isHost = true;
+            
+            // 🔧 【追加】再接続用の情報保存
+            if (this.game.myName && this.game.roomId) {
+                this.saveReconnectInfo(
+                    this.game.roomId,
+                    this.game.myName,
+                    'waiting',
+                    true
+                );
+            }
+            
+            // プレイヤー情報保存
+            if (data.playerInfo) {
+                StorageManager.savePlayerInfo(data.playerInfo);
+            }
+            
+            // 画面遷移
+            UIManager.showScreen('room-info');
+            this.showRoomInfo();
+            
+            UIManager.showError(`ルーム ${data.roomId} を作成しました！`, 'success');
+            
+        } catch (error) {
+            console.error('ルーム作成成功処理エラー:', error);
+        }
+    }
+
+    // 🔧 【修正】参加成功時に再接続情報保存
+    onJoinSuccess(data) {
+        console.log('✅ ルーム参加成功:', data);
+        
+        try {
+            this.forceResetAllStates();
+            
+            // ゲーム状態を更新
+            this.game.roomId = data.roomId;
+            this.game.gameData = data.gameData;
+            this.game.isHost = data.playerInfo?.isHost || false;
+            
+            // 🔧 【追加】再接続用の情報保存
+            if (this.game.myName && this.game.roomId) {
+                this.saveReconnectInfo(
+                    this.game.roomId,
+                    this.game.myName,
+                    data.gameData?.gameState || 'waiting',
+                    this.game.isHost
+                );
+            }
+            
+            // プレイヤー情報保存
+            if (data.playerInfo) {
+                StorageManager.savePlayerInfo(data.playerInfo);
+            }
+            
+            // 画面遷移
+            UIManager.showScreen('room-info');
+            this.showRoomInfo();
+            
+            UIManager.showError('ルームに参加しました！', 'success');
+            
+        } catch (error) {
+            console.error('参加成功処理エラー:', error);
+        }
+    }
+    
+    // 🔧 【修正】再入場成功処理
+    onRejoinSuccess(data) {
+        console.log('✅ 再入場成功:', data);
+        
+        try {
+            // 再接続フラグをクリア
+            this.reconnectInfo.isReconnecting = false;
+            this.reconnectInfo.reconnectAttempts = 0;
+            
+            this.forceResetAllStates();
+            
+            // ゲーム状態を更新
+            this.game.roomId = data.roomId;
+            this.game.gameData = data.gameData;
+            this.game.isHost = data.isHost || false;
+            
+            // 🔧 【追加】再接続情報を更新
+            this.saveReconnectInfo(
+                this.game.roomId,
+                this.game.myName,
+                data.gameData?.gameState || 'playing',
+                this.game.isHost
+            );
+            
+            // 復帰情報をクリア
+            StorageManager.clearRejoinInfo();
+            
+            // 画面遷移
+            if (data.gameData?.gameState === 'playing') {
+                UIManager.showScreen('game-board');
+            } else {
+                UIManager.showScreen('room-info');
+            }
+            
+            UIManager.showError('ゲームに再入場しました！', 'success');
+            
+        } catch (error) {
+            console.error('再入場成功処理エラー:', error);
+        }
+    }
+    
+    // 🔧 【修正】ルーム退出時に再接続情報をクリア
+    leaveRoom() {
+        try {
+            console.log('🚪 ルーム退出処理');
+            
+            // 再接続情報をクリア（意図的な退出のため）
+            this.clearReconnectInfo();
+            
+            if (this.game.socketClient && this.game.socketClient.isConnected()) {
+                this.game.socketClient.leaveRoom();
+            }
+            
+            this.forceResetAllStates();
+            this.game.roomId = null;
+            this.game.gameData = null;
+            this.game.isHost = false;
+            
+            StorageManager.clearPlayerInfo();
+            StorageManager.clearRejoinInfo();
+            
+            UIManager.showScreen('lobby');
+            UIManager.showError('ルームを退出しました', 'warning');
+            
+        } catch (error) {
+            console.error('ルーム退出エラー:', error);
+        }
+    }
+    
+    // 🔧 【修正】一時退出時の処理改良
+    tempLeaveRoom() {
+        try {
+            console.log('⏸️ 一時退出処理');
+            
+            // 一時退出情報を保存
+            const rejoinInfo = {
+                roomId: this.game.roomId,
+                playerName: this.game.myName,
+                tempLeft: true,
+                timestamp: Date.now()
+            };
+            
+            StorageManager.saveRejoinInfo(rejoinInfo);
+            
+            // 🔧 【重要】再接続情報は保持（自動復帰用）
+            // this.clearReconnectInfo(); ← これは実行しない
+            
+            // Socket切断
+            if (this.game.socketClient && this.game.socketClient.isConnected()) {
+                this.game.socketClient.tempLeaveRoom();
+            }
+            
+            this.forceResetAllStates();
+            UIManager.showScreen('lobby');
+            this.populateRejoinInfo(rejoinInfo);
+            UIManager.showError('一時退出しました。再入場情報が入力されています。', 'warning');
+            
+        } catch (error) {
+            console.error('一時退出エラー:', error);
+        }
+    }
+    
+    // 🔧 【追加】一時退出関連
+    showTempLeaveDialog() {
+        if (this.game.gameData?.gameState === 'playing') {
+            const tempLeaveSection = safeGetElement('temp-leave-section');
+            if (tempLeaveSection) tempLeaveSection.style.display = 'block';
+            UIManager.showScreen('room-info');
+        } else {
+            this.leaveRoom();
+        }
+    }
+
+    cancelTempLeave() {
+        const tempLeaveSection = safeGetElement('temp-leave-section');
+        if (tempLeaveSection) tempLeaveSection.style.display = 'none';
+        if (this.game.gameData?.gameState === 'playing') {
+            UIManager.showScreen('game-board');
+        }
+    }
+    
+    // 🔧 【追加】エラーハンドリング強化
+    onError(error) {
+        console.error('❌ RoomManager エラー:', error);
+        
+        // 最優先でフラグリセット（再接続フラグも含む）
+        this.forceResetAllStates();
+        
+        this.debug.lastError = error;
+        
+        // エラーメッセージ表示
+        const message = error?.message || 'エラーが発生しました';
+        UIManager.showError(message);
+        
+        // 特定のエラーへの対応
+        if (message.includes('ルームが見つかりません')) {
+            this.clearReconnectInfo(); // ルームが存在しない場合は再接続情報もクリア
+            UIManager.showError('指定されたルームが存在しません。ルームIDを確認してください。', 'warning');
+        } else if (message.includes('接続')) {
+            UIManager.showError('サーバー接続に問題があります。しばらく待ってから再試行してください。', 'warning');
+        } else if (message.includes('既に接続中')) {
+            this.clearReconnectInfo(); // 重複接続の場合も再接続情報をクリア
+            UIManager.showError('このプレイヤーは既に接続中です。', 'warning');
+        }
+    }
+    
+    // 🔧 【追加】ボタン状態更新（再接続状態も考慮）
+    updateButtonStates() {
+        try {
+            const createBtn = safeGetElement('create-room');
+            const joinBtn = safeGetElement('join-room');
+            const rejoinBtn = safeGetElement('rejoin-room');
+            
+            const isOperationInProgress = this.isCreating || this.isJoining || this.reconnectInfo.isReconnecting;
+            
+            if (createBtn) {
+                createBtn.disabled = isOperationInProgress;
+                createBtn.textContent = this.isCreating ? '作成中...' : 'ルームを作成';
+                createBtn.style.opacity = isOperationInProgress ? '0.6' : '1';
+            }
+            
+            if (joinBtn) {
+                joinBtn.disabled = isOperationInProgress;
+                joinBtn.textContent = this.isJoining ? '参加中...' : 'ルームに参加';
+                joinBtn.style.opacity = isOperationInProgress ? '0.6' : '1';
+            }
+            
+            if (rejoinBtn) {
+                rejoinBtn.disabled = isOperationInProgress;
+                rejoinBtn.textContent = this.reconnectInfo.isReconnecting ? '再接続中...' : 'ゲームに再入場';
+                rejoinBtn.style.opacity = isOperationInProgress ? '0.6' : '1';
+            }
+            
+        } catch (error) {
+            console.error('❌ ボタン状態更新エラー:', error);
+        }
+    }
+
+    // 🔧 【追加】強制リセット（公開メソッド）
+    forceResetJoinState() {
+        console.log('🔧 参加状態強制リセット（外部呼出）');
+        this.forceResetAllStates();
+    }
+
+    // 🔧 【追加】デバッグ情報拡張
+    getDebugInfo() {
+        return {
+            // 基本フラグ状態
+            isJoining: this.isJoining,
+            isCreating: this.isCreating,
+            
+            // 再接続関連
+            isReconnecting: this.reconnectInfo.isReconnecting,
+            reconnectAttempts: this.reconnectInfo.reconnectAttempts,
+            lastReconnectAttempt: this.reconnectInfo.lastReconnectAttempt,
+            hasReconnectInfo: !!this.getReconnectInfo(),
+            
+            // 時間情報
+            lastJoinAttempt: this.lastJoinAttempt,
+            lastCreateAttempt: this.lastCreateAttempt,
+            timeSinceLastJoin: Date.now() - this.lastJoinAttempt,
+            timeSinceLastCreate: Date.now() - this.lastCreateAttempt,
+            
+            // タイマー状態
+            activeTimers: Object.keys(this.timers).filter(key => this.timers[key] !== null),
+            
+            // デバッグカウンター
+            resetCount: this.debug.resetCount,
+            joinAttempts: this.debug.joinAttempts,
+            lastError: this.debug.lastError,
+            
+            // ゲーム状態
+            roomId: this.game.roomId,
+            isHost: this.game.isHost,
+            gameState: this.game.gameData?.gameState || 'なし',
+            
+            // Socket状態
+            socketConnected: this.game.socketClient?.isConnected() || false
+        };
+    }
+}
