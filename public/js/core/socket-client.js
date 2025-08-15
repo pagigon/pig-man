@@ -10,90 +10,103 @@ export class SocketClient {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.connectionTimeout = null;
-        this.clientId = 'pig-game-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        
-        // 🔧 【追加】再接続管理
-        this.lastDisconnectReason = null;
-        this.reconnectTimer = null;
-        this.isInGame = false; // ゲーム中フラグ
-        this.savedRoomData = null; // ルーム情報保存
-        
-        this.initialize();
-    }
+        // 🔧 【修正】各タブ/ウィンドウで独立したclientIdを生成
+    this.clientId = 'pig-game-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) + '-' + Math.floor(Math.random() * 10000);
     
-    // 🔧 【追加】初期化メソッド
-    initialize() {
-        console.log('🔧 Socket.io 初期化開始（再接続対応版）');
+    // 🔧 【追加】複数タブサポート
+    this.tabId = 'tab-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+    
+    // 🔧 【追加】再接続管理
+    this.lastDisconnectReason = null;
+    this.reconnectTimer = null;
+    this.isInGame = false; // ゲーム中フラグ
+    this.savedRoomData = null; // ルーム情報保存
+    
+    this.initialize();
+}
+
+    // 🔧 【修正】Socket.io設定で重複防止を無効化
+initialize() {
+    console.log('🔧 Socket.io 初期化開始（複数タブ対応版）');
+    
+    try {
+        this.isConnecting = true;
         
-        try {
-            this.isConnecting = true;
-            
-            // Socket.io設定
-            const socketConfig = {
-                transports: ['websocket', 'polling'],
-                timeout: 30000,
-                forceNew: true,
-                multiplex: false,
-                upgrade: true,
-                rememberUpgrade: true,
-                autoConnect: true,
-                query: {
-                    clientId: this.clientId,
-                    preventDuplicate: 'true',
-                    timestamp: Date.now()
+        // Socket.io設定
+        const socketConfig = {
+            transports: ['websocket', 'polling'],
+            timeout: 30000,
+            forceNew: true,
+            multiplex: false,
+            upgrade: true,
+            rememberUpgrade: true,
+            autoConnect: true,
+            query: {
+                clientId: this.clientId,
+                tabId: this.tabId,
+                preventDuplicate: 'false', // 🔧 【重要】重複防止を無効化
+                timestamp: Date.now(),
+                allowMultipleTabs: 'true' // 🔧 【追加】複数タブ許可フラグ
+            },
+            transportOptions: {
+                polling: {
+                    extraHeaders: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache',
+                        'X-Client-Id': this.clientId,
+                        'X-Tab-Id': this.tabId // 🔧 【追加】タブID
+                    }
                 },
-                transportOptions: {
-                    polling: {
-                        extraHeaders: {
-                            'Cache-Control': 'no-cache',
-                            'Pragma': 'no-cache',
-                            'X-Client-Id': this.clientId
-                        }
-                    },
-                    websocket: {
-                        extraHeaders: {
-                            'Cache-Control': 'no-cache',
-                            'X-Client-Id': this.clientId
-                        }
+                websocket: {
+                    extraHeaders: {
+                        'Cache-Control': 'no-cache',
+                        'X-Client-Id': this.clientId,
+                        'X-Tab-Id': this.tabId // 🔧 【追加】タブID
                     }
                 }
-            };
-
-            console.log('🔧 Socket.io設定:', {
-                transports: socketConfig.transports,
-                forceNew: socketConfig.forceNew,
-                clientId: socketConfig.query.clientId
-            });
-            
-            // 既存のSocketがあれば完全に切断
-            if (this.socket) {
-                console.log('🔧 既存Socket切断中...');
-                try {
-                    this.socket.removeAllListeners();
-                    this.socket.disconnect();
-                    this.socket.close();
-                } catch (e) {
-                    console.warn('既存Socket切断時のエラー:', e);
-                }
-                this.socket = null;
             }
+        };
 
-            // 新しいSocket接続を作成
-            this.socket = io(socketConfig);
-            
-            // 🔧 【重要】グローバル参照設定（重複防止）
-            window.globalSocketInstance = this.socket;
-
-            console.log('✅ Socket.io インスタンス作成成功（再接続対応版）');
-            this.setupEventListeners();
-            this.setupConnectionMonitoring();
-            
-        } catch (error) {
-            console.error('❌ Socket.io 初期化エラー:', error);
-            UIManager.showError('サーバー接続の初期化に失敗しました');
-            this.isConnecting = false;
+        console.log('🔧 Socket.io設定（複数タブ対応）:', {
+            transports: socketConfig.transports,
+            forceNew: socketConfig.forceNew,
+            clientId: socketConfig.query.clientId,
+            tabId: socketConfig.query.tabId,
+            preventDuplicate: socketConfig.query.preventDuplicate
+        });
+        
+        // 既存のSocketがあれば完全に切断
+        if (this.socket) {
+            console.log('🔧 既存Socket切断中...');
+            try {
+                this.socket.removeAllListeners();
+                this.socket.disconnect();
+                this.socket.close();
+            } catch (e) {
+                console.warn('既存Socket切断時のエラー:', e);
+            }
+            this.socket = null;
         }
+
+        // 新しいSocket接続を作成
+        this.socket = io(socketConfig);
+        
+        // 🔧 【修正】グローバル参照設定（タブIDを含む）
+        if (!window.globalSocketInstances) {
+            window.globalSocketInstances = new Map();
+        }
+        window.globalSocketInstances.set(this.tabId, this.socket);
+
+        console.log('✅ Socket.io インスタンス作成成功（複数タブ対応版）');
+        this.setupEventListeners();
+        this.setupConnectionMonitoring();
+        
+    } catch (error) {
+        console.error('❌ Socket.io 初期化エラー:', error);
+        UIManager.showError('サーバー接続の初期化に失敗しました');
+        this.isConnecting = false;
     }
+}
     
     // 🔧 【追加】接続監視
     setupConnectionMonitoring() {
