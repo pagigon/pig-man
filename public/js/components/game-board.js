@@ -560,12 +560,124 @@ safeShowPlayerRole() {
                 return;
             }
             
+            // 🔧 【追加】連打防止チェック
+            const now = Date.now();
+            // 処理中チェック
+            if (this.isProcessingCardSelection) {
+                console.warn('⚠️ カード選択処理中 - 重複実行を防止');
+                UIManager.showError('カード選択処理中です...', 'warning');
+                return;
+            }
+            
+            // クールダウンチェック
+            if (now - this.lastCardSelection < this.cardSelectionCooldown) {
+                const remaining = Math.ceil((this.cardSelectionCooldown - (now - this.lastCardSelection)) / 100);
+                console.warn('⚠️ カード選択クールダウン中');
+                UIManager.showError(`カード選択は${remaining * 0.1}秒後に可能です`, 'warning');
+                return;
+            }
+            
+            // ターンチェック
+            if (this.game.gameData.keyHolderId !== this.game.mySocketId) {
+                UIManager.showError('あなたのターンではありません');
+                return;
+            }
+            
+            // 🔧 【追加】カードの有効性チェック
+            const targetPlayer = this.game.gameData.players.find(p => p.id === targetPlayerId);
+            if (!targetPlayer || !targetPlayer.hand || !targetPlayer.hand[cardIndex]) {
+                UIManager.showError('無効なカード選択です');
+                return;
+            }
+            
+            // 🔧 【追加】既に公開されているカードのチェック
+            if (targetPlayer.hand[cardIndex].revealed) {
+                UIManager.showError('そのカードは既に公開されています');
+                return;
+            }
+            
+            // 🔧 【追加】プレイヤーの接続状態チェック
+            if (!targetPlayer.connected) {
+                UIManager.showError('そのプレイヤーは切断中です');
+                return;
+            }
+            
             console.log('🃏 カード選択:', { targetPlayerId, cardIndex });
-            this.game.socketClient.selectCard(targetPlayerId, cardIndex);
+            
+            // 🔧 【重要】処理開始フラグを設定
+            this.isProcessingCardSelection = true;
+            this.lastCardSelection = now;
+            
+            // 🔧 【追加】視覚的フィードバック
+            this.addCardSelectionFeedback(targetPlayerId, cardIndex);
+            
+            // 🔧 【重要】一定時間後に処理フラグをリセット（サーバー応答がない場合のフォールバック）
+            setTimeout(() => {
+                if (this.isProcessingCardSelection) {
+                    console.warn('⚠️ カード選択処理タイムアウト - フラグリセット');
+                    this.isProcessingCardSelection = false;
+                }
+            }, 3000); // 3秒後にリセット
+            
+            // Socket送信
+            const success = this.game.socketClient.selectCard(targetPlayerId, cardIndex);
+            
+            if (!success) {
+                // 送信失敗時はすぐにフラグをリセット
+                this.isProcessingCardSelection = false;
+                UIManager.showError('カード選択の送信に失敗しました');
+            }
             
         } catch (error) {
             console.error('カード選択エラー:', error);
+            this.isProcessingCardSelection = false; // エラー時もフラグをリセット
             UIManager.showError('カード選択でエラーが発生しました');
+        }
+    }
+
+    // 🔧 【追加】カード選択の視覚的フィードバック
+    addCardSelectionFeedback(targetPlayerId, cardIndex) {
+        try {
+            // 対象のカード要素を取得
+            const playerBoxes = document.querySelectorAll('.other-player-box');
+            
+            for (const playerBox of playerBoxes) {
+                const header = playerBox.querySelector('h4');
+                if (header && header.textContent.includes(this.getPlayerNameById(targetPlayerId))) {
+                    const cards = playerBox.querySelectorAll('.other-card');
+                    const targetCard = cards[cardIndex];
+                    
+                    if (targetCard && !targetCard.classList.contains('revealed')) {
+                        // 選択中の視覚効果を追加
+                        targetCard.classList.add('selecting');
+                        targetCard.style.border = '3px solid #FFD700';
+                        targetCard.style.boxShadow = '0 0 15px rgba(255, 215, 0, 0.8)';
+                        
+                        // 3秒後に効果を削除（サーバー応答が遅い場合のフォールバック）
+                        setTimeout(() => {
+                            targetCard.classList.remove('selecting');
+                            if (!targetCard.classList.contains('revealed')) {
+                                targetCard.style.border = '';
+                                targetCard.style.boxShadow = '';
+                            }
+                        }, 3000);
+                    }
+                    break;
+                }
+            }
+        } catch (error) {
+            console.error('視覚的フィードバック追加エラー:', error);
+        }
+    }
+
+    // 🔧 【追加】プレイヤー名取得ヘルパー
+    getPlayerNameById(playerId) {
+        try {
+            const player = this.game.gameData.players.find(p => p.id === playerId);
+            return player ? player.name : '不明';
+        } catch (error) {
+            console.error('プレイヤー名取得エラー:', error);
+            return '不明';
         }
     }
 
