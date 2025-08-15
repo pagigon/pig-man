@@ -1,4 +1,4 @@
-// server/handlers/game-handlers.js - カードリサイクル修正版
+// server/handlers/game-handlers.js - 画面遷移修正版
 
 function setupGameHandlers(io, socket, socketRequestHistory) {
     // activeRoomsは room-handlers.js から取得
@@ -79,8 +79,14 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
             
             console.log('🎮 ゲーム開始成功');
             
-            // 全プレイヤーにゲーム状態を送信
+            // 🔧 【重要修正】gameStarted イベントを送信してから他のイベントを送信
             io.to(socket.roomId).emit('gameStarted', room.gameData);
+            
+            // 少し遅延してから他のイベントを送信（クライアント処理時間を確保）
+            setTimeout(() => {
+                io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                io.to(socket.roomId).emit('roundStart', 1);
+            }, 100);
             
             // ゲームログ
             sendGameLog(io, socket.roomId, '🎮 豚小屋探検隊ゲームが開始されました！', activeRooms);
@@ -325,8 +331,14 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
             
             console.log('🔄 連戦開始成功');
             
-            // 全プレイヤーにゲーム再開を通知
+            // 🔧 【重要修正】gameRestarted イベントを送信
             io.to(socket.roomId).emit('gameRestarted', room.gameData);
+            
+            // 少し遅延してから他のイベントを送信
+            setTimeout(() => {
+                io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                io.to(socket.roomId).emit('roundStart', 1);
+            }, 100);
             
             sendGameLog(io, socket.roomId, '🔄 連戦開始！新しい豚小屋探検が始まりました！', activeRooms);
             
