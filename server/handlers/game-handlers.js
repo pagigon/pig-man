@@ -118,6 +118,31 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
             return;
         }
 
+        // 🔧 【追加】連打防止チェック
+        const now = Date.now();
+        const cardSelectionKey = `${socket.id}_${data.targetPlayerId}_${data.cardIndex}`;
+        
+        // 最後のカード選択時間を記録
+        if (!room.gameData.lastCardSelections) {
+            room.gameData.lastCardSelections = new Map();
+        }
+        
+        const lastSelectionTime = room.gameData.lastCardSelections.get(cardSelectionKey);
+        if (lastSelectionTime && (now - lastSelectionTime) < 1000) { // 1秒以内の連打を防止
+            console.warn(`⚠️ カード連打検出: ${socket.id} - ${cardSelectionKey}`);
+            socket.emit('error', { message: 'カード選択が早すぎます。少し待ってから再試行してください。' });
+            return;
+        }
+        
+        // 🔧 【追加】同一プレイヤーのカード選択間隔チェック
+        const playerSelectionKey = `${socket.id}_any`;
+        const lastPlayerSelectionTime = room.gameData.lastCardSelections.get(playerSelectionKey);
+        if (lastPlayerSelectionTime && (now - lastPlayerSelectionTime) < 500) { // 0.5秒以内の連続選択を防止
+            console.warn(`⚠️ プレイヤー連続選択検出: ${socket.id}`);
+            socket.emit('error', { message: 'カード選択間隔が短すぎます。' });
+            return;
+        }
+
         // プレイヤー切断チェック
         const disconnectedPlayers = room.gameData.players.filter(p => !p.connected);
         if (disconnectedPlayers.length > 0) {
@@ -145,6 +170,17 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
             if (selectedCard.revealed) {
                 socket.emit('error', { message: 'そのカードは既に公開されています' });
                 return;
+            }
+            
+            // 🔧 【重要】カード選択時間を記録（処理開始時点で記録）
+            room.gameData.lastCardSelections.set(cardSelectionKey, now);
+            room.gameData.lastCardSelections.set(playerSelectionKey, now);
+            
+            // 🔧 【追加】古い記録をクリーンアップ（メモリリーク防止）
+            for (const [key, time] of room.gameData.lastCardSelections) {
+                if (now - time > 10000) { // 10秒以上古い記録を削除
+                    room.gameData.lastCardSelections.delete(key);
+                }
             }
             
             // カードを公開
@@ -237,6 +273,9 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                                 console.error('❌ カードリサイクル失敗:', recycleResult.error);
                             }
                         }
+                        
+                        // 🔧 【追加】新ラウンド開始時にカード選択履歴をクリア
+                        room.gameData.lastCardSelections = new Map();
                         
                         // ラウンド開始イベントを送信（3秒遅延後）
                         io.to(socket.roomId).emit('roundStart', roundResult.newRound);
