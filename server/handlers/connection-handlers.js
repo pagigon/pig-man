@@ -9,35 +9,60 @@ const { setupChatHandlers } = require('./chat-handlers');
 function setupConnectionHandlers(io) {
     const socketRequestHistory = new Map();
     
-    // 🔧 【追加】クライアント接続管理
-    const clientConnections = new Map(); // clientId -> socketId のマッピング
+    // 🔧 【修正】クライアント接続管理（複数タブ対応）
+    const clientConnections = new Map(); // clientId -> Set<socketId> のマッピング（複数socketId対応）
     
     io.on('connection', (socket) => {
         console.log('✅ 新しい接続確認:', socket.id);
         
-        // 🔧 【重要】重複接続チェック
+        // 🔧 【修正】複数タブ対応の重複接続チェック
         const clientId = socket.handshake.query.clientId;
+        const tabId = socket.handshake.query.tabId;
         const preventDuplicate = socket.handshake.query.preventDuplicate;
+        const allowMultipleTabs = socket.handshake.query.allowMultipleTabs;
         
-        if (clientId && preventDuplicate === 'true') {
-            console.log('🔍 重複接続チェック:', { clientId, socketId: socket.id });
-            
-            // 既存の同じクライアントIDの接続があるかチェック
-            const existingSocketId = clientConnections.get(clientId);
-            if (existingSocketId && existingSocketId !== socket.id) {
-                const existingSocket = io.sockets.sockets.get(existingSocketId);
-                if (existingSocket && existingSocket.connected) {
-                    console.warn(`⚠️ 重複接続検出: クライアント ${clientId} が既に接続中 (${existingSocketId}) - 古い接続を切断`);
-                    
-                    // 古い接続を切断
-                    existingSocket.emit('error', { message: '新しい接続により切断されました' });
-                    existingSocket.disconnect(true);
+        console.log('🔍 接続情報確認:', { 
+            clientId, 
+            tabId, 
+            socketId: socket.id, 
+            preventDuplicate, 
+            allowMultipleTabs 
+        });
+        
+        if (clientId) {
+            // 🔧 【修正】複数タブが許可されている場合は重複チェックをスキップ
+            if (allowMultipleTabs === 'true') {
+                console.log('✅ 複数タブモード: 重複チェックをスキップ');
+                
+                // 複数接続を許可（Setで管理）
+                if (!clientConnections.has(clientId)) {
+                    clientConnections.set(clientId, new Set());
                 }
+                clientConnections.get(clientId).add(socket.id);
+                
+            } else if (preventDuplicate === 'true') {
+                // 従来の重複防止モード
+                console.log('🔍 重複接続チェック（従来モード）:', { clientId, socketId: socket.id });
+                
+                const existingSocketIds = clientConnections.get(clientId);
+                if (existingSocketIds && existingSocketIds.size > 0) {
+                    // 古い接続を全て切断
+                    for (const existingSocketId of existingSocketIds) {
+                        const existingSocket = io.sockets.sockets.get(existingSocketId);
+                        if (existingSocket && existingSocket.connected) {
+                            console.warn(`⚠️ 重複接続検出: 古い接続 ${existingSocketId} を切断`);
+                            existingSocket.emit('error', { message: '新しい接続により切断されました' });
+                            existingSocket.disconnect(true);
+                        }
+                    }
+                }
+                
+                // 新しい接続を記録（Setで管理）
+                clientConnections.set(clientId, new Set([socket.id]));
             }
             
-            // 新しい接続を記録
-            clientConnections.set(clientId, socket.id);
             socket.clientId = clientId;
+            socket.tabId = tabId;
         }
         
         // Socket毎の要求履歴を初期化
@@ -64,19 +89,33 @@ function setupConnectionHandlers(io) {
             console.error('クライアントエラー受信:', {
                 socketId: socket.id,
                 clientId: socket.clientId,
+                tabId: socket.tabId,
                 error: errorInfo,
                 timestamp: new Date().toISOString()
             });
         });
         
-        // 切断時の処理
+        // 🔧 【修正】切断時の処理（複数タブ対応）
         socket.on('disconnect', (reason) => {
             console.log('🔌 切断:', socket.id, 'reason:', reason);
             
-            // 🔧 【追加】クライアント接続記録削除
+            // 🔧 【修正】クライアント接続記録更新（複数タブ対応）
             if (socket.clientId) {
-                clientConnections.delete(socket.clientId);
-                console.log('🗑️ クライアント接続記録削除:', socket.clientId);
+                const socketIds = clientConnections.get(socket.clientId);
+                if (socketIds) {
+                    socketIds.delete(socket.id);
+                    
+                    // 最後の接続が切断された場合のみ削除
+                    if (socketIds.size === 0) {
+                        clientConnections.delete(socket.clientId);
+                        console.log('🗑️ 最後の接続が切断 - クライアント記録削除:', socket.clientId);
+                    } else {
+                        console.log('🔌 タブ切断 - 他のタブは接続中:', { 
+                            clientId: socket.clientId, 
+                            remainingConnections: socketIds.size 
+                        });
+                    }
+                }
             }
             
             // 履歴削除
@@ -95,14 +134,26 @@ function setupConnectionHandlers(io) {
         console.log('🎯 Socket接続処理完了:', socket.id);
     });
     
-    // 🔧 【追加】定期的なクライアント接続クリーンアップ
+    // 🔧 【修正】定期的なクライアント接続クリーンアップ（複数タブ対応）
     setInterval(() => {
         const currentTime = Date.now();
         let cleanedCount = 0;
         
-        for (const [clientId, socketId] of clientConnections) {
-            const socket = io.sockets.sockets.get(socketId);
-            if (!socket || !socket.connected) {
+        for (const [clientId, socketIds] of clientConnections) {
+            const connectedSocketIds = new Set();
+            
+            // 接続中のsocketIdのみ残す
+            for (const socketId of socketIds) {
+                const socket = io.sockets.sockets.get(socketId);
+                if (socket && socket.connected) {
+                    connectedSocketIds.add(socketId);
+                }
+            }
+            
+            // 更新または削除
+            if (connectedSocketIds.size > 0) {
+                clientConnections.set(clientId, connectedSocketIds);
+            } else {
                 clientConnections.delete(clientId);
                 cleanedCount++;
             }
@@ -111,7 +162,7 @@ function setupConnectionHandlers(io) {
         if (cleanedCount > 0) {
             console.log(`🧹 クライアント接続記録クリーンアップ: ${cleanedCount}件削除`);
         }
-    }, 30000); // 30秒ごと
+    }, 300000); // 5分ごと
     
     return socketRequestHistory;
 }
