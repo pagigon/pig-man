@@ -1,4 +1,4 @@
-// public/js/components/room-manager.js - 修正完全版（再接続システム対応）
+// public/js/components/room-manager.js - 修正版（HTML要素ID対応）
 
 import { UIManager } from '../core/ui-manager.js';
 import { StorageManager } from '../utils/storage.js';
@@ -262,58 +262,9 @@ export class RoomManager {
         }
     }
     
-    // 🔧 【追加】再接続情報の管理
-    saveReconnectInfo(roomId, playerName, gameState, isHost = false) {
-        try {
-            const reconnectInfo = {
-                roomId,
-                playerName,
-                gameState,
-                isHost,
-                timestamp: Date.now()
-            };
-            
-            localStorage.setItem('pigGame_reconnectInfo', JSON.stringify(reconnectInfo));
-            console.log('💾 再接続情報保存:', reconnectInfo);
-            
-        } catch (error) {
-            console.error('❌ 再接続情報保存エラー:', error);
-        }
-    }
-    
-    getReconnectInfo() {
-        try {
-            const data = localStorage.getItem('pigGame_reconnectInfo');
-            if (!data) return null;
-            
-            const reconnectInfo = JSON.parse(data);
-            
-            // 30分以上古い情報は削除
-            if (Date.now() - reconnectInfo.timestamp > 30 * 60 * 1000) {
-                this.clearReconnectInfo();
-                return null;
-            }
-            
-            return reconnectInfo;
-            
-        } catch (error) {
-            console.error('❌ 再接続情報取得エラー:', error);
-            return null;
-        }
-    }
-    
-    clearReconnectInfo() {
-        try {
-            localStorage.removeItem('pigGame_reconnectInfo');
-            console.log('🗑️ 再接続情報クリア');
-        } catch (error) {
-            console.error('❌ 再接続情報クリアエラー:', error);
-        }
-    }
-    
-    // 🔧 【基本機能】ルーム作成
+    // 🔧 【修正】ルーム作成処理 - 正しいHTML要素ID使用
     createRoom() {
-        console.log('🏠 ルーム作成処理開始（完全修正版）');
+        console.log('🏠 ルーム作成処理開始（HTML要素ID修正版）');
         
         const now = Date.now();
         this.debug.createAttempts = (this.debug.createAttempts || 0) + 1;
@@ -333,7 +284,8 @@ export class RoomManager {
         }
 
         try {
-            const nameInput = safeGetElement('player-name');
+            // 🔧 【修正】正しいHTML要素IDを使用
+            const nameInput = safeGetElement('player-name-create'); // 修正前: 'player-name'
             const passwordCheckbox = safeGetElement('use-password');
             const passwordInput = safeGetElement('room-password');
 
@@ -383,9 +335,9 @@ export class RoomManager {
         }
     }
     
-    // 🔧 【基本機能】ルーム参加
+    // 🔧 【修正】ルーム参加処理 - 正しいHTML要素ID使用
     joinRoom() {
-        console.log('👥 ルーム参加処理開始（完全修正版）');
+        console.log('👥 ルーム参加処理開始（HTML要素ID修正版）');
         
         const now = Date.now();
         this.debug.joinAttempts++;
@@ -421,8 +373,9 @@ export class RoomManager {
         }
 
         try {
-            const nameInput = safeGetElement('join-player-name');
-            const roomInput = safeGetElement('join-room-id');
+            // 🔧 【修正】正しいHTML要素IDを使用
+            const nameInput = safeGetElement('player-name-join'); // 修正前: 'join-player-name'
+            const roomInput = safeGetElement('room-id-input'); // 修正前: 'join-room-id'
             const passwordInput = safeGetElement('join-password');
 
             const playerName = nameInput?.value.trim();
@@ -466,9 +419,10 @@ export class RoomManager {
         }
     }
     
-    // 🔧 【基本機能】再入場機能
+    // 🔧 【修正】再入場機能 - 正しいHTML要素ID使用
     rejoinRoom() {
         try {
+            // 🔧 【修正】正しいHTML要素IDを使用
             const nameInput = safeGetElement('rejoin-player-name');
             const roomInput = safeGetElement('rejoin-room-id');
             
@@ -512,9 +466,10 @@ export class RoomManager {
         }
     }
     
-    // その他のメソッド（観戦、ルーム情報表示など）
+    // 🔧 【修正】観戦機能 - 正しいHTML要素ID使用
     spectateRoom() {
         try {
+            // 🔧 【修正】正しいHTML要素IDを使用
             const nameInput = safeGetElement('spectator-name');
             const roomInput = safeGetElement('spectate-room-id');
             
@@ -534,6 +489,55 @@ export class RoomManager {
         } catch (error) {
             console.error('観戦エラー:', error);
             UIManager.showError('観戦処理でエラーが発生しました');
+        }
+    }
+    
+    // 🔧 【追加】再接続情報の管理
+    saveReconnectInfo(roomId, playerName, gameState, isHost = false) {
+        try {
+            const reconnectInfo = {
+                roomId,
+                playerName,
+                gameState,
+                isHost,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('pigGame_reconnectInfo', JSON.stringify(reconnectInfo));
+            console.log('💾 再接続情報保存:', reconnectInfo);
+            
+        } catch (error) {
+            console.error('❌ 再接続情報保存エラー:', error);
+        }
+    }
+    
+    getReconnectInfo() {
+        try {
+            const data = localStorage.getItem('pigGame_reconnectInfo');
+            if (!data) return null;
+            
+            const reconnectInfo = JSON.parse(data);
+            
+            // 30分以上古い情報は削除
+            if (Date.now() - reconnectInfo.timestamp > 30 * 60 * 1000) {
+                this.clearReconnectInfo();
+                return null;
+            }
+            
+            return reconnectInfo;
+            
+        } catch (error) {
+            console.error('❌ 再接続情報取得エラー:', error);
+            return null;
+        }
+    }
+    
+    clearReconnectInfo() {
+        try {
+            localStorage.removeItem('pigGame_reconnectInfo');
+            console.log('🗑️ 再接続情報クリア');
+        } catch (error) {
+            console.error('❌ 再接続情報クリアエラー:', error);
         }
     }
     
@@ -888,4 +892,3 @@ export class RoomManager {
         };
     }
 }
-
