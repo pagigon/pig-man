@@ -117,6 +117,20 @@ forceResetAllStates() {
         
         const now = Date.now();
         this.debug.joinAttempts++;
+
+        // 🔧 【追加】既にルームに参加している場合は即座に拒否
+        if (this.game.roomId) {
+            console.warn(`⚠️ 既にルーム ${this.game.roomId} に参加中 - 重複参加防止`);
+            UIManager.showError('既に他のルームに参加しています。一度退出してから参加してください。');
+            return;
+        }
+        
+        // 🔧 【追加】Socket自体のルーム情報もチェック
+        if (this.game.socketClient && this.game.socketClient.socket && this.game.socketClient.socket.roomId) {
+            console.warn(`⚠️ Socket側でもルーム ${this.game.socketClient.socket.roomId} に参加中 - 重複防止`);
+            UIManager.showError('既に他のルームに参加しています。一度退出してから参加してください。');
+            return;
+        }
         
         // 🔧 【追加】自動リセット（古いフラグを強制クリア）
         if (this.isJoining) {
@@ -199,10 +213,9 @@ forceResetAllStates() {
 
             console.log('✅ 参加データ検証完了:', { playerName, roomId, hasPassword: !!password });
 
-            // ゲーム状態設定
-            this.game.myName = playerName;
-            this.game.roomId = roomId;
-            UIManager.showPlayerName(this.game.myName);
+            // 🔧 【注意】ゲーム状態設定はSocket送信成功後に移動
+            // this.game.myName = playerName;  // ここでは設定しない
+            // this.game.roomId = roomId;      // ここでは設定しない
 
             // フラグ設定
             this.isJoining = true;
@@ -223,6 +236,7 @@ forceResetAllStates() {
             
             if (success) {
                 UIManager.showError('ルームに参加中...', 'warning');
+                console.log('✅ Socket送信成功 - 応答待機中');
             } else {
                 console.error('❌ Socket送信失敗');
                 this.forceResetAllStates();
