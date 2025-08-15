@@ -1,6 +1,8 @@
-// public/js/core/socket-client.js - 再接続システム修正版
+// public/js/core/socket-client.js - 完全版（再接続システム対応）
 
-class SocketClient {
+import { UIManager } from './ui-manager.js';
+
+export class SocketClient {
     constructor(game) {
         this.game = game;
         this.socket = null;
@@ -17,6 +19,99 @@ class SocketClient {
         this.savedRoomData = null; // ルーム情報保存
         
         this.initialize();
+    }
+    
+    // 🔧 【追加】初期化メソッド
+    initialize() {
+        console.log('🔧 Socket.io 初期化開始（再接続対応版）');
+        
+        try {
+            this.isConnecting = true;
+            
+            // Socket.io設定
+            const socketConfig = {
+                transports: ['websocket', 'polling'],
+                timeout: 30000,
+                forceNew: true,
+                multiplex: false,
+                upgrade: true,
+                rememberUpgrade: true,
+                autoConnect: true,
+                query: {
+                    clientId: this.clientId,
+                    preventDuplicate: 'true',
+                    timestamp: Date.now()
+                },
+                transportOptions: {
+                    polling: {
+                        extraHeaders: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache',
+                            'X-Client-Id': this.clientId
+                        }
+                    },
+                    websocket: {
+                        extraHeaders: {
+                            'Cache-Control': 'no-cache',
+                            'X-Client-Id': this.clientId
+                        }
+                    }
+                }
+            };
+
+            console.log('🔧 Socket.io設定:', {
+                transports: socketConfig.transports,
+                forceNew: socketConfig.forceNew,
+                clientId: socketConfig.query.clientId
+            });
+            
+            // 既存のSocketがあれば完全に切断
+            if (this.socket) {
+                console.log('🔧 既存Socket切断中...');
+                try {
+                    this.socket.removeAllListeners();
+                    this.socket.disconnect();
+                    this.socket.close();
+                } catch (e) {
+                    console.warn('既存Socket切断時のエラー:', e);
+                }
+                this.socket = null;
+            }
+
+            // 新しいSocket接続を作成
+            this.socket = io(socketConfig);
+            
+            // 🔧 【重要】グローバル参照設定（重複防止）
+            window.globalSocketInstance = this.socket;
+
+            console.log('✅ Socket.io インスタンス作成成功（再接続対応版）');
+            this.setupEventListeners();
+            this.setupConnectionMonitoring();
+            
+        } catch (error) {
+            console.error('❌ Socket.io 初期化エラー:', error);
+            UIManager.showError('サーバー接続の初期化に失敗しました');
+            this.isConnecting = false;
+        }
+    }
+    
+    // 🔧 【追加】接続監視
+    setupConnectionMonitoring() {
+        const self = this;
+        
+        this.connectionTimeout = setTimeout(function() {
+            if (!self.isConnected()) {
+                console.warn('⚠️ 初期接続がタイムアウトしました');
+                UIManager.showError('サーバー接続に時間がかかっています...', 'warning');
+                self.isConnecting = false;
+            }
+        }, 30000);
+
+        setInterval(function() {
+            if (self.socket && !self.socket.connected && !self.isConnecting) {
+                console.warn('⚠️ Socket接続が切れています - 自動再接続中...');
+            }
+        }, 60000);
     }
     
     // 🔧 【修正】自動再参加システム
@@ -106,20 +201,29 @@ class SocketClient {
         this.socket.on('connect', function() {
             console.log('✅ Socket.io 接続成功:', self.socket.id);
             
+            // Transport情報の安全な取得
+            let transportName = 'unknown';
+            try {
+                transportName = self.getTransportName();
+            } catch (e) {
+                console.warn('Transport名取得エラー:', e);
+            }
+            console.log('Transport:', transportName);
+            
             self.game.mySocketId = self.socket.id;
             UIManager.showConnectionStatus('connected');
             self.reconnectAttempts = 0;
             self.isConnecting = false;
             self.lastDisconnectReason = null;
             
-            // 🔧 【重要】接続後に自動再参加チェック
-            setTimeout(() => {
+            // 接続後の処理を遅延実行
+            setTimeout(function() {
                 if (!self.handleAutoRejoin()) {
                     // 再参加しない場合は通常のロビー処理
                     self.getRoomList();
                     self.getOngoingGames();
                 }
-            }, 1000);
+            }, 2000);
         });
         
         // 🔧 【修正】切断イベント処理強化
@@ -177,12 +281,21 @@ class SocketClient {
                 errorMessage = 'Error parsing failed';
             }
             
-            if (self.reconnectAttempts >= self.maxReconnectAttempts) {
+            if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {
+                console.warn('🔧 Render.com環境での400エラーを検出');
+                UIManager.showError('サーバーが一時的に利用できません。しばらく待ってから再試行してください。', 'warning');
+            } else if (self.reconnectAttempts >= self.maxReconnectAttempts) {
                 UIManager.showError('サーバーに接続できません。ページをリロードしてください。');
                 self.clearSavedGameInfo(); // 失敗時は保存情報をクリア
             } else {
                 UIManager.showError(`接続エラー (${self.reconnectAttempts}/${self.maxReconnectAttempts}): ${errorMessage}`, 'warning');
             }
+        });
+        
+        // 再接続試行
+        this.socket.on('reconnect_attempt', function(attemptNumber) {
+            console.log('🔄 再接続試行 ' + attemptNumber + '/' + self.maxReconnectAttempts + ' (Render.com対応)');
+            UIManager.showError('再接続中... (' + attemptNumber + '/' + self.maxReconnectAttempts + ')', 'warning');
         });
         
         // 再接続成功
@@ -194,43 +307,37 @@ class SocketClient {
             // 再接続後の自動再参加チェックは connect イベントで処理される
         });
         
-        // 🔧 【追加】再入場成功処理
-        this.socket.on('rejoinSuccess', function(data) {
-            console.log('✅ 再入場成功:', data);
-            try {
-                self.game.onRejoinSuccess(data);
-                self.isInGame = true;
-                UIManager.showError('ゲームに再参加しました！', 'success');
-            } catch (error) {
-                console.error('再入場成功処理エラー:', error);
-                UIManager.showError('再入場後の処理でエラーが発生しました');
-            }
-        });
-        
-        // 🔧 【追加】再入場失敗処理
-        this.socket.on('rejoinFailed', function(data) {
-            console.warn('❌ 再入場失敗:', data);
-            self.clearSavedGameInfo();
-            self.isInGame = false;
+        // 🔧 【追加】ホスト変更イベント
+        this.socket.on('hostChanged', function(data) {
+            console.log('👑 ホスト変更通知:', data);
             
-            const message = data?.message || '再入場に失敗しました';
-            UIManager.showError(message, 'warning');
-        });
-        
-        // ゲーム開始/終了の追跡
-        this.socket.on('gameStarted', function(gameData) {
-            console.log('🎮 ゲーム開始検出');
-            self.isInGame = true;
-        });
-        
-        this.socket.on('gameEnded', function(data) {
-            console.log('🏆 ゲーム終了検出');
-            self.isInGame = false;
-            self.clearSavedGameInfo(); // ゲーム終了時は保存情報をクリア
+            try {
+                if (data && data.newHostId && data.newHostName) {
+                    // 自分が新しいホストになった場合
+                    if (data.newHostId === self.socket.id) {
+                        self.game.isHost = true;
+                        UIManager.showError(`あなたが新しいホストになりました！`, 'success');
+                        
+                        // ゲーム開始ボタンを表示
+                        if (self.game.gameData && self.game.gameData.gameState === 'waiting') {
+                            const startButton = document.getElementById('start-game');
+                            if (startButton) {
+                                startButton.style.display = 'block';
+                            }
+                        }
+                    } else {
+                        UIManager.showError(`${data.newHostName} が新しいホストになりました`, 'warning');
+                    }
+                }
+            } catch (error) {
+                console.error('ホスト変更処理エラー:', error);
+            }
         });
         
         // その他の既存イベントリスナー...
         this.setupOtherEventListeners();
+        
+        console.log('✅ Socket イベントリスナー設定完了（再接続対応）');
     }
     
     // 🔧 【追加】スケジュール再接続
@@ -356,6 +463,7 @@ class SocketClient {
         
         // ルーム参加成功
         this.socket.on('joinSuccess', function(data) {
+            console.log('🎯 joinSuccess イベント受信確認!', data);
             console.log('✅ ルーム参加成功:', data);
             try {
                 self.game.onJoinSuccess(data);
@@ -363,6 +471,48 @@ class SocketClient {
             } catch (error) {
                 console.error('ルーム参加処理エラー:', error);
                 UIManager.showError('ルーム参加後の処理でエラーが発生しました');
+            }
+        });
+        
+        // 🔧 【追加】再入場成功処理
+        this.socket.on('rejoinSuccess', function(data) {
+            console.log('✅ 再入場成功:', data);
+            try {
+                self.game.onRejoinSuccess(data);
+                self.isInGame = true;
+                UIManager.showError('ゲームに再参加しました！', 'success');
+            } catch (error) {
+                console.error('再入場成功処理エラー:', error);
+                UIManager.showError('再入場後の処理でエラーが発生しました');
+            }
+        });
+        
+        // 観戦成功
+        this.socket.on('spectateSuccess', function(data) {
+            console.log('✅ 観戦成功:', data);
+            try {
+                self.game.onSpectateSuccess(data);
+            } catch (error) {
+                console.error('観戦処理エラー:', error);
+                UIManager.showError('観戦後の処理でエラーが発生しました');
+            }
+        });
+        
+        // 再接続失敗
+        this.socket.on('reconnectFailed', function(data) {
+            console.warn('❌ 再接続失敗:', data);
+            try {
+                // 🔧 【重要】再接続失敗時も必ずフラグリセット
+                if (self.game.roomManager && typeof self.game.roomManager.forceResetJoinState === 'function') {
+                    console.log('🔧 再接続失敗時のフラグリセット実行');
+                    self.game.roomManager.forceResetJoinState();
+                }
+                
+                const message = data?.message || '再接続に失敗しました';
+                UIManager.showError(message, 'warning');
+                
+            } catch (error) {
+                console.error('再接続失敗処理エラー:', error);
             }
         });
         
@@ -387,6 +537,37 @@ class SocketClient {
             }
         });
         
+        // ゲーム開始/終了の追跡
+        this.socket.on('gameStarted', function(gameData) {
+            console.log('🎮 ゲーム開始検出');
+            self.isInGame = true;
+        });
+        
+        this.socket.on('gameEnded', function(data) {
+            console.log('🏆 ゲーム終了検出');
+            self.isInGame = false;
+            self.clearSavedGameInfo(); // ゲーム終了時は保存情報をクリア
+        });
+        
+        // 🔧 【追加】切断プレイヤー待機の処理
+        this.socket.on('waitingForReconnect', function(data) {
+            console.log('⏸️ プレイヤー切断により待機中:', data);
+            
+            try {
+                if (data && data.disconnectedPlayers && Array.isArray(data.disconnectedPlayers)) {
+                    const playerNames = data.disconnectedPlayers.join(', ');
+                    const message = data.message || `${playerNames} が切断されました。復帰をお待ちください...`;
+                    UIManager.showError(message, 'warning');
+                } else if (data && data.message) {
+                    UIManager.showError(data.message, 'warning');
+                } else {
+                    UIManager.showError('プレイヤーの復帰をお待ちください...', 'warning');
+                }
+            } catch (error) {
+                console.error('切断待機メッセージ処理エラー:', error);
+            }
+        });
+        
         // エラー
         this.socket.on('error', function(error) {
             console.error('❌ サーバーエラー:', error);
@@ -404,15 +585,197 @@ class SocketClient {
                 
             } catch (resetError) {
                 console.error('❌ エラー時フラグリセット失敗:', resetError);
+                
+                // 🔧 【最後の手段】DOM直接操作
+                try {
+                    const joinBtn = document.getElementById('join-room');
+                    const createBtn = document.getElementById('create-room');
+                    if (joinBtn) {
+                        joinBtn.disabled = false;
+                        joinBtn.textContent = 'ルームに参加';
+                        joinBtn.style.opacity = '1';
+                    }
+                    if (createBtn) {
+                        createBtn.disabled = false;
+                        createBtn.textContent = 'ルームを作成';
+                        createBtn.style.opacity = '1';
+                    }
+                    console.log('✅ DOM直接操作でボタン復旧完了');
+                } catch (domError) {
+                    console.error('❌ DOM直接操作も失敗:', domError);
+                }
+                
+                // エラーメッセージ表示
                 UIManager.showError(error?.message || 'サーバーエラーが発生しました');
             }
         });
-        
-        console.log('✅ Socket イベントリスナー設定完了（再接続対応）');
     }
     
-    // 既存のメソッドはそのまま維持...
+    // 🔧 【追加】Transport名取得
+    getTransportName() {
+        try {
+            return this.socket?.io?.engine?.transport?.name || 'unknown';
+        } catch (error) {
+            return 'unknown';
+        }
+    }
     
+    // 基本的なSocket操作メソッド
+    emit(event, data) {
+        console.log('📤 Socket送信: ' + event, data);
+        
+        if (!this.socket) {
+            console.error('❌ Socket が存在しません');
+            UIManager.showError('サーバー接続が初期化されていません');
+            return false;
+        }
+
+        if (!this.socket.connected) {
+            console.error('❌ Socket 未接続');
+            UIManager.showError('サーバーに接続されていません。接続を確認中...');
+            
+            if (!this.isConnecting) {
+                this.forceReconnect();
+            }
+            return false;
+        }
+
+        try {
+            this.socket.emit(event, data);
+            console.log('✅ Socket送信成功: ' + event);
+            return true;
+        } catch (error) {
+            console.error('❌ Socket送信エラー: ' + event, error);
+            UIManager.showError('通信エラーが発生しました');
+            return false;
+        }
+    }
+
+    // 基本的なSocket操作メソッド
+    getRoomList() {
+        console.log('📋 ルーム一覧要求');
+        return this.emit('getRoomList');
+    }
+
+    getOngoingGames() {
+        console.log('📋 進行中ゲーム一覧要求');
+        return this.emit('getOngoingGames');
+    }
+
+    createRoom(playerName, hasPassword, password) {
+        console.log('🏠 ルーム作成要求:', { playerName: playerName, hasPassword: !!hasPassword });
+        
+        if (!playerName || playerName.trim().length === 0) {
+            UIManager.showError('プレイヤー名を入力してください');
+            return false;
+        }
+        
+        if (playerName.trim().length > 20) {
+            UIManager.showError('プレイヤー名は20文字以内で入力してください');
+            return false;
+        }
+        
+        return this.emit('createRoom', { 
+            playerName: playerName.trim(), 
+            hasPassword: !!hasPassword, 
+            password: password || '' 
+        });
+    }
+
+    joinRoom(roomId, playerName, password) {
+        console.log('👥 ルーム参加要求:', { roomId, playerName, hasPassword: !!password });
+        
+        if (!roomId || !playerName) {
+            UIManager.showError('ルームIDとプレイヤー名を入力してください');
+            return false;
+        }
+        
+        if (playerName.trim().length > 20) {
+            UIManager.showError('プレイヤー名は20文字以内で入力してください');
+            return false;
+        }
+        
+        return this.emit('joinRoom', { 
+            roomId: roomId.trim().toUpperCase(), 
+            playerName: playerName.trim(), 
+            password: password || '' 
+        });
+    }
+
+    rejoinRoom(roomId, playerName) {
+        console.log('🔄 ルーム再入場要求:', { roomId, playerName });
+        
+        if (!roomId || !playerName) {
+            UIManager.showError('ルームIDとプレイヤー名を入力してください');
+            return false;
+        }
+        
+        return this.emit('rejoinRoom', { 
+            roomId: roomId.trim().toUpperCase(), 
+            playerName: playerName.trim() 
+        });
+    }
+
+    spectateRoom(roomId, spectatorName) {
+        console.log('👁️ 観戦要求:', { roomId, spectatorName });
+        
+        if (!roomId || !spectatorName) {
+            UIManager.showError('ルームIDと観戦者名を入力してください');
+            return false;
+        }
+        
+        return this.emit('spectateRoom', { 
+            roomId: roomId.trim().toUpperCase(), 
+            spectatorName: spectatorName.trim() 
+        });
+    }
+
+    leaveRoom() {
+        console.log('🚪 ルーム退出要求');
+        return this.emit('leaveRoom');
+    }
+
+    tempLeaveRoom() {
+        console.log('⏸️ 一時退出要求');
+        return this.emit('tempLeaveRoom');
+    }
+
+    returnToLobby() {
+        console.log('🏠 ロビー復帰要求');
+        return this.emit('returnToLobby');
+    }
+
+    startGame() {
+        console.log('🎮 ゲーム開始要求');
+        return this.emit('startGame');
+    }
+
+    restartGame() {
+        console.log('🔄 連戦開始要求');
+        return this.emit('restartGame');
+    }
+
+    selectCard(targetPlayerId, cardIndex) {
+        console.log('🎯 カード選択要求:', { targetPlayerId, cardIndex });
+        return this.emit('selectCard', { targetPlayerId, cardIndex });
+    }
+
+    sendChatMessage(message) {
+        console.log('💬 チャット送信:', message);
+        
+        if (!message || message.trim().length === 0) {
+            return false;
+        }
+        
+        if (message.trim().length > 200) {
+            UIManager.showError('メッセージは200文字以内で入力してください');
+            return false;
+        }
+        
+        return this.emit('chatMessage', { message: message.trim() });
+    }
+    
+    // 状態確認メソッド
     isConnected() {
         return this.socket && this.socket.connected;
     }
@@ -430,9 +793,8 @@ class SocketClient {
             lastDisconnectReason: this.lastDisconnectReason,
             isInGame: this.isInGame,
             hasSavedGameInfo: !!this.getSavedGameInfo(),
-            clientId: this.clientId
+            clientId: this.clientId,
+            transportName: this.getTransportName()
         };
     }
 }
-
-export { SocketClient };
