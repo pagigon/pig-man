@@ -108,4 +108,37 @@ class GameManager {
     }
 }
 
+// ⭐ カードリサイクル処理メソッド
+    static processCardRecycle(roomId, roundNumber) {
+        const game = this.get(roomId);
+        if (!game) return { success: false, error: 'ゲームが見つかりません' };
+        
+        // 既存の correctCardRecycleSystem を活用
+        const { correctCardRecycleSystem } = require('./game-Logic');
+        const connectedPlayers = game.players.filter(p => p.connected);
+        return correctCardRecycleSystem(game, connectedPlayers);
+    }
+
+    // ⭐ ラウンド進行データ更新メソッド
+    static updateRoundProgress(roomId, roundData) {
+        const game = this.get(roomId);
+        if (game) {
+            Object.assign(game, roundData);
+            return true;
+        }
+        return false;
+    }
+
+    // ⭐ activeRooms との同期メソッド（データ整合性確保）
+    static syncWithActiveRooms(activeRooms) {
+        // room-handlers.js の activeRooms との同期
+        for (const [roomId, roomData] of activeRooms) {
+            const gameData = this.get(roomId);
+            if (gameData && roomData) {
+                // データ同期処理
+                Object.assign(roomData.gameData, gameData);
+            }
+        }
+    }
+
 module.exports = GameManager;
