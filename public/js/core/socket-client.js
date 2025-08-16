@@ -454,17 +454,35 @@ initializeSocket() {
             }
         });
 
-        this.socket.on('roundStart', function(roundNumber) {
-            try {
-                if (UIManager.showRoundStartWithRecycle) {
-                    UIManager.showRoundStartWithRecycle(roundNumber);
-                } else {
-                    UIManager.showRoundStart(roundNumber);
-                }
-            } catch (error) {
-                console.error('ラウンド開始表示エラー:', error);
-            }
-        });
+        // 【新コード】（上記の既存コードを以下に置き換え）
+this.socket.on('roundStart', function(roundNumber) {
+    try {
+        // 🆕 【改良】リサイクル対応の表示
+        if (UIManager.showRoundStartWithRecycle) {
+            UIManager.showRoundStartWithRecycle(roundNumber);
+        } else if (UIManager.showRoundStart) {
+            // フォールバック: 新しいメソッドがない場合は既存メソッドを使用
+            UIManager.showRoundStart(roundNumber);
+        }
+    } catch (error) {
+        console.error('ラウンド開始表示エラー:', error);
+        // エラーが発生しても処理を継続
+    }
+});
+
+// 🆕 【追加】カードリサイクル完了通知の受信処理
+this.socket.on('cardRecycleComplete', function(recycleData) {
+    try {
+        console.log('♻️ カードリサイクル完了通知受信:', recycleData);
+        
+        if (UIManager.updateRecycleStatus) {
+            const status = `ラウンド${recycleData.roundNumber}カードリサイクル完了！手札${recycleData.newCardsPerPlayer}枚`;
+            UIManager.updateRecycleStatus(status);
+        }
+    } catch (error) {
+        console.error('カードリサイクル通知処理エラー:', error);
+    }
+});
 
         // エラーイベント処理
         this.socket.on('error', function(error) {
