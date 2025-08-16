@@ -206,7 +206,7 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                 
 
                 // 【新コード】（上記の既存コードを以下に置き換え）
-if (roundResult.needsCardRecycle) {
+                if (roundResult.needsCardRecycle) {
                     // 🆕 【改良】GameManager を活用したカードリサイクル
                     const GameManager = require('../game/game-Manager');
                     const recycleResult = GameManager.processCardRecycle(socket.roomId, roundResult.newRound);
