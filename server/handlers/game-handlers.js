@@ -207,29 +207,29 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
 
                 // 【新コード】（上記の既存コードを以下に置き換え）
 if (roundResult.needsCardRecycle) {
-    // 🆕 【改良】GameManager を活用したカードリサイクル
-    const GameManager = require('../game/game-Manager');
-    const recycleResult = GameManager.processCardRecycle(socket.roomId, roundResult.newRound);
-    
-    if (recycleResult.success) {
-        console.log('♻️ カードリサイクル成功');
-        
-        // GameManager側でゲームデータも更新
-        GameManager.updateRoundProgress(socket.roomId, {
-            currentRound: roundResult.newRound,
-            cardsPerPlayer: recycleResult.newCardsPerPlayer
-        });
-        
-        // 既存のログ送信機能を活用（変更なし）
-        sendGameLog(io, socket.roomId, 
-            `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`, 
-            activeRooms
-        );
-    } else {
-        console.error('❌ カードリサイクル失敗:', recycleResult.error);
-        // エラーが発生した場合でも処理を継続（既存の安全性を維持）
-    }
-}
+                    // 🆕 【改良】GameManager を活用したカードリサイクル
+                    const GameManager = require('../game/game-Manager');
+                    const recycleResult = GameManager.processCardRecycle(socket.roomId, roundResult.newRound);
+                    
+                    if (recycleResult.success) {
+                        console.log('♻️ カードリサイクル成功');
+                        
+                        // GameManager側でゲームデータも更新
+                        GameManager.updateRoundProgress(socket.roomId, {
+                            currentRound: roundResult.newRound,
+                            cardsPerPlayer: recycleResult.newCardsPerPlayer
+                        });
+                        
+                        // 既存のログ送信機能を活用（変更なし）
+                        sendGameLog(io, socket.roomId, 
+                            `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`, 
+                            activeRooms
+                        );
+                    } else {
+                        console.error('❌ カードリサイクル失敗:', recycleResult.error);
+                        // エラーが発生した場合でも処理を継続（既存の安全性を維持）
+                    }
+                }
                 
                 // 新ラウンド開始時にカード選択履歴をクリア
                 room.gameData.lastCardSelections = new Map();
