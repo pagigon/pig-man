@@ -1,4 +1,4 @@
-// UIManager - ゲームログ表示修正版（既存コードを拡張）
+// UIManager - ゲームログ表示修正版（構文エラー修正済み）
 
 export class UIManager {
     // 🔧 【修正】メッセージ更新処理（ゲームログ表示対応）
@@ -69,7 +69,22 @@ export class UIManager {
                 } catch (error) {
                     console.error('メッセージアイテム作成エラー:', error);
                 }
-                // ⭐ リサイクル状況表示更新メソッド
+            });
+            
+            // スクロール位置を最下部に移動
+            container.scrollTop = container.scrollHeight;
+            
+            // 🔧 【追加】大量メッセージ時のパフォーマンス警告
+            if (recentMessages.length > 80) {
+                console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
+            }
+            
+        } catch (error) {
+            console.error('メッセージ更新エラー:', error);
+        }
+    }
+
+    // ⭐ リサイクル状況表示更新メソッド
     static updateRecycleStatus(status) {
         const recycleEl = this.safeGetElement('recycle-status');
         if (recycleEl) {
@@ -127,20 +142,6 @@ export class UIManager {
             }
         } catch (error) {
             console.error('リサイクル対応ゲーム情報更新エラー:', error);
-        }
-    }
-            });
-            
-            // スクロール位置を最下部に移動
-            container.scrollTop = container.scrollHeight;
-            
-            // 🔧 【追加】大量メッセージ時のパフォーマンス警告
-            if (recentMessages.length > 80) {
-                console.warn(`⚠️ チャット履歴が多くなっています（${recentMessages.length}件）。パフォーマンスに注意。`);
-            }
-            
-        } catch (error) {
-            console.error('メッセージ更新エラー:', error);
         }
     }
 
