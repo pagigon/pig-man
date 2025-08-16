@@ -106,9 +106,8 @@ class GameManager {
             Object.assign(game, updates);
         }
     }
-}
 
-// ⭐ カードリサイクル処理メソッド
+    // 🆕 【追加】カードリサイクル処理メソッド
     static processCardRecycle(roomId, roundNumber) {
         const game = this.get(roomId);
         if (!game) return { success: false, error: 'ゲームが見つかりません' };
@@ -119,7 +118,7 @@ class GameManager {
         return correctCardRecycleSystem(game, connectedPlayers);
     }
 
-    // ⭐ ラウンド進行データ更新メソッド
+    // 🆕 【追加】ラウンド進行データ更新メソッド
     static updateRoundProgress(roomId, roundData) {
         const game = this.get(roomId);
         if (game) {
@@ -129,7 +128,7 @@ class GameManager {
         return false;
     }
 
-    // ⭐ activeRooms との同期メソッド（データ整合性確保）
+    // 🆕 【追加】activeRooms との同期メソッド（データ整合性確保）
     static syncWithActiveRooms(activeRooms) {
         // room-handlers.js の activeRooms との同期
         for (const [roomId, roomData] of activeRooms) {
@@ -140,5 +139,6 @@ class GameManager {
             }
         }
     }
+}
 
 module.exports = GameManager;
