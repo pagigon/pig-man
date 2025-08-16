@@ -168,15 +168,15 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
             const endCheck = checkGameEndConditions(room.gameData);
             if (endCheck.ended) {
                 room.gameData.gameState = 'finished';
-                room.gameData.winner = endCheck.winner;
-                room.gameData.winMessage = endCheck.message;
+                room.gameData.winningTeam = endCheck.winner; // 🔧 【重要】正しいチーム名
+                room.gameData.victoryMessage = endCheck.message;
                 
                 console.log('🏆 ゲーム終了:', endCheck);
                 
                 io.to(socket.roomId).emit('gameUpdate', room.gameData);
                 io.to(socket.roomId).emit('gameEnded', {
-                    winner: endCheck.winner,
-                    message: endCheck.message
+                    winningTeam: endCheck.winner, // 🔧 【修正】正しいキー名
+                    victoryMessage: endCheck.message
                 });
                 
                 sendGameLog(io, socket.roomId, `🏆 ${endCheck.message}`, activeRooms);
@@ -192,15 +192,21 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                 
                 // 次ラウンドへ進行
                 const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
-                
+
                 if (roundResult.gameEnded) {
                     room.gameData.gameState = 'finished';
-                    room.gameData.winner = 'guardian';
-                    room.gameData.winMessage = roundResult.reason === 'max_rounds_reached' ? 
+                    room.gameData.winningTeam = 'guardian'; // 🔧 【修正】guardian に統一
+                    room.gameData.victoryMessage = roundResult.reason === 'max_rounds_reached' ? 
                         `${room.gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！` : 
                         '豚男チームの勝利です！';
                     
                     io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                    io.to(socket.roomId).emit('gameEnded', {
+                        winningTeam: 'guardian', // 🔧 【修正】
+                        victoryMessage: room.gameData.victoryMessage
+                    });
+                    
+                    sendGameLog(io, socket.roomId, `🏆 ${room.gameData.victoryMessage}`, activeRooms);
                     return;
                 }
                 
@@ -214,11 +220,28 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                     if (recycleResult.success) {
                         console.log('♻️ カードリサイクル成功');
                         
-                        // GameManager側でゲームデータも更新
+                        // 🔧 【重要】GameManager側でゲームデータも更新
                         GameManager.updateRoundProgress(socket.roomId, {
                             currentRound: roundResult.newRound,
                             cardsPerPlayer: recycleResult.newCardsPerPlayer
                         });
+                        
+                        // 🔧 【追加】activeRooms側のデータも直接更新（同期確保）
+                        room.gameData.currentRound = roundResult.newRound;
+                        room.gameData.cardsPerPlayer = recycleResult.newCardsPerPlayer;
+                        room.gameData.cardsFlippedThisRound = 0; // ラウンド開始時にリセット
+                        
+                        // 🔧 【重要】GameManagerから更新されたプレイヤーデータを取得
+                        const updatedGame = GameManager.get(socket.roomId);
+                        if (updatedGame && updatedGame.players) {
+                            // プレイヤーの手札をactiveRooms側に同期
+                            room.gameData.players.forEach((roomPlayer) => {
+                                const gamePlayer = updatedGame.players.find(p => p.id === roomPlayer.id);
+                                if (gamePlayer) {
+                                    roomPlayer.hand = gamePlayer.hand; // 新しい手札を同期
+                                }
+                            });
+                        }
                         
                         // 既存のログ送信機能を活用（変更なし）
                         sendGameLog(io, socket.roomId, 
