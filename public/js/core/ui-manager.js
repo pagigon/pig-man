@@ -69,6 +69,66 @@ export class UIManager {
                 } catch (error) {
                     console.error('メッセージアイテム作成エラー:', error);
                 }
+                // ⭐ リサイクル状況表示更新メソッド
+    static updateRecycleStatus(status) {
+        const recycleEl = this.safeGetElement('recycle-status');
+        if (recycleEl) {
+            recycleEl.textContent = status;
+            recycleEl.style.color = '#32CD32'; // 成功時の緑色
+            
+            // 3秒後に元の表示に戻す
+            setTimeout(() => {
+                recycleEl.textContent = 'ラウンド終了時：全部屋調査完了→残存保証→再配布';
+                recycleEl.style.color = '#FFA500'; // 元のオレンジ色
+            }, 3000);
+        }
+    }
+
+    // ⭐ リサイクル対応ラウンド開始表示メソッド
+    static showRoundStartWithRecycle(roundNumber, recycleInfo = null) {
+        try {
+            // 既存の showRoundStart メソッドがあれば実行
+            if (typeof this.showRoundStart === 'function') {
+                this.showRoundStart(roundNumber);
+            }
+            
+            // リサイクル情報を追加表示
+            if (recycleInfo) {
+                const recycleStatus = `ラウンド${roundNumber}開始！カードリサイクル完了（手札${recycleInfo.newCardsPerPlayer}枚）`;
+                this.updateRecycleStatus(recycleStatus);
+            } else {
+                const recycleStatus = `ラウンド${roundNumber}開始！カードリサイクル完了`;
+                this.updateRecycleStatus(recycleStatus);
+            }
+        } catch (error) {
+            console.error('リサイクル対応ラウンド表示エラー:', error);
+            // エラーが発生しても既存機能は維持
+        }
+    }
+
+    // ⭐ ゲーム情報更新（リサイクル情報付き）
+    static updateGameInfoWithRecycle(gameData) {
+        try {
+            // 既存の updateGameInfo メソッドを呼び出し（既存機能維持）
+            if (typeof this.updateGameInfo === 'function') {
+                this.updateGameInfo(gameData);
+            }
+            
+            // リサイクル情報の追加表示
+            if (gameData && gameData.currentRound > 1) {
+                const remainingTreasures = (gameData.totalTreasures || 7) - (gameData.treasureFound || 0);
+                const remainingTraps = (gameData.totalTraps || 2) - (gameData.trapTriggered || 0);
+                
+                const recycleEl = this.safeGetElement('recycle-status');
+                if (recycleEl) {
+                    recycleEl.innerHTML = `R${gameData.currentRound}: 手札${gameData.cardsPerPlayer}枚<br><small>残り子豚${remainingTreasures}匹・罠${remainingTraps}個を回収済み</small>`;
+                    recycleEl.style.color = '#32CD32';
+                }
+            }
+        } catch (error) {
+            console.error('リサイクル対応ゲーム情報更新エラー:', error);
+        }
+    }
             });
             
             // スクロール位置を最下部に移動
