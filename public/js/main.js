@@ -6,10 +6,10 @@ console.log('🐷 豚小屋探検隊 JavaScript 開始');
 
 // 🔧 【重要】グローバル初期化フラグチェック
 if (window.pigGameInitialized) {
-    console.warn('⚠️ PigManGame は既に初期化済み - 重複初期化を防止');
+    console.warn('⚠️ Game は既に初期化済み - 重複初期化を防止');
     // 既存のインスタンスがある場合はそれを使用
     if (window.pigGame) {
-        console.log('✅ 既存のPigManGameインスタンスを使用');
+        console.log('✅ 既存のGameインスタンスを使用');
     }
 } else {
     // 折りたたみ機能
@@ -45,7 +45,7 @@ if (window.pigGameInitialized) {
         try {
             const game = new Game();
             window.pigGame = game;
-            console.log('✅ PigManGame インスタンス作成完了');
+            console.log('✅ Game インスタンス作成完了');
             
             // 🔧 【追加】重複防止確認ログ
             console.log('🔧 重複防止確認:', {
