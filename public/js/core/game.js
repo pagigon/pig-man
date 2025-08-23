@@ -130,8 +130,8 @@ export class Game {
                         this.chat.sendChat();
                     }
                 });
-
-                restartGame() {
+}
+                
         console.log('🔄 連戦開始処理');
         
         try {
@@ -236,6 +236,55 @@ export class Game {
         } catch (error) {
             console.error('デバッグ情報取得エラー:', error);
             return { error: 'デバッグ情報取得失敗' };
+        }
+    }
+        // 🔧 【追加】連戦開始メソッド
+    restartGame() {
+        console.log('🔄 連戦開始処理');
+        
+        try {
+            if (!this.isHost) {
+                UIManager.showError('連戦開始はホストのみ実行できます');
+                return;
+            }
+            this.socketClient.restartGame();
+            UIManager.showError('新しいゲームを開始中...', 'warning');
+        } catch (error) {
+            console.error('連戦開始エラー:', error);
+            UIManager.showError('連戦開始でエラーが発生しました');
+        }
+    }
+
+    // 🔧 【追加】勝利画面イベント処理
+    onGameEnded(data) {
+        console.log('🏁 ゲーム終了イベント受信:', data);
+        try {
+            if (this.gameData) {
+                this.gameData.gameState = 'finished';
+                this.gameData.winningTeam = data.winningTeam;
+                this.gameData.victoryMessage = data.victoryMessage;
+            }
+            if (this.gameBoard && this.gameBoard.handleVictoryScreen) {
+                this.gameBoard.handleVictoryScreen(this.gameData);
+            } else {
+                UIManager.showVictoryScreen(this.gameData || data);
+            }
+        } catch (error) {
+            console.error('ゲーム終了イベント処理エラー:', error);
+        }
+    }
+
+    // 🔧 【追加】ゲーム再開イベント処理
+    onGameRestarted(gameData) {
+        console.log('🔄 ゲーム再開イベント受信:', gameData);
+        try {
+            this.gameData = gameData;
+            if (this.gameBoard && this.gameBoard.updateGameUI) {
+                this.gameBoard.updateGameUI();
+            }
+            UIManager.showError('新しいゲームが開始されました！', 'success');
+        } catch (error) {
+            console.error('ゲーム再開イベント処理エラー:', error);
         }
     }
 }
