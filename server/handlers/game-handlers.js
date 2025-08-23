@@ -288,9 +288,6 @@ setTimeout(() => {
 
 
             }
-
-            // ゲーム更新を全員に送信
-            io.to(socket.roomId).emit('gameUpdate', room.gameData);
             
             // カード選択イベントを送信
             io.to(socket.roomId).emit('cardSelected', {
