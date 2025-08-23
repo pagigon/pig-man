@@ -3,7 +3,7 @@ import { SocketClient } from './socket-client.js';
 import { UIManager } from './ui-manager.js';
 import { RoomManager } from '../components/room-manager.js';
 import { GameBoard } from '../components/game-board.js';
-import { ChatManager } from '../components/chat-manager.js';
+import { Chat } from '../components/chat.js';
 
 // 🔧 【保持】既存の safeGetElement と safeAddEventListener 関数
 function safeGetElement(id) {
@@ -45,7 +45,7 @@ export class Game {
         this.socketClient = new SocketClient(this);
         this.roomManager = new RoomManager(this);
         this.gameBoard = new GameBoard(this);
-        this.chatManager = new ChatManager(this);
+        this.chat = new Chat(this);
         
         this.setupEventListeners();
         
@@ -119,7 +119,7 @@ export class Game {
             // 🔧 【保持】既存のチャット関連
             safeAddEventListener('send-chat', 'click', (e) => {
                 e.preventDefault();
-                this.chatManager.sendMessage();
+                this.chat.sendChat();
             });
 
             const chatInput = safeGetElement('chat-input');
@@ -127,7 +127,7 @@ export class Game {
                 chatInput.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        this.chatManager.sendMessage();
+                        this.chat.sendChat();
                     }
                 });
             }
@@ -326,7 +326,7 @@ export class Game {
     // 🔧 【保持】既存のチャットメッセージ処理
     onChatMessage(data) {
         try {
-            this.chatManager.addMessage(data);
+            this.chat.addMessage(data);
         } catch (error) {
             console.error('チャットメッセージ処理エラー:', error);
         }
@@ -335,7 +335,7 @@ export class Game {
     // 🔧 【保持】既存のゲームログ処理
     onGameLog(data) {
         try {
-            this.chatManager.addGameLog(data.message);
+            this.chat.addGameLog(data.message);
         } catch (error) {
             console.error('ゲームログ処理エラー:', error);
         }
