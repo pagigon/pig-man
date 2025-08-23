@@ -1,6 +1,6 @@
 // main.js - 完全修正版（重複防止対応）
 
-import { PigManGame } from './core/game.js';
+import { Game } from './core/game.js';
 
 console.log('🐷 豚小屋探検隊 JavaScript 開始');
 
@@ -43,7 +43,7 @@ if (window.pigGameInitialized) {
         window.pigGameInitialized = true;
         
         try {
-            const game = new PigManGame();
+            const game = new Game();
             window.pigGame = game;
             console.log('✅ PigManGame インスタンス作成完了');
             
