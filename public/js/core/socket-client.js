@@ -246,6 +246,26 @@ export class SocketClient {
             this.game.onGameEnd(data);
         });
 
+        this.socket.on('gameEnded', (data) => {
+            if (this.game.onGameEnded) {
+                this.game.onGameEnded(data);
+            } else {
+                this.game.onGameEnd(data);
+            }
+        });
+
+        this.socket.on('gameRestarted', (data) => {
+            if (this.game.onGameRestarted) {
+                this.game.onGameRestarted(data);
+            }
+        });
+
+        this.socket.on('newMessage', (messages) => {
+            if (typeof UIManager !== 'undefined' && UIManager.updateMessages) {
+                UIManager.updateMessages(messages);
+            }
+        });
+
         // チャット関連イベント
         this.socket.on('chatMessage', (data) => {
             this.game.onChatMessage(data);
