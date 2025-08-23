@@ -212,44 +212,59 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                 
 
                 if (roundResult.needsCardRecycle) {
-                    // 🆕 【改良】GameManager を活用したカードリサイクル
-                    const GameManager = require('../game/game-Manager');
-                    const recycleResult = GameManager.processCardRecycle(socket.roomId, roundResult.newRound);
+                    console.log('🔍 【デバッグ】カードリサイクル処理開始');
                     
-                    if (recycleResult.success) {
-                        console.log('♻️ カードリサイクル成功');
+                    try {
+                        // 🔧 【方法1】GameManagerを使わず、直接correctCardRecycleSystemを実行
+                        const { correctCardRecycleSystem } = require('../game/game-Logic');
+                        const connectedPlayers = room.gameData.players.filter(p => p.connected);
                         
-                        // 🔧 【重要】GameManager側でゲームデータも更新
-                        GameManager.updateRoundProgress(socket.roomId, {
-                            currentRound: roundResult.newRound,
-                            cardsPerPlayer: recycleResult.newCardsPerPlayer
+                        console.log('🔍 【デバッグ】リサイクル前の手札確認');
+                        connectedPlayers.forEach(player => {
+                            console.log(`${player.name}: ${player.hand.length}枚`);
                         });
                         
-                        // 🔧 【追加】activeRooms側のデータも直接更新（同期確保）
-                        room.gameData.currentRound = roundResult.newRound;
-                        room.gameData.cardsPerPlayer = recycleResult.newCardsPerPlayer;
-                        room.gameData.cardsFlippedThisRound = 0; // ラウンド開始時にリセット
+                        // 直接カードリサイクル実行
+                        const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
+                        console.log('🔍 【デバッグ】recycleResult:', recycleResult);
                         
-                        // 🔧 【重要】GameManagerから更新されたプレイヤーデータを取得
-                        const updatedGame = GameManager.get(socket.roomId);
-                        if (updatedGame && updatedGame.players) {
-                            // プレイヤーの手札をactiveRooms側に同期
-                            room.gameData.players.forEach((roomPlayer) => {
-                                const gamePlayer = updatedGame.players.find(p => p.id === roomPlayer.id);
-                                if (gamePlayer) {
-                                    roomPlayer.hand = gamePlayer.hand; // 新しい手札を同期
-                                }
+                        if (recycleResult.success) {
+                            console.log('♻️ カードリサイクル成功');
+                            
+                            // 🔧 【重要】ゲームデータを直接更新
+                            room.gameData.currentRound = roundResult.newRound;
+                            room.gameData.cardsPerPlayer = recycleResult.newCardsPerPlayer;
+                            room.gameData.cardsFlippedThisRound = 0;
+                            
+                            console.log('🔍 【デバッグ】リサイクル後の手札確認');
+                            connectedPlayers.forEach(player => {
+                                console.log(`${player.name}: ${player.hand.length}枚`);
                             });
+                            
+                            // 🔧 【重要】GameManager側も同期
+                            try {
+                                const GameManager = require('../game/game-Manager');
+                                // GameManager側のデータをactiveRooms側に合わせる
+                                const gameData = GameManager.get(socket.roomId);
+                                if (gameData) {
+                                    Object.assign(gameData, room.gameData);
+                                    console.log('🔍 【デバッグ】GameManager同期完了');
+                                }
+                            } catch (gmError) {
+                                console.warn('⚠️ GameManager同期エラー:', gmError);
+                            }
+                            
+                            // ログ送信
+                            sendGameLog(io, socket.roomId, 
+                                `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`, 
+                                activeRooms
+                            );
+                        } else {
+                            console.error('❌ カードリサイクル失敗:', recycleResult.error);
                         }
-                        
-                        // 既存のログ送信機能を活用（変更なし）
-                        sendGameLog(io, socket.roomId, 
-                            `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`, 
-                            activeRooms
-                        );
-                    } else {
-                        console.error('❌ カードリサイクル失敗:', recycleResult.error);
-                        // エラーが発生した場合でも処理を継続（既存の安全性を維持）
+                    } catch (error) {
+                        console.error('🚨 【緊急】カードリサイクル処理でエラー:', error);
+                        console.error('エラー詳細:', error.stack);
                     }
                 }
                 
