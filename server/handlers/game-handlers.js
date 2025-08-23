@@ -261,28 +261,32 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                     }
                 }
                 
-                // 新ラウンド開始時にカード選択履歴をクリア
-                room.gameData.lastCardSelections = new Map();
-                
-                // 🆕 【追加】3秒のラグを追加
-                setTimeout(() => {
-                    console.log('⏰ 3秒待機完了 - 次ラウンド開始');
-                    
-                    // ラウンド開始イベントを送信
-                    io.to(socket.roomId).emit('roundStart', roundResult.newRound);
-                    
-                    // 新ラウンドの鍵保持者を正しく設定
-                    if (room.gameData.lastTargetedPlayerId) {
-                        const lastTargetedPlayer = room.gameData.players.find(p => p.id === room.gameData.lastTargetedPlayerId);
-                        if (lastTargetedPlayer && lastTargetedPlayer.connected) {
-                            room.gameData.keyHolderId = lastTargetedPlayer.id;
-                            console.log(`🗝️ 新ラウンド鍵保持者: ${lastTargetedPlayer.name}`);
-                        }
-                    }
-                }, 3000);
-                
-                // 🔧 【重要】ゲーム更新は即座に送信（手札変更を反映）
-                io.to(socket.roomId).emit('gameUpdate', room.gameData);
+
+// 新ラウンド開始時にカード選択履歴をクリア
+room.gameData.lastCardSelections = new Map();
+
+// 🆕 【修正】3秒のラグ - カードめくり演出後に次ラウンド処理
+setTimeout(() => {
+    console.log('⏰ 3秒待機完了 - 次ラウンド開始処理');
+    
+    // 🔧 【重要】3秒後にゲーム更新を送信（手札変更を含む）
+    io.to(socket.roomId).emit('gameUpdate', room.gameData);
+    
+    // ラウンド開始イベントを送信
+    io.to(socket.roomId).emit('roundStart', roundResult.newRound);
+    
+    // 新ラウンドの鍵保持者を正しく設定
+    if (room.gameData.lastTargetedPlayerId) {
+        const lastTargetedPlayer = room.gameData.players.find(p => p.id === room.gameData.lastTargetedPlayerId);
+        if (lastTargetedPlayer && lastTargetedPlayer.connected) {
+            room.gameData.keyHolderId = lastTargetedPlayer.id;
+            console.log(`🗝️ 新ラウンド鍵保持者: ${lastTargetedPlayer.name}`);
+        }
+    }
+    
+}, 3000); // 3秒待機
+
+
             }
 
             // ゲーム更新を全員に送信
