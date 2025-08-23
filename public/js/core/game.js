@@ -1,138 +1,63 @@
-// メインゲームクラス - 修正版
+// 🔧 【保持】既存の import 文
 import { SocketClient } from './socket-client.js';
 import { UIManager } from './ui-manager.js';
 import { RoomManager } from '../components/room-manager.js';
 import { GameBoard } from '../components/game-board.js';
-import { Chat } from '../components/chat.js';
-import { StorageManager } from '../utils/storage.js';
-import { setupDebugInfo, logError, safeAddEventListener, safeGetElement } from '../utils/helpers.js';
+import { ChatManager } from '../components/chat-manager.js';
 
-export class PigManGame {
+// 🔧 【保持】既存の safeGetElement と safeAddEventListener 関数
+function safeGetElement(id) {
+    try {
+        return document.getElementById(id);
+    } catch (error) {
+        console.warn(`Element not found: ${id}`);
+        return null;
+    }
+}
+
+function safeAddEventListener(elementId, event, handler) {
+    try {
+        const element = safeGetElement(elementId);
+        if (element) {
+            element.addEventListener(event, handler);
+            console.log(`✅ ${elementId} に ${event} イベントリスナー追加`);
+        } else {
+            console.warn(`⚠️ ${elementId} 要素が見つかりません`);
+        }
+    } catch (error) {
+        console.error(`イベントリスナー追加エラー (${elementId}):`, error);
+    }
+}
+
+export class Game {
     constructor() {
-        console.log('🐷 PigManGame 初期化開始');
+        console.log('🎮 Game クラス初期化開始');
         
-        // ゲーム状態
-        this.socket = null;
+        // 🔧 【保持】既存のプロパティ
         this.roomId = null;
         this.gameData = null;
-        this.isHost = false;
-        this.mySocketId = null;
         this.myName = null;
+        this.isHost = false;
         this.isSpectator = false;
+        this.mySocketId = null;
         
-        // 初期化フラグ
-        this.isInitialized = false;
+        // 🔧 【保持】既存のマネージャー初期化
+        this.socketClient = new SocketClient(this);
+        this.roomManager = new RoomManager(this);
+        this.gameBoard = new GameBoard(this);
+        this.chatManager = new ChatManager(this);
         
-        try {
-            // コンポーネント初期化
-            this.socketClient = new SocketClient(this);
-            this.roomManager = new RoomManager(this);
-            this.gameBoard = new GameBoard(this);
-            this.chat = new Chat(this);
-            
-            // 初期化
-            this.initializeEventListeners();
-            this.initializeErrorMonitoring();
-            setupDebugInfo();
-            
-            // 再接続を試行（遅延実行）
-            setTimeout(() => {
-                this.roomManager.attemptReconnection();
-            }, 1000);
-            
-            this.isInitialized = true;
-            console.log('✅ PigManGame 初期化完了');
-        } catch (error) {
-            console.error('❌ PigManGame 初期化エラー:', error);
-            UIManager.showError('ゲームの初期化に失敗しました。ページをリロードしてください。');
-        }
+        this.setupEventListeners();
+        
+        console.log('✅ Game クラス初期化完了');
     }
 
-    
-    returnToLobby() {
+    // 🔧 【修正】一時退出関連のイベントリスナーを削除
+    setupEventListeners() {
         try {
-            if (!this.socketClient.isConnected()) {
-                UIManager.showError('サーバーに接続されていません');
-                return;
-            }
+            console.log('🔧 イベントリスナー設定開始');
             
-            console.log('🏠 ロビー復帰要求');
-            this.socketClient.returnToLobby();
-            
-        } catch (error) {
-            console.error('ロビー復帰エラー:', error);
-            UIManager.showError('ロビー復帰でエラーが発生しました');
-        }
-    }
-    
-    // 🔧 【追加】連戦開始
-    restartGame() {
-        try {
-            if (!this.isHost) {
-                UIManager.showError('連戦開始権限がありません');
-                return;
-            }
-            
-            if (!this.socketClient.isConnected()) {
-                UIManager.showError('サーバーに接続されていません');
-                return;
-            }
-            
-            console.log('🔄 連戦開始要求');
-            this.socketClient.restartGame();
-            
-        } catch (error) {
-            console.error('連戦開始エラー:', error);
-            UIManager.showError('連戦開始でエラーが発生しました');
-        }
-    }
-    
-    // 🔧 【追加】勝利画面からの復帰処理
-    onReturnToLobby() {
-        try {
-            this.returnToLobby();
-        } catch (error) {
-            console.error('勝利画面からのロビー復帰エラー:', error);
-            UIManager.showError('ロビー復帰でエラーが発生しました');
-        }
-    }
-    
-    // 🔧 【追加】勝利画面からの連戦開始処理
-    onRestartGame() {
-        try {
-            this.restartGame();
-        } catch (error) {
-            console.error('勝利画面からの連戦開始エラー:', error);
-            UIManager.showError('連戦開始でエラーが発生しました');
-        }
-    }
-    
-    initializeErrorMonitoring() {
-        const self = this;
-        
-        window.addEventListener('error', (event) => {
-            logError('JavaScript Error', {
-                message: event.message,
-                filename: event.filename,
-                lineno: event.lineno,
-                colno: event.colno,
-                stack: event.error?.stack
-            }, self.socketClient);
-        });
-
-        window.addEventListener('unhandledrejection', (event) => {
-            logError('Unhandled Promise Rejection', {
-                reason: event.reason,
-                promise: event.promise
-            }, self.socketClient);
-        });
-    }
-
-    initializeEventListeners() {
-        console.log('🎮 イベントリスナー設定開始');
-        
-        try {
-            // パスワード表示切り替え
+            // 🔧 【保持】既存のパスワード表示切り替え
             safeAddEventListener('use-password', 'change', (e) => {
                 const passwordGroup = safeGetElement('password-group');
                 if (passwordGroup) {
@@ -140,7 +65,7 @@ export class PigManGame {
                 }
             });
 
-            // ルーム関連
+            // 🔧 【保持】既存のルーム関連イベント
             safeAddEventListener('create-room', 'click', (e) => {
                 e.preventDefault();
                 this.roomManager.createRoom();
@@ -151,54 +76,36 @@ export class PigManGame {
                 this.roomManager.joinRoom();
             });
 
-            safeAddEventListener('rejoin-room', 'click', (e) => {
-                e.preventDefault();
-                this.roomManager.rejoinRoom();
-            });
-
             safeAddEventListener('spectate-room', 'click', (e) => {
                 e.preventDefault();
                 this.roomManager.spectateRoom();
             });
 
+            // 🔧 【修正】退出関連イベント - シンプル退出のみ
             safeAddEventListener('leave-room', 'click', (e) => {
                 e.preventDefault();
                 this.roomManager.leaveRoom();
             });
 
-            safeAddEventListener('temp-leave-room', 'click', (e) => {
-                e.preventDefault();
-                this.roomManager.tempLeaveRoom();
-            });
-
-            safeAddEventListener('cancel-temp-leave', 'click', (e) => {
-                e.preventDefault();
-                this.roomManager.cancelTempLeave();
-            });
-
+            // 🔧 【修正】ゲーム中退出 - 確認ダイアログ付き
             safeAddEventListener('game-leave-room', 'click', (e) => {
                 e.preventDefault();
-                this.roomManager.showTempLeaveDialog();
+                this.roomManager.confirmGameLeave();
             });
 
-            // ゲーム関連
+            // 🔧 【保持】既存のゲーム関連イベント
             safeAddEventListener('start-game', 'click', (e) => {
                 e.preventDefault();
                 this.startGame();
             });
 
-            // return-to-lobbyボタンは動的生成されるため、条件付きで処理
-const returnToLobbyBtn = safeGetElement('return-to-lobby');
-if (returnToLobbyBtn) {
-    returnToLobbyBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.roomManager.leaveRoom();
-    });
-} else {
-    console.log('return-to-lobbyボタンは動的生成のためスキップ');
-}
+            // 🔧 【保持】勝利画面からの退出
+            safeAddEventListener('return-to-lobby', 'click', (e) => {
+                e.preventDefault();
+                this.roomManager.leaveRoom();
+            });
 
-            // リフレッシュボタン
+            // 🔧 【保持】既存のリフレッシュボタン
             safeAddEventListener('refresh-rooms', 'click', (e) => {
                 e.preventDefault();
                 this.socketClient.getRoomList();
@@ -209,7 +116,23 @@ if (returnToLobbyBtn) {
                 this.socketClient.getOngoingGames();
             });
 
-            // ページ離脱時の警告
+            // 🔧 【保持】既存のチャット関連
+            safeAddEventListener('send-chat', 'click', (e) => {
+                e.preventDefault();
+                this.chatManager.sendMessage();
+            });
+
+            const chatInput = safeGetElement('chat-input');
+            if (chatInput) {
+                chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.chatManager.sendMessage();
+                    }
+                });
+            }
+
+            // 🔧 【保持】既存のページ離脱時の警告
             window.addEventListener('beforeunload', (e) => {
                 if (this.roomId && this.gameData && this.gameData.gameState === 'playing') {
                     e.preventDefault();
@@ -218,7 +141,7 @@ if (returnToLobbyBtn) {
                 }
             });
 
-            // 手動再接続ボタンを追加
+            // 🔧 【保持】既存の手動再接続ボタン
             this.addManualReconnectButton();
 
             console.log('✅ イベントリスナー設定完了');
@@ -227,206 +150,260 @@ if (returnToLobbyBtn) {
         }
     }
 
-// public/js/core/game.js の addManualReconnectButton メソッドを修正
+    // 🔧 【保持】既存の手動再接続ボタン追加
+    addManualReconnectButton() {
+        try {
+            // 既存のボタンがあれば削除
+            const existingBtn = document.getElementById('manual-reconnect');
+            if (existingBtn) {
+                existingBtn.remove();
+            }
 
-addManualReconnectButton() {
-    try {
-        // 既存のボタンがあれば削除
-        const existingBtn = document.getElementById('manual-reconnect');
-        if (existingBtn) {
-            existingBtn.remove();
+            const reconnectBtn = document.createElement('button');
+            reconnectBtn.id = 'manual-reconnect';
+            reconnectBtn.className = 'btn btn-small';
+            reconnectBtn.textContent = '🔄 再接続';
+            reconnectBtn.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 200px;
+                z-index: 1000;
+                width: auto;
+                font-size: 12px;
+                padding: 6px 12px;
+            `;
+            
+            reconnectBtn.onclick = () => {
+                console.log('手動再接続ボタンクリック');
+                
+                // ゲーム中の再接続を防止
+                if (this.roomId && this.gameData) {
+                    console.warn('⚠️ ゲーム中の手動再接続はスキップします');
+                    UIManager.showError('ゲーム中は再接続ボタンを使用できません', 'warning');
+                    return;
+                }
+                
+                try {
+                    this.socketClient.forceReconnect();
+                    UIManager.showError('再接続を試行中...', 'warning');
+                } catch (error) {
+                    console.error('手動再接続エラー:', error);
+                    UIManager.showError('再接続に失敗しました');
+                }
+            };
+            
+            document.body.appendChild(reconnectBtn);
+        } catch (error) {
+            console.error('手動再接続ボタン追加エラー:', error);
         }
-
-        const reconnectBtn = document.createElement('button');
-        reconnectBtn.id = 'manual-reconnect';
-        reconnectBtn.className = 'btn btn-small';
-        reconnectBtn.textContent = '🔄 再接続';
-        reconnectBtn.style.cssText = `
-            position: fixed;
-            top: 10px;
-            left: 200px;
-            z-index: 1000;
-            width: auto;
-            font-size: 12px;
-            padding: 6px 12px;
-        `;
-        
-        reconnectBtn.onclick = () => {
-            console.log('手動再接続ボタンクリック');
-            
-            // 🔧 ゲーム中の再接続を防止
-            if (this.roomId && this.gameData) {
-                console.warn('⚠️ ゲーム中の手動再接続はスキップします');
-                UIManager.showError('ゲーム中は再接続ボタンを使用できません', 'warning');
-                return;
-            }
-            
-            try {
-                this.socketClient.forceReconnect();
-                UIManager.showError('再接続を試行中...', 'warning');
-            } catch (error) {
-                console.error('手動再接続エラー:', error);
-                UIManager.showError('再接続に失敗しました');
-            }
-        };
-        
-        document.body.appendChild(reconnectBtn);
-    } catch (error) {
-        console.error('手動再接続ボタン追加エラー:', error);
     }
-}
 
-    // サーバーからのイベント処理 - roomManagerに委譲（エラーハンドリング強化）
+    // 🔧 【保持】既存のサーバーからのイベント処理
     onRoomCreated(data) {
         try {
             this.roomManager.onRoomCreated(data);
-            this.updateUI();
         } catch (error) {
-            console.error('ルーム作成処理エラー:', error);
-            UIManager.showError('ルーム作成後の処理でエラーが発生しました');
+            console.error('ルーム作成イベント処理エラー:', error);
         }
     }
 
-    onJoinSuccess(data) {
+    onRoomJoined(data) {
         try {
-            this.roomManager.onJoinSuccess(data);
-            this.updateUI();
+            this.roomManager.onRoomJoined(data);
         } catch (error) {
-            console.error('ルーム参加処理エラー:', error);
-            UIManager.showError('ルーム参加後の処理でエラーが発生しました');
+            console.error('ルーム参加イベント処理エラー:', error);
         }
     }
 
     onSpectateSuccess(data) {
         try {
             this.roomManager.onSpectateSuccess(data);
-            this.updateUI();
         } catch (error) {
-            console.error('観戦処理エラー:', error);
-            UIManager.showError('観戦後の処理でエラーが発生しました');
+            console.error('観戦成功イベント処理エラー:', error);
         }
     }
 
-    onRejoinSuccess(data) {
+    onError(data) {
         try {
-            this.roomManager.onRejoinSuccess(data);
-            this.updateUI();
+            this.roomManager.onError(data);
         } catch (error) {
-            console.error('再入場処理エラー:', error);
-            UIManager.showError('再入場後の処理でエラーが発生しました');
+            console.error('エラーイベント処理エラー:', error);
         }
     }
 
-    onReconnectSuccess(data) {
+    onGameUpdate(gameData) {
         try {
-            this.roomManager.onReconnectSuccess(data);
-            this.updateUI();
+            this.roomManager.onGameUpdate(gameData);
         } catch (error) {
-            console.error('再接続処理エラー:', error);
-            UIManager.showError('再接続後の処理でエラーが発生しました');
+            console.error('ゲーム更新イベント処理エラー:', error);
         }
     }
 
-    // エラー時の処理
-    onError(error) {
-        console.error('❌ サーバーエラー:', error);
+    onHostChanged(data) {
+        try {
+            this.roomManager.onHostChanged(data);
+        } catch (error) {
+            console.error('ホスト変更イベント処理エラー:', error);
+        }
+    }
+
+    // 🔧 【保持】既存のゲーム開始メソッド
+    startGame() {
+        console.log('🎮 ゲーム開始要求');
         
         try {
-            // RoomManagerのエラー処理も呼び出し
-            if (this.roomManager && typeof this.roomManager.onError === 'function') {
-                this.roomManager.onError(error);
-            } else {
-                // フラグをリセット
-                if (this.roomManager) {
-                    this.roomManager.isJoining = false;
-                    this.roomManager.isCreating = false;
-                    this.roomManager.updateButtonStates();
-                }
-                
-                UIManager.showError(error.message || 'エラーが発生しました');
-            }
-        } catch (e) {
-            console.error('エラー処理中のエラー:', e);
-            UIManager.showError('予期しないエラーが発生しました');
-        }
-    }
-
-    updateUI() {
-        try {
-            console.log('🎨 UI更新');
-            if (!this.gameData) {
-                console.warn('⚠️ ゲームデータが存在しません');
-                return;
-            }
-
-            // 安全にUI要素を更新
-            const treasureGoalEl = safeGetElement('treasure-goal');
-            if (treasureGoalEl) {
-                treasureGoalEl.textContent = this.gameData.treasureGoal || 7;
-            }
-
-            if (this.gameData.gameState === 'waiting') {
-                this.gameBoard.updateLobbyUI();
-            } else if (this.gameData.gameState === 'playing') {
-                this.gameBoard.updateGameUI();
-            } else if (this.gameData.gameState === 'finished') {
-                this.gameBoard.handleVictoryScreen(this.gameData);
-            }
-        } catch (error) {
-            console.error('UI更新エラー:', error);
-        }
-    }
-
-    startGame() {
-        try {
-            if (this.isSpectator) {
-                UIManager.showError('観戦者はゲームを開始できません');
-                return;
-            }
-            
             if (!this.isHost) {
-                UIManager.showError('ゲーム開始権限がありません');
+                UIManager.showError('ゲームを開始できるのはホストのみです');
                 return;
             }
-            
-            if (!this.socketClient.isConnected()) {
-                UIManager.showError('サーバーに接続されていません');
+
+            const playerCount = this.gameData?.players?.length || 0;
+            if (playerCount < 3) {
+                UIManager.showError('ゲーム開始には最低3人必要です');
                 return;
             }
-            
+
             this.socketClient.startGame();
+            UIManager.showError('ゲームを開始中...', 'warning');
+
         } catch (error) {
             console.error('ゲーム開始エラー:', error);
             UIManager.showError('ゲーム開始でエラーが発生しました');
         }
     }
 
-    // 公開メソッド（観戦機能用）
-    spectateRoom() {
+    // 🔧 【保持】既存のゲーム開始イベント処理
+    onGameStart(gameData) {
+        console.log('🎮 ゲーム開始:', gameData);
+        
         try {
-            this.roomManager.spectateRoom();
+            this.gameData = gameData;
+            this.gameBoard.onGameStart(gameData);
+            UIManager.showScreen('game-board');
+            UIManager.showError('ゲームが開始されました！', 'success');
+            
         } catch (error) {
-            console.error('観戦機能エラー:', error);
-            UIManager.showError('観戦でエラーが発生しました');
+            console.error('ゲーム開始イベント処理エラー:', error);
         }
     }
 
-    // デバッグ用メソッド
+    // 🔧 【保持】既存のラウンド開始処理
+    onRoundStart(roundNumber) {
+        console.log('🔄 ラウンド開始:', roundNumber);
+        
+        try {
+            this.gameBoard.onRoundStart(roundNumber);
+            
+        } catch (error) {
+            console.error('ラウンド開始イベント処理エラー:', error);
+        }
+    }
+
+    // 🔧 【保持】既存のカード選択結果処理
+    onCardResult(data) {
+        console.log('🃏 カード選択結果:', data);
+        
+        try {
+            this.gameBoard.onCardResult(data);
+            
+        } catch (error) {
+            console.error('カード選択結果処理エラー:', error);
+        }
+    }
+
+    // 🔧 【保持】既存のゲーム終了処理
+    onGameEnd(data) {
+        console.log('🏁 ゲーム終了:', data);
+        
+        try {
+            this.gameBoard.onGameEnd(data);
+            
+        } catch (error) {
+            console.error('ゲーム終了イベント処理エラー:', error);
+        }
+    }
+
+    // 🔧 【保持】既存のチャットメッセージ処理
+    onChatMessage(data) {
+        try {
+            this.chatManager.addMessage(data);
+        } catch (error) {
+            console.error('チャットメッセージ処理エラー:', error);
+        }
+    }
+
+    // 🔧 【保持】既存のゲームログ処理
+    onGameLog(data) {
+        try {
+            this.chatManager.addGameLog(data.message);
+        } catch (error) {
+            console.error('ゲームログ処理エラー:', error);
+        }
+    }
+
+    // 🔧 【保持】既存のルーム一覧更新処理
+    onRoomList(roomList) {
+        console.log('🏠 ルーム一覧更新:', roomList);
+        
+        try {
+            UIManager.updateRoomList(roomList);
+        } catch (error) {
+            console.error('ルーム一覧更新エラー:', error);
+        }
+    }
+
+    // 🔧 【保持】既存の進行中ゲーム更新処理
+    onOngoingGames(gamesList) {
+        console.log('🎮 進行中ゲーム更新:', gamesList);
+        
+        try {
+            UIManager.updateOngoingGames(gamesList);
+        } catch (error) {
+            console.error('進行中ゲーム更新エラー:', error);
+        }
+    }
+
+    // 🔧 【保持】既存のロビー復帰メソッド
+    returnToLobby() {
+        console.log('🏠 ロビー復帰処理');
+        
+        try {
+            this.roomManager.leaveRoom();
+        } catch (error) {
+            console.error('ロビー復帰エラー:', error);
+            UIManager.showScreen('lobby');
+        }
+    }
+
+    // 🔧 【保持】既存の連戦開始メソッド
+    onRestartGame() {
+        console.log('🔄 連戦開始処理');
+        
+        try {
+            this.socketClient.restartGame();
+            UIManager.showError('新しいゲームを開始中...', 'warning');
+        } catch (error) {
+            console.error('連戦開始エラー:', error);
+            UIManager.showError('連戦開始でエラーが発生しました');
+        }
+    }
+
+    // 🔧 【保持】既存のデバッグ情報取得
     getDebugInfo() {
         try {
             return {
-                isInitialized: this.isInitialized,
                 roomId: this.roomId,
-                myName: this.myName,
+                gameState: this.gameData?.gameState || 'なし',
+                playerName: this.myName,
                 isHost: this.isHost,
                 isSpectator: this.isSpectator,
-                gameState: this.gameData?.gameState || 'なし',
-                socketInfo: this.socketClient?.getDebugInfo() || 'なし',
-                roomManagerInfo: this.roomManager?.getDebugInfo() || 'なし'
+                socketId: this.mySocketId,
+                socketInfo: this.socketClient?.getDebugInfo() || {},
+                roomManagerInfo: this.roomManager?.debug || {}
             };
         } catch (error) {
             console.error('デバッグ情報取得エラー:', error);
-            return { error: error.message };
+            return { error: 'デバッグ情報取得失敗' };
         }
     }
 }
