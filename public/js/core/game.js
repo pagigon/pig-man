@@ -52,7 +52,7 @@ export class Game {
         console.log('✅ Game クラス初期化完了');
     }
 
-    // 🔧 【修正】一時退出関連のイベントリスナーを削除
+    // 🔧 【修正】完全に修正されたsetupEventListeners メソッド
     setupEventListeners() {
         try {
             console.log('🔧 イベントリスナー設定開始');
@@ -122,6 +122,7 @@ export class Game {
                 this.chat.sendChat();
             });
 
+            // 🔧 【修正】チャット入力のイベントリスナー（構文エラー修正）
             const chatInput = safeGetElement('chat-input');
             if (chatInput) {
                 chatInput.addEventListener('keypress', (e) => {
@@ -130,164 +131,7 @@ export class Game {
                         this.chat.sendChat();
                     }
                 });
-}
-                
-        console.log('🔄 連戦開始処理');
-        
-        try {
-            if (!this.isHost) {
-                console.warn('⚠️ 連戦開始はホストのみ可能');
-                UIManager.showError('連戦開始はホストのみ実行できます');
-                return;
             }
-
-            if (!this.socketClient || !this.socketClient.isConnected()) {
-                console.warn('⚠️ サーバー未接続');
-                UIManager.showError('サーバーとの接続が切断されています');
-                return;
-            }
-
-            this.socketClient.restartGame();
-            UIManager.showError('新しいゲームを開始中...', 'warning');
-            
-        } catch (error) {
-            console.error('連戦開始エラー:', error);
-            UIManager.showError('連戦開始でエラーが発生しました');
-        }
-    }
-
-    // 🔧 【追加】ロビー復帰メソッド（main.jsで呼び出される）
-    returnToLobby() {
-        console.log('🏠 ロビー復帰処理');
-        
-        try {
-            if (this.roomManager && typeof this.roomManager.leaveRoom === 'function') {
-                this.roomManager.leaveRoom();
-            } else {
-                console.warn('⚠️ roomManager.leaveRoom が見つからない - 代替処理実行');
-                // 代替処理
-                UIManager.showScreen('lobby');
-                UIManager.showError('ロビーに戻りました', 'success');
-            }
-        } catch (error) {
-            console.error('ロビー復帰エラー:', error);
-            // エラーでもロビーには戻す
-            UIManager.showScreen('lobby');
-            UIManager.showError('ロビーに戻りました', 'warning');
-        }
-    }
-
-    // 🔧 【追加】勝利画面イベント処理メソッド
-    onGameEnded(data) {
-        console.log('🏁 ゲーム終了イベント受信:', data);
-        
-        try {
-            // ゲームデータ更新
-            if (this.gameData) {
-                this.gameData.gameState = 'finished';
-                this.gameData.winningTeam = data.winningTeam;
-                this.gameData.victoryMessage = data.victoryMessage;
-            }
-
-            // GameBoardクラスに勝利画面表示を委譲
-            if (this.gameBoard && typeof this.gameBoard.handleVictoryScreen === 'function') {
-                this.gameBoard.handleVictoryScreen(this.gameData);
-            } else {
-                // フォールバック処理
-                UIManager.showVictoryScreen(this.gameData || data);
-            }
-            
-        } catch (error) {
-            console.error('ゲーム終了イベント処理エラー:', error);
-        }
-    }
-
-    // 🔧 【追加】ゲーム再開イベント処理メソッド
-    onGameRestarted(gameData) {
-        console.log('🔄 ゲーム再開イベント受信:', gameData);
-        
-        try {
-            this.gameData = gameData;
-            
-            if (this.gameBoard && typeof this.gameBoard.updateGameUI === 'function') {
-                this.gameBoard.updateGameUI();
-            }
-            
-            UIManager.showError('新しいゲームが開始されました！', 'success');
-            
-        } catch (error) {
-            console.error('ゲーム再開イベント処理エラー:', error);
-        }
-    }
-
-    // 🔧 【既存メソッドの保持】デバッグ情報取得
-    getDebugInfo() {
-        try {
-            return {
-                roomId: this.roomId,
-                gameState: this.gameData?.gameState || 'なし',
-                playerName: this.myName,
-                isHost: this.isHost,
-                isSpectator: this.isSpectator,
-                socketId: this.mySocketId,
-                socketInfo: this.socketClient?.getDebugInfo() || {},
-                roomManagerInfo: this.roomManager?.debug || {}
-            };
-        } catch (error) {
-            console.error('デバッグ情報取得エラー:', error);
-            return { error: 'デバッグ情報取得失敗' };
-        }
-    }
-        // 🔧 【追加】連戦開始メソッド
-    restartGame() {
-        console.log('🔄 連戦開始処理');
-        
-        try {
-            if (!this.isHost) {
-                UIManager.showError('連戦開始はホストのみ実行できます');
-                return;
-            }
-            this.socketClient.restartGame();
-            UIManager.showError('新しいゲームを開始中...', 'warning');
-        } catch (error) {
-            console.error('連戦開始エラー:', error);
-            UIManager.showError('連戦開始でエラーが発生しました');
-        }
-    }
-
-    // 🔧 【追加】勝利画面イベント処理
-    onGameEnded(data) {
-        console.log('🏁 ゲーム終了イベント受信:', data);
-        try {
-            if (this.gameData) {
-                this.gameData.gameState = 'finished';
-                this.gameData.winningTeam = data.winningTeam;
-                this.gameData.victoryMessage = data.victoryMessage;
-            }
-            if (this.gameBoard && this.gameBoard.handleVictoryScreen) {
-                this.gameBoard.handleVictoryScreen(this.gameData);
-            } else {
-                UIManager.showVictoryScreen(this.gameData || data);
-            }
-        } catch (error) {
-            console.error('ゲーム終了イベント処理エラー:', error);
-        }
-    }
-
-    // 🔧 【追加】ゲーム再開イベント処理
-    onGameRestarted(gameData) {
-        console.log('🔄 ゲーム再開イベント受信:', gameData);
-        try {
-            this.gameData = gameData;
-            if (this.gameBoard && this.gameBoard.updateGameUI) {
-                this.gameBoard.updateGameUI();
-            }
-            UIManager.showError('新しいゲームが開始されました！', 'success');
-        } catch (error) {
-            console.error('ゲーム再開イベント処理エラー:', error);
-        }
-    }
-}
             
             // 🔧 【保持】既存のページ離脱時の警告
             window.addEventListener('beforeunload', (e) => {
@@ -525,25 +369,92 @@ export class Game {
         console.log('🏠 ロビー復帰処理');
         
         try {
-            this.roomManager.leaveRoom();
+            if (this.roomManager && typeof this.roomManager.leaveRoom === 'function') {
+                this.roomManager.leaveRoom();
+            } else {
+                console.warn('⚠️ roomManager.leaveRoom が見つからない - 代替処理実行');
+                // 代替処理
+                UIManager.showScreen('lobby');
+                UIManager.showError('ロビーに戻りました', 'success');
+            }
         } catch (error) {
             console.error('ロビー復帰エラー:', error);
+            // エラーでもロビーには戻す
             UIManager.showScreen('lobby');
+            UIManager.showError('ロビーに戻りました', 'warning');
         }
     }
 
-    // 🔧 【保持】既存の連戦開始メソッド
-    onRestartGame() {
+    // 🔧 【追加】連戦開始メソッド（重複削除）
+    restartGame() {
         console.log('🔄 連戦開始処理');
         
         try {
+            if (!this.isHost) {
+                console.warn('⚠️ 連戦開始はホストのみ可能');
+                UIManager.showError('連戦開始はホストのみ実行できます');
+                return;
+            }
+
+            if (!this.socketClient || !this.socketClient.isConnected()) {
+                console.warn('⚠️ サーバー未接続');
+                UIManager.showError('サーバーとの接続が切断されています');
+                return;
+            }
+
             this.socketClient.restartGame();
             UIManager.showError('新しいゲームを開始中...', 'warning');
+            
         } catch (error) {
             console.error('連戦開始エラー:', error);
             UIManager.showError('連戦開始でエラーが発生しました');
         }
     }
+
+    // 🔧 【追加】勝利画面イベント処理メソッド（重複削除）
+    onGameEnded(data) {
+        console.log('🏁 ゲーム終了イベント受信:', data);
+        
+        try {
+            // ゲームデータ更新
+            if (this.gameData) {
+                this.gameData.gameState = 'finished';
+                this.gameData.winningTeam = data.winningTeam;
+                this.gameData.victoryMessage = data.victoryMessage;
+            }
+
+            // GameBoardクラスに勝利画面表示を委譲
+            if (this.gameBoard && typeof this.gameBoard.handleVictoryScreen === 'function') {
+                this.gameBoard.handleVictoryScreen(this.gameData);
+            } else {
+                // フォールバック処理
+                UIManager.showVictoryScreen(this.gameData || data);
+            }
+            
+        } catch (error) {
+            console.error('ゲーム終了イベント処理エラー:', error);
+        }
+    }
+
+    // 🔧 【追加】ゲーム再開イベント処理メソッド（重複削除）
+    onGameRestarted(gameData) {
+        console.log('🔄 ゲーム再開イベント受信:', gameData);
+        
+        try {
+            this.gameData = gameData;
+            
+            if (this.gameBoard && typeof this.gameBoard.updateGameUI === 'function') {
+                this.gameBoard.updateGameUI();
+            }
+            
+            UIManager.showError('新しいゲームが開始されました！', 'success');
+            
+        } catch (error) {
+            console.error('ゲーム再開イベント処理エラー:', error);
+        }
+    }
+
+    // 🔧 【削除】onRestartGame メソッド（重複のため削除）
 
     // 🔧 【保持】既存のデバッグ情報取得
     getDebugInfo() {
