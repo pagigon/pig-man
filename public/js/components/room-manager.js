@@ -296,18 +296,18 @@ export class RoomManager {
             
             // ストレージクリア
             try {
-    // StorageManagerが未定義の場合は直接localStorage操作
-    if (typeof StorageManager !== 'undefined' && StorageManager.clearAllData) {
-        StorageManager.clearAllData();
-    } else {
-        // フォールバック: 直接localStorage操作
-        localStorage.removeItem('pigGamePlayerInfo');
-        localStorage.removeItem('pigGameRejoinInfo');
-        console.log('✅ ストレージクリア完了（フォールバック）');
-    }
-} catch (e) {
-    console.warn('ストレージクリア失敗:', e);
-}
+                // StorageManagerが未定義の場合は直接localStorage操作
+                if (typeof StorageManager !== 'undefined' && StorageManager.clearAllData) {
+                    StorageManager.clearAllData();
+                } else {
+                    // フォールバック: 直接localStorage操作
+                    localStorage.removeItem('pigGamePlayerInfo');
+                    localStorage.removeItem('pigGameRejoinInfo');
+                    console.log('✅ ストレージクリア完了（フォールバック）');
+                }
+            } catch (e) {
+                console.warn('ストレージクリア失敗:', e);
+            }
             
             // デバッグカウンター更新
             this.debug.resetCount++;
