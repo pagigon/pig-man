@@ -38,47 +38,47 @@
     <div class="container">
 
         <div class="header">
-    <!-- 🔧 【修正】タイトル画像に変更 -->
-    <div class="title-image-container">
-        <img id="title-banner" 
-             class="title-banner-image" 
-             src="/images/title-banner.webp" 
-             alt="豚小屋探検隊 - 豚小屋に入らずんば子豚を得ず"
-             loading="eager">
-        
-        <!-- 🔧 【追加】画像読み込み失敗時のフォールバック -->
-        <div id="title-fallback" class="title-fallback" style="display: none;">
-            <h1>🐷 豚小屋探検隊 🐷</h1>
-            <p class="subtitle">豚小屋に入らずんば子豚を得ず</p>
+            <!-- 🔧 【修正】タイトル画像に変更 -->
+            <div class="title-image-container">
+                <img id="title-banner" 
+                     class="title-banner-image" 
+                     src="/images/title-banner.webp" 
+                     alt="豚小屋探検隊 - 豚小屋に入らずんば子豚を得ず"
+                     loading="eager">
+                
+                <!-- 🔧 【追加】画像読み込み失敗時のフォールバック -->
+                <div id="title-fallback" class="title-fallback" style="display: none;">
+                    <h1>🐷 豚小屋探検隊 🐷</h1>
+                    <p class="subtitle">豚小屋に入らずんば子豚を得ず</p>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
-<!-- 🔧 【追加】画像読み込みエラー処理用JavaScript -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const titleImage = document.getElementById('title-banner');
-    const titleFallback = document.getElementById('title-fallback');
-    
-    // 画像読み込みエラー時のフォールバック処理
-    titleImage.addEventListener('error', function() {
-        console.warn('⚠️ タイトル画像の読み込みに失敗 - テキストフォールバックを表示');
-        titleImage.style.display = 'none';
-        titleFallback.style.display = 'block';
-    });
-    
-    // 画像読み込み成功時の処理
-    titleImage.addEventListener('load', function() {
-        console.log('✅ タイトル画像読み込み成功');
-        titleFallback.style.display = 'none';
-    });
-    
-    // 画像が既に読み込まれている場合（キャッシュから）
-    if (titleImage.complete && titleImage.naturalHeight !== 0) {
-        console.log('✅ タイトル画像キャッシュから読み込み済み');
-        titleFallback.style.display = 'none';
-    }
-});
-</script>
+        <!-- 🔧 【追加】画像読み込みエラー処理用JavaScript -->
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const titleImage = document.getElementById('title-banner');
+            const titleFallback = document.getElementById('title-fallback');
+            
+            // 画像読み込みエラー時のフォールバック処理
+            titleImage.addEventListener('error', function() {
+                console.warn('⚠️ タイトル画像の読み込みに失敗 - テキストフォールバックを表示');
+                titleImage.style.display = 'none';
+                titleFallback.style.display = 'block';
+            });
+            
+            // 画像読み込み成功時の処理
+            titleImage.addEventListener('load', function() {
+                console.log('✅ タイトル画像読み込み成功');
+                titleFallback.style.display = 'none';
+            });
+            
+            // 画像が既に読み込まれている場合（キャッシュから）
+            if (titleImage.complete && titleImage.naturalHeight !== 0) {
+                console.log('✅ タイトル画像キャッシュから読み込み済み');
+                titleFallback.style.display = 'none';
+            }
+        });
+        </script>
         
         <div id="error-message" class="error-message"></div>
 
@@ -119,19 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button id="join-room" class="btn">ルームに参加</button>
                 </div>
 
-                <div class="control-section">
-                    <h3>ゲーム中のルームに再入場</h3>
-                    <div class="input-group">
-                        <label for="rejoin-player-name">プレイヤー名:</label>
-                        <input type="text" id="rejoin-player-name" placeholder="元の名前を入力" maxlength="20">
-                    </div>
-                    <div class="input-group">
-                        <label for="rejoin-room-id">ルームID:</label>
-                        <input type="text" id="rejoin-room-id" placeholder="ルームIDを入力" maxlength="10">
-                    </div>
-                    <button id="rejoin-room" class="btn">ゲームに再入場</button>
-                </div>
-
+                <!-- 🔧 【保持】観戦機能は残す -->
                 <div class="control-section">
                     <h3>観戦モード</h3>
                     <div class="input-group">
@@ -300,25 +288,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div id="other-players-container"></div>
             </div>
 
-            <!-- ゲーム中の退出ボタン -->
+            <!-- 🔧 【修正】ゲーム中の退出ボタン - シンプル退出のみ -->
             <div class="game-leave-section">
                 <button id="game-leave-room" class="btn btn-secondary btn-small">🚪 ゲームを退出</button>
             </div>
 
             <!-- チャットセクション修正 -->
-<div class="collapsible-section">
-    <button class="section-toggle" onclick="toggleSection('chat-section')">
-        <span>探検隊通信</span> <span class="toggle-icon">▼</span>
-    </button>
-    <div id="chat-section" class="collapsed">
-        <!-- 🔧 【修正】chat-container のIDを追加 -->
-        <div id="chat-container" class="chat-container mobile"></div>
-        <div class="chat-input-container">
-            <input type="text" id="chat-input" placeholder="探検隊にメッセージ..." maxlength="100">
-            <button id="send-chat" class="btn btn-small">送信</button>
-        </div>
-    </div>
-</div>
+            <div class="collapsible-section">
+                <button class="section-toggle" onclick="toggleSection('chat-section')">
+                    <span>探検隊通信</span> <span class="toggle-icon">▼</span>
+                </button>
+                <div id="chat-section" class="collapsed">
+                    <!-- 🔧 【修正】chat-container のIDを追加 -->
+                    <div id="chat-container" class="chat-container mobile"></div>
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-input" placeholder="探検隊にメッセージ..." maxlength="100">
+                        <button id="send-chat" class="btn btn-small">送信</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- 正しいカードリサイクル対応のラウンド開始演出 -->
@@ -328,22 +316,21 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
 
-
         <!-- 🔧 【修正】勝利画面のボタンエリア構造 -->
-<div id="victory-screen" class="victory-screen">
-    <div class="victory-content">
-        <h2 id="victory-title"></h2>
-        <p id="victory-message"></p>
-        <div id="winners-list" style="margin: 20px 0;">
-            <!-- JavaScriptで動的に生成されるボタンエリア -->
+        <div id="victory-screen" class="victory-screen">
+            <div class="victory-content">
+                <h2 id="victory-title"></h2>
+                <p id="victory-message"></p>
+                <div id="winners-list" style="margin: 20px 0;">
+                    <!-- JavaScriptで動的に生成されるボタンエリア -->
+                </div>
+                <!-- 🔧 【追加】固定のボタンエリア -->
+                <div id="victory-buttons" class="victory-buttons" style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                    <button id="return-to-lobby" class="btn btn-secondary">🏠 ロビーに戻る</button>
+                    <button id="restart-game" class="btn btn-primary" style="display: none;">🔄 もう一戦！</button>
+                </div>
+            </div>
         </div>
-        <!-- 🔧 【追加】固定のボタンエリア -->
-        <div id="victory-buttons" class="victory-buttons" style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-            <button id="return-to-lobby" class="btn btn-secondary">🏠 ロビーに戻る</button>
-            <button id="restart-game" class="btn btn-primary" style="display: none;">🔄 もう一戦！</button>
-        </div>
-    </div>
-</div>
         
     </div>
 
