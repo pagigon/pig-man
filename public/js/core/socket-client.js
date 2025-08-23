@@ -369,6 +369,16 @@ export class SocketClient {
         }
         return this.emit('chatMessage', { message: message.trim() });
     }
+    
+    // 🔧 【追加】Chat.js で使用される sendChat メソッド
+sendChat(message) {
+    console.log('💬 チャット送信');
+    if (!message || message.trim().length === 0) {
+        return false;
+    }
+    // 🔧 【重要】サーバーで期待されるイベント名は 'sendChat'
+    return this.emit('sendChat', message.trim());
+}
 
     // 🔧 【保持】既存のリスト取得メソッド
     getRoomList() {
