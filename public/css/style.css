@@ -76,42 +76,7 @@ body {
     border: 2px solid #FFD700;
 }
 
-/* 一時退出機能用スタイル */
-.temp-leave-section {
-    background: rgba(255, 165, 0, 0.1);
-    padding: 15px;
-    border-radius: 10px;
-    margin-top: 15px;
-    border: 2px solid rgba(255, 165, 0, 0.3);
-}
-
-.temp-leave-info {
-    margin-bottom: 15px;
-}
-
-.temp-leave-info h4 {
-    color: #FFA500;
-    margin-bottom: 8px;
-    font-size: 14px;
-}
-
-.temp-leave-info p {
-    font-size: 12px;
-    line-height: 1.4;
-    margin: 4px 0;
-    color: #FFE4B5;
-}
-
-.temp-leave-buttons {
-    display: flex;
-    gap: 10px;
-}
-
-.temp-leave-buttons .btn {
-    flex: 1;
-}
-
-/* ゲーム中退出ボタン */
+/* 🔧 【修正】ゲーム中退出ボタンのスタイルをシンプルに */
 .game-leave-section {
     text-align: center;
     margin: 15px 0;
@@ -124,6 +89,26 @@ body {
 .game-leave-section .btn {
     width: auto;
     min-width: 120px;
+    background: rgba(220, 20, 60, 0.8);
+    color: white;
+    border: 2px solid #DC143C;
+}
+
+.game-leave-section .btn:hover {
+    background: rgba(220, 20, 60, 1.0);
+    transform: translateY(-2px);
+}
+
+/* 🔧 【追加】通常の退出ボタンスタイル */
+#leave-room {
+    background: rgba(220, 20, 60, 0.8);
+    color: white;
+    border: 2px solid #DC143C;
+}
+
+#leave-room:hover {
+    background: rgba(220, 20, 60, 1.0);
+    transform: translateY(-2px);
 }
 
 /* 再入場セクション用スタイル */
