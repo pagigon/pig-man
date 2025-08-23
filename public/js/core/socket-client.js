@@ -484,6 +484,43 @@ this.socket.on('cardRecycleComplete', function(recycleData) {
     }
 });
 
+        this.socket.on('cardSelected', function(data) {
+            console.log('🃏 カード選択完了通知:', data);
+            
+            try {
+                // 🔧 【重要】処理フラグをリセット
+                if (self.game && self.game.gameBoard && self.game.gameBoard.isProcessingCardSelection) {
+                    console.log('🔧 カード選択処理完了によりフラグリセット');
+                    self.game.gameBoard.isProcessingCardSelection = false;
+                }
+                
+                // カード選択の視覚効果を更新
+                if (data.cardType) {
+                    const cardTypeText = data.cardType === 'treasure' ? '🐷 子豚' : 
+                                        data.cardType === 'trap' ? '💀 罠' : '🏠 空き部屋';
+                    console.log(`✅ ${cardTypeText}を発見！`);
+                }
+                
+                // バイブレーション追加
+                if (navigator.vibrate) {
+                    switch (data.cardType) {
+                        case 'treasure':
+                            navigator.vibrate([100, 50, 100]); // 短い2回
+                            break;
+                        case 'trap':
+                            navigator.vibrate([200, 100, 200, 100, 200]); // 長い3回
+                            break;
+                        case 'empty':
+                            navigator.vibrate([50]); // 短い1回
+                            break;
+                    }
+                }
+                
+            } catch (error) {
+                console.error('カード選択完了処理エラー:', error);
+            }
+        });
+
         // エラーイベント処理
         this.socket.on('error', function(error) {
             console.error('❌ サーバーエラー:', error);
