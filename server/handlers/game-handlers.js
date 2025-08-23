@@ -191,6 +191,9 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                 newKeyHolder: targetPlayer.id
             });
             
+            // 🔧 【重要】カードめくり結果を即座に反映するため、現在の状態でgameUpdateも送信
+            io.to(socket.roomId).emit('gameUpdate', room.gameData);
+            
             // ゲームログに記録
             const cardTypeText = selectedCard.type === 'treasure' ? '🐷 子豚' : 
                                 selectedCard.type === 'trap' ? '💀 罠' : '🏠 空き部屋';
@@ -300,8 +303,8 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                 }, 3000); // 3秒待機
                 
             } else {
-                // 🔧 【重要】通常時のゲーム更新（ラウンド終了でない場合は即座に送信）
-                io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                // 🔧 【削除】通常時のgameUpdateは削除（上で既に送信済み）
+                // 通常時は上で既にgameUpdateを送信しているため、ここでは送信しない
             }
 
         } catch (error) {
