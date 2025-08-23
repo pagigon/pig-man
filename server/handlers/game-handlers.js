@@ -1,4 +1,4 @@
-// server/handlers/game-handlers.js - 演出タイミング修正完全版
+// server/handlers/game-handlers.js - カード演出タイミング完全修正版
 
 function setupGameHandlers(io, socket, socketRequestHistory) {
     // activeRoomsは room-handlers.js から取得
@@ -183,96 +183,106 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                 return;
             }
 
+            // 🔧 【重要】カード選択結果を即座に送信（演出用）
+            io.to(socket.roomId).emit('cardSelected', {
+                targetPlayerId: data.targetPlayerId,
+                cardIndex: data.cardIndex,
+                cardType: selectedCard.type,
+                newKeyHolder: targetPlayer.id
+            });
+            
+            // ゲームログに記録
+            const cardTypeText = selectedCard.type === 'treasure' ? '🐷 子豚' : 
+                                selectedCard.type === 'trap' ? '💀 罠' : '🏠 空き部屋';
+            sendGameLog(io, socket.roomId, 
+                `🎯 ${targetPlayer.name}の部屋を調査 → ${cardTypeText}を発見！`, 
+                activeRooms
+            );
+
             // ラウンド終了チェック
             const connectedPlayerCount = room.gameData.players.filter(p => p.connected).length;
             const maxCardsThisRound = connectedPlayerCount;
             
             if (room.gameData.cardsFlippedThisRound >= maxCardsThisRound) {
-                console.log('📋 ラウンド終了条件達成');
+                console.log('📋 ラウンド終了条件達成 - 3秒後に次ラウンド処理開始');
                 
-                // 次ラウンドへ進行
-                const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
+                // 🔧 【重要修正】ラウンド終了時は3秒後に全処理を実行
+                setTimeout(() => {
+                    console.log('⏰ 3秒待機完了 - 次ラウンド処理開始');
+                    
+                    // 次ラウンドへ進行
+                    const roundResult = advanceToNextRound(room.gameData, connectedPlayerCount);
 
-                if (roundResult.gameEnded) {
-                    room.gameData.gameState = 'finished';
-                    room.gameData.winningTeam = 'guardian';
-                    room.gameData.victoryMessage = roundResult.reason === 'max_rounds_reached' ? 
-                        `${room.gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！` : 
-                        '豚男チームの勝利です！';
-                    
-                    io.to(socket.roomId).emit('gameUpdate', room.gameData);
-                    io.to(socket.roomId).emit('gameEnded', {
-                        winningTeam: 'guardian',
-                        victoryMessage: room.gameData.victoryMessage
-                    });
-                    
-                    sendGameLog(io, socket.roomId, `🏆 ${room.gameData.victoryMessage}`, activeRooms);
-                    return;
-                }
-
-                if (roundResult.needsCardRecycle) {
-                    console.log('🔍 【デバッグ】カードリサイクル処理開始');
-                    
-                    try {
-                        const { correctCardRecycleSystem } = require('../game/game-Logic');
-                        const connectedPlayers = room.gameData.players.filter(p => p.connected);
+                    if (roundResult.gameEnded) {
+                        room.gameData.gameState = 'finished';
+                        room.gameData.winningTeam = 'guardian';
+                        room.gameData.victoryMessage = roundResult.reason === 'max_rounds_reached' ? 
+                            `${room.gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！` : 
+                            '豚男チームの勝利です！';
                         
-                        console.log('🔍 【デバッグ】リサイクル前の手札確認');
-                        connectedPlayers.forEach(player => {
-                            console.log(`${player.name}: ${player.hand.length}枚`);
+                        io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                        io.to(socket.roomId).emit('gameEnded', {
+                            winningTeam: 'guardian',
+                            victoryMessage: room.gameData.victoryMessage
                         });
                         
-                        const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
-                        console.log('🔍 【デバッグ】recycleResult:', recycleResult);
+                        sendGameLog(io, socket.roomId, `🏆 ${room.gameData.victoryMessage}`, activeRooms);
+                        return;
+                    }
+
+                    if (roundResult.needsCardRecycle) {
+                        console.log('🔍 【デバッグ】カードリサイクル処理開始');
                         
-                        if (recycleResult.success) {
-                            console.log('♻️ カードリサイクル成功');
+                        try {
+                            const { correctCardRecycleSystem } = require('../game/game-Logic');
+                            const connectedPlayers = room.gameData.players.filter(p => p.connected);
                             
-                            room.gameData.currentRound = roundResult.newRound;
-                            room.gameData.cardsPerPlayer = recycleResult.newCardsPerPlayer;
-                            room.gameData.cardsFlippedThisRound = 0;
-                            
-                            console.log('🔍 【デバッグ】リサイクル後の手札確認');
+                            console.log('🔍 【デバッグ】リサイクル前の手札確認');
                             connectedPlayers.forEach(player => {
                                 console.log(`${player.name}: ${player.hand.length}枚`);
                             });
                             
-                            try {
-                                const GameManager = require('../game/game-Manager');
-                                const gameData = GameManager.get(socket.roomId);
-                                if (gameData) {
-                                    Object.assign(gameData, room.gameData);
-                                    console.log('🔍 【デバッグ】GameManager同期完了');
-                                }
-                            } catch (gmError) {
-                                console.warn('⚠️ GameManager同期エラー:', gmError);
-                            }
+                            const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
+                            console.log('🔍 【デバッグ】recycleResult:', recycleResult);
                             
-                            sendGameLog(io, socket.roomId, 
-                                `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`, 
-                                activeRooms
-                            );
-                        } else {
-                            console.error('❌ カードリサイクル失敗:', recycleResult.error);
+                            if (recycleResult.success) {
+                                console.log('♻️ カードリサイクル成功');
+                                
+                                room.gameData.currentRound = roundResult.newRound;
+                                room.gameData.cardsPerPlayer = recycleResult.newCardsPerPlayer;
+                                room.gameData.cardsFlippedThisRound = 0;
+                                
+                                console.log('🔍 【デバッグ】リサイクル後の手札確認');
+                                connectedPlayers.forEach(player => {
+                                    console.log(`${player.name}: ${player.hand.length}枚`);
+                                });
+                                
+                                try {
+                                    const GameManager = require('../game/game-Manager');
+                                    const gameData = GameManager.get(socket.roomId);
+                                    if (gameData) {
+                                        Object.assign(gameData, room.gameData);
+                                        console.log('🔍 【デバッグ】GameManager同期完了');
+                                    }
+                                } catch (gmError) {
+                                    console.warn('⚠️ GameManager同期エラー:', gmError);
+                                }
+                                
+                                sendGameLog(io, socket.roomId, 
+                                    `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`, 
+                                    activeRooms
+                                );
+                            } else {
+                                console.error('❌ カードリサイクル失敗:', recycleResult.error);
+                            }
+                        } catch (error) {
+                            console.error('🚨 【緊急】カードリサイクル処理でエラー:', error);
+                            console.error('エラー詳細:', error.stack);
                         }
-                    } catch (error) {
-                        console.error('🚨 【緊急】カードリサイクル処理でエラー:', error);
-                        console.error('エラー詳細:', error.stack);
                     }
-                }
-                
-                // 新ラウンド開始時にカード選択履歴をクリア
-                room.gameData.lastCardSelections = new Map();
-
-                // 🔧 【修正】演出タイミング改善：3秒後に次ラウンド処理
-                setTimeout(() => {
-                    console.log('⏰ 3秒待機完了 - 次ラウンド開始処理');
                     
-                    // 🔧 【重要】3秒後にゲーム更新を送信（手札変更を含む）
-                    io.to(socket.roomId).emit('gameUpdate', room.gameData);
-                    
-                    // ラウンド開始イベントを送信
-                    io.to(socket.roomId).emit('roundStart', roundResult.newRound);
+                    // 新ラウンド開始時にカード選択履歴をクリア
+                    room.gameData.lastCardSelections = new Map();
                     
                     // 新ラウンドの鍵保持者を正しく設定
                     if (room.gameData.lastTargetedPlayerId) {
@@ -283,29 +293,16 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                         }
                     }
                     
+                    // 🔧 【重要】3秒後にゲーム更新とラウンド開始を送信
+                    io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                    io.to(socket.roomId).emit('roundStart', roundResult.newRound);
+                    
                 }, 3000); // 3秒待機
-            }
-            
-            // 🔧 【重要】カード選択イベントは即座に送信（演出用）
-            io.to(socket.roomId).emit('cardSelected', {
-                targetPlayerId: data.targetPlayerId,
-                cardIndex: data.cardIndex,
-                cardType: selectedCard.type,
-                newKeyHolder: targetPlayer.id
-            });
-            
-            // 🔧 【重要】通常時のゲーム更新（ラウンド終了でない場合）
-            if (room.gameData.cardsFlippedThisRound < maxCardsThisRound) {
+                
+            } else {
+                // 🔧 【重要】通常時のゲーム更新（ラウンド終了でない場合は即座に送信）
                 io.to(socket.roomId).emit('gameUpdate', room.gameData);
             }
-            
-            // ゲームログに記録
-            const cardTypeText = selectedCard.type === 'treasure' ? '🐷 子豚' : 
-                                selectedCard.type === 'trap' ? '💀 罠' : '🏠 空き部屋';
-            sendGameLog(io, socket.roomId, 
-                `🎯 ${targetPlayer.name}の部屋を調査 → ${cardTypeText}を発見！`, 
-                activeRooms
-            );
 
         } catch (error) {
             console.error('🎯 カード選択エラー:', error);
