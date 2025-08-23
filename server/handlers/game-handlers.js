@@ -268,24 +268,31 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                     }
                 }
                 
+                // 🔧 【修正】カードリサイクル処理後に3秒の待機時間を追加
+                
                 // 新ラウンド開始時にカード選択履歴をクリア
                 room.gameData.lastCardSelections = new Map();
                 
-                // ラウンド開始イベントを送信
-                io.to(socket.roomId).emit('roundStart', roundResult.newRound);
-                
-                // 新ラウンドの鍵保持者を正しく設定
-                if (room.gameData.lastTargetedPlayerId) {
-                    const lastTargetedPlayer = room.gameData.players.find(p => p.id === room.gameData.lastTargetedPlayerId);
-                    if (lastTargetedPlayer && lastTargetedPlayer.connected) {
-                        room.gameData.keyHolderId = lastTargetedPlayer.id;
-                        console.log(`🗝️ 新ラウンド鍵保持者: ${lastTargetedPlayer.name}`);
+                // 🆕 【追加】3秒のラグを追加して演出効果を向上
+                setTimeout(() => {
+                    console.log('⏰ 3秒待機完了 - 次ラウンド開始');
+                    
+                    // ラウンド開始イベントを送信
+                    io.to(socket.roomId).emit('roundStart', roundResult.newRound);
+                    
+                    // 新ラウンドの鍵保持者を正しく設定
+                    if (room.gameData.lastTargetedPlayerId) {
+                        const lastTargetedPlayer = room.gameData.players.find(p => p.id === room.gameData.lastTargetedPlayerId);
+                        if (lastTargetedPlayer && lastTargetedPlayer.connected) {
+                            room.gameData.keyHolderId = lastTargetedPlayer.id;
+                            console.log(`🗝️ 新ラウンド鍵保持者: ${lastTargetedPlayer.name}`);
+                        }
                     }
-                }
-            }
-
-            // ゲーム更新を全員に送信
-            io.to(socket.roomId).emit('gameUpdate', room.gameData);
+                    
+                }, 3000); // 3秒待機
+                
+                // 🔧 【重要】ゲーム更新は即座に送信（手札変更を反映）
+                io.to(socket.roomId).emit('gameUpdate', room.gameData);
             
             // カード選択イベントを送信
             io.to(socket.roomId).emit('cardSelected', {
