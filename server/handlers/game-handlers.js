@@ -195,27 +195,25 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
 
                 if (roundResult.gameEnded) {
                     room.gameData.gameState = 'finished';
-                    room.gameData.winningTeam = 'guardian'; // 🔧 【修正】guardian に統一
+                    room.gameData.winningTeam = 'guardian';
                     room.gameData.victoryMessage = roundResult.reason === 'max_rounds_reached' ? 
                         `${room.gameData.maxRounds}ラウンドが終了しました！豚男チームの勝利です！` : 
                         '豚男チームの勝利です！';
                     
                     io.to(socket.roomId).emit('gameUpdate', room.gameData);
                     io.to(socket.roomId).emit('gameEnded', {
-                        winningTeam: 'guardian', // 🔧 【修正】
+                        winningTeam: 'guardian',
                         victoryMessage: room.gameData.victoryMessage
                     });
                     
                     sendGameLog(io, socket.roomId, `🏆 ${room.gameData.victoryMessage}`, activeRooms);
                     return;
                 }
-                
 
                 if (roundResult.needsCardRecycle) {
                     console.log('🔍 【デバッグ】カードリサイクル処理開始');
                     
                     try {
-                        // 🔧 【方法1】GameManagerを使わず、直接correctCardRecycleSystemを実行
                         const { correctCardRecycleSystem } = require('../game/game-Logic');
                         const connectedPlayers = room.gameData.players.filter(p => p.connected);
                         
@@ -224,14 +222,12 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                             console.log(`${player.name}: ${player.hand.length}枚`);
                         });
                         
-                        // 直接カードリサイクル実行
                         const recycleResult = correctCardRecycleSystem(room.gameData, connectedPlayers);
                         console.log('🔍 【デバッグ】recycleResult:', recycleResult);
                         
                         if (recycleResult.success) {
                             console.log('♻️ カードリサイクル成功');
                             
-                            // 🔧 【重要】ゲームデータを直接更新
                             room.gameData.currentRound = roundResult.newRound;
                             room.gameData.cardsPerPlayer = recycleResult.newCardsPerPlayer;
                             room.gameData.cardsFlippedThisRound = 0;
@@ -241,10 +237,8 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                                 console.log(`${player.name}: ${player.hand.length}枚`);
                             });
                             
-                            // 🔧 【重要】GameManager側も同期
                             try {
                                 const GameManager = require('../game/game-Manager');
-                                // GameManager側のデータをactiveRooms側に合わせる
                                 const gameData = GameManager.get(socket.roomId);
                                 if (gameData) {
                                     Object.assign(gameData, room.gameData);
@@ -254,7 +248,6 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                                 console.warn('⚠️ GameManager同期エラー:', gmError);
                             }
                             
-                            // ログ送信
                             sendGameLog(io, socket.roomId, 
                                 `♻️ ラウンド${roundResult.newRound}開始！全カード回収→残存カード保証→再配布完了（手札${recycleResult.newCardsPerPlayer}枚）`, 
                                 activeRooms
@@ -268,12 +261,10 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                     }
                 }
                 
-                // 🔧 【修正】カードリサイクル処理後に3秒の待機時間を追加
-                
                 // 新ラウンド開始時にカード選択履歴をクリア
                 room.gameData.lastCardSelections = new Map();
                 
-                // 🆕 【追加】3秒のラグを追加して演出効果を向上
+                // 🆕 【追加】3秒のラグを追加
                 setTimeout(() => {
                     console.log('⏰ 3秒待機完了 - 次ラウンド開始');
                     
@@ -288,11 +279,14 @@ function setupGameHandlers(io, socket, socketRequestHistory) {
                             console.log(`🗝️ 新ラウンド鍵保持者: ${lastTargetedPlayer.name}`);
                         }
                     }
-                    
-                }, 3000); // 3秒待機
+                }, 3000);
                 
                 // 🔧 【重要】ゲーム更新は即座に送信（手札変更を反映）
                 io.to(socket.roomId).emit('gameUpdate', room.gameData);
+            }
+
+            // ゲーム更新を全員に送信
+            io.to(socket.roomId).emit('gameUpdate', room.gameData);
             
             // カード選択イベントを送信
             io.to(socket.roomId).emit('cardSelected', {
